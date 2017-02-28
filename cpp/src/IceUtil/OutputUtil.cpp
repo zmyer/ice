@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -23,6 +23,8 @@ StartBlock sb;
 EndBlock eb;
 StartPar spar;
 EndPar epar;
+StartAbrk sabrk;
+EndAbrk eabrk;
 Separator sp;
 EndElement ee;
 StartEscapes startEscapes;
@@ -93,7 +95,7 @@ IceUtilInternal::OutputBase::open(const string& s)
     // mismatches on case-insensitive OSs.
     //
     IceUtilInternal::unlink(s);
-    _fout.open(s.c_str());
+    _fout.open(IceUtilInternal::streamFilename(s).c_str());
 }
 
 void
@@ -170,13 +172,13 @@ IceUtilInternal::OutputBase::currIndent()
     return _indent;
 }
 
-void 
+void
 IceUtilInternal::OutputBase::setIndent(int indentSize)
 {
-    _indentSize = indentSize; 
+    _indentSize = indentSize;
 }
 
-void 
+void
 IceUtilInternal::OutputBase::setUseTab(bool useTab)
 {
     _useTab = useTab;
@@ -302,17 +304,17 @@ IceUtilInternal::Output::eb()
 }
 
 void
-IceUtilInternal::Output::spar()
+IceUtilInternal::Output::spar(char c)
 {
-    _out << '(';
+    _out << c;
     _par = 0;
 }
 
 void
-IceUtilInternal::Output::epar()
+IceUtilInternal::Output::epar(char c)
 {
     _par = -1;
-    _out << ')';
+    _out << c;
 }
 
 Output&
@@ -552,7 +554,7 @@ IceUtilInternal::StartElement::StartElement(const string& name) :
     _name(name)
 {
 }
-    
+
 const string&
 IceUtilInternal::StartElement::getName() const
 {

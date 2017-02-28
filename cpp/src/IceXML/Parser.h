@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -42,20 +42,21 @@
 namespace IceXML
 {
 
-class ICE_XML_API ParserException : public IceUtil::Exception
+class ICE_XML_API ParserException : public IceUtil::ExceptionHelper<ParserException>
 {
 public:
 
     ParserException(const std::string&);
     ParserException(const char*, int, const std::string&);
-    virtual ~ParserException() ICE_NOEXCEPT;
+#ifndef ICE_CPP11_COMPILER
+    virtual ~ParserException() throw();
+#endif
 
     virtual std::string ice_id() const;
     virtual void ice_print(std::ostream&) const;
 #ifndef ICE_CPP11_MAPPING
     virtual ParserException* ice_clone() const;
 #endif
-    virtual void ice_throw() const;
 
     std::string reason() const;
 

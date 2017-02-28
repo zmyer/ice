@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -121,7 +121,10 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
          Test::s10 == literals[10] &&
          Test::s10 == literals[21]);
 
-    test(Test::ss0 == "\'\"\?\\\a\b\f\n\r\t\v" &&
+    test(Test::s11 == "\xe2\x82\xac\xe2\x82\xac\xe2\x82\xac");
+    test(Test::s12 == "\\101");
+
+    test(Test::ss0 == "\'\"\?\\\a\b\f\n\r\t\v\006" &&
          Test::ss0 == Test::ss1 &&
          Test::ss0 == Test::ss2 &&
          Test::ss0 == literals[22] &&
@@ -203,7 +206,7 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
          Test::ws10 == wliterals[10] &&
          Test::ws10 == wliterals[21]);
 
-    test(Test::wss0 == L"\'\"\?\\\a\b\f\n\r\t\v" &&
+    test(Test::wss0 == L"\'\"\?\\\a\b\f\n\r\t\v\006" &&
          Test::wss0 == Test::wss1 &&
          Test::wss0 == Test::wss2 &&
          Test::wss0 == wliterals[22] &&
@@ -230,11 +233,7 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
     }
 
     {
-#ifdef ICE_CPP11_MAPPING
-        test(Test::MyClassPrx::ice_staticId() == Test::MyClassDisp::ice_staticId());
-#else
         test(Test::MyClassPrx::ice_staticId() == Test::MyClass::ice_staticId());
-#endif
         test(Ice::ObjectPrx::ice_staticId() == Ice::Object::ice_staticId());
     }
 
@@ -351,9 +350,9 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
         test(Ice::proxyIdentityAndFacetEqual(c1, p));
         test(!Ice::proxyIdentityAndFacetEqual(c2, p));
         test(Ice::proxyIdentityAndFacetEqual(r, p));
-        test(c1->ice_getIdentity() == communicator->stringToIdentity("test"));
-        test(c2->ice_getIdentity() == communicator->stringToIdentity("noSuchIdentity"));
-        test(r->ice_getIdentity() == communicator->stringToIdentity("test"));
+        test(c1->ice_getIdentity() == Ice::stringToIdentity("test"));
+        test(c2->ice_getIdentity() == Ice::stringToIdentity("noSuchIdentity"));
+        test(r->ice_getIdentity() == Ice::stringToIdentity("test"));
         r->opVoid();
         c1->opVoid();
         try
@@ -389,7 +388,7 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
         test(rso.e == ICE_ENUM(MyEnum, enum2));
         test(rso.s.s == "def");
 #ifdef ICE_CPP11_MAPPING
-        test(Ice::targetEquals(so.p, p));
+        test(Ice::targetEqualTo(so.p, p));
 #else
         test(so.p == p);
 #endif
@@ -1735,7 +1734,7 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
             test(r == ctx);
         }
 
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
         if(p->ice_getConnection() && communicator->getProperties()->getProperty("Ice.Default.Protocol") != "bt")
         {
             //
@@ -1847,5 +1846,31 @@ twoways(const Ice::CommunicatorPtr& communicator, const Test::MyClassPrxPtr& p)
     Test::ByteBoolD dict;
     p->opByteBoolD1(dict);
 
+    {
+        Test::Structure p1 = p->opMStruct1();
+        p1.e = ICE_ENUM(MyEnum, enum3);
+        Test::Structure p2, p3;
+        p3 = p->opMStruct2(p1, p2);
+        test(p2.e == p1.e && p3.e == p1.e);
+    }
 
+    {
+        p->opMSeq1();
+
+        StringS p1;
+        p1.push_back("test");
+        StringS p2, p3;
+        p3 = p->opMSeq2(p1, p2);
+        test(p2 == p1 && p3 == p1);
+    }
+
+    {
+        p->opMDict1();
+
+        map<string, string> p1;
+        p1["test"] = "test";
+        map<string, string> p2, p3;
+        p3 = p->opMDict2(p1, p2);
+        test(p2 == p1 && p3 == p1);
+    }
 }

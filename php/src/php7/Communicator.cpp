@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,9 +18,10 @@
 #include <IceUtil/MutexPtrLock.h>
 #include <IceUtil/StringUtil.h>
 #include <IceUtil/Timer.h>
+#include <fstream>
 
 #ifdef getcwd
-#undef getcwd
+#  undef getcwd
 #endif
 #include <IceUtil/FileUtil.h>
 
@@ -359,7 +360,7 @@ ZEND_METHOD(Ice_Communicator, proxyToString)
         if(zv)
         {
             Ice::ObjectPrx prx;
-            ClassInfoPtr info;
+            ProxyInfoPtr info;
             if(!fetchProxy(zv, prx, info))
             {
                 RETURN_NULL();
@@ -425,7 +426,7 @@ ZEND_METHOD(Ice_Communicator, proxyToProperty)
         if(zv)
         {
             Ice::ObjectPrx prx;
-            ClassInfoPtr info;
+            ProxyInfoPtr info;
             if(!fetchProxy(zv, prx, info))
             {
                 RETURN_NULL();
@@ -669,7 +670,7 @@ ZEND_METHOD(Ice_Communicator, getDefaultRouter)
         Ice::RouterPrx router = _this->getCommunicator()->getDefaultRouter();
         if(router)
         {
-            ClassInfoPtr info = getClassInfoById("::Ice::Router");
+            ProxyInfoPtr info = getProxyInfo("::Ice::Router");
             if(!info)
             {
                 runtimeError("no definition for Ice::Router");
@@ -705,7 +706,7 @@ ZEND_METHOD(Ice_Communicator, setDefaultRouter)
     }
 
     Ice::ObjectPrx proxy;
-    ClassInfoPtr info;
+    ProxyInfoPtr info;
     if(zv && !fetchProxy(zv, proxy, info))
     {
         RETURN_NULL();
@@ -747,7 +748,7 @@ ZEND_METHOD(Ice_Communicator, getDefaultLocator)
         Ice::LocatorPrx locator = _this->getCommunicator()->getDefaultLocator();
         if(locator)
         {
-            ClassInfoPtr info = getClassInfoById("::Ice::Locator");
+            ProxyInfoPtr info = getProxyInfo("::Ice::Locator");
             if(!info)
             {
                 runtimeError("no definition for Ice::Locator");
@@ -783,7 +784,7 @@ ZEND_METHOD(Ice_Communicator, setDefaultLocator)
     }
 
     Ice::ObjectPrx proxy;
-    ClassInfoPtr info;
+    ProxyInfoPtr info;
     if(zv && !fetchProxy(zv, proxy, info))
     {
         RETURN_NULL();
@@ -812,21 +813,29 @@ ZEND_METHOD(Ice_Communicator, setDefaultLocator)
 
 ZEND_METHOD(Ice_Communicator, flushBatchRequests)
 {
-    CommunicatorInfoIPtr _this = Wrapper<CommunicatorInfoIPtr>::value(getThis());
-    assert(_this);
-
-    if(ZEND_NUM_ARGS() != 8)
+    zval* compress;
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, const_cast<char*>("z"), &compress TSRMLS_CC) != SUCCESS)
     {
-        WRONG_PARAM_COUNT;
+        RETURN_NULL();
     }
+
+    if(Z_TYPE_P(compress) != IS_LONG)
+    {
+        invalidArgument("value for 'compress' argument must be an enumerator of CompressBatch" TSRMLS_CC);
+        RETURN_NULL();
+    }
+    Ice::CompressBatch cb = static_cast<Ice::CompressBatch>(Z_LVAL_P(compress));
+
+    CommunicatorInfoIPtr _this = Wrapper<CommunicatorInfoIPtr>::value(getThis() TSRMLS_CC);
+    assert(_this);
 
     try
     {
-        _this->getCommunicator()->flushBatchRequests();
+        _this->getCommunicator()->flushBatchRequests(cb);
     }
     catch(const IceUtil::Exception& ex)
     {
-        throwException(ex);
+        throwException(ex TSRMLS_CC);
         RETURN_NULL();
     }
 }
@@ -1367,7 +1376,9 @@ ZEND_FUNCTION(Ice_identityToString)
     assert(identityClass);
 
     zval* zv;
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), const_cast<char*>("O"), &zv, identityClass) != SUCCESS)
+    long mode = 0;
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), const_cast<char*>("O|l"), &zv, identityClass, &mode) != SUCCESS)
     {
         RETURN_NULL();
     }
@@ -1379,7 +1390,7 @@ ZEND_FUNCTION(Ice_identityToString)
 
     try
     {
-        string str = Ice::identityToString(id);
+        string str = Ice::identityToString(id, static_cast<Ice::ToStringMode>(mode));
         RETURN_STRINGL(STRCAST(str.c_str()), static_cast<int>(str.length()));
     }
     catch(const IceUtil::Exception& ex)
@@ -1431,25 +1442,25 @@ static zend_function_entry _interfaceMethods[] =
 };
 static zend_function_entry _classMethods[] =
 {
-    ZEND_ME(Ice_Communicator, __construct, NULL, ZEND_ACC_PRIVATE|ZEND_ACC_CTOR)
-    ZEND_ME(Ice_Communicator, destroy, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, stringToProxy, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, proxyToString, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, propertyToProxy, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, proxyToProperty, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, stringToIdentity, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, identityToString, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, addObjectFactory, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, findObjectFactory, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, getValueFactoryManager, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, getImplicitContext, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, getProperties, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, getLogger, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, getDefaultRouter, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, setDefaultRouter, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, getDefaultLocator, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, setDefaultLocator, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_Communicator, flushBatchRequests, NULL, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, __construct, ICE_NULLPTR, ZEND_ACC_PRIVATE|ZEND_ACC_CTOR)
+    ZEND_ME(Ice_Communicator, destroy, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, stringToProxy, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, proxyToString, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, propertyToProxy, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, proxyToProperty, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, stringToIdentity, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, identityToString, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, addObjectFactory, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, findObjectFactory, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, getValueFactoryManager, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, getImplicitContext, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, getProperties, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, getLogger, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, getDefaultRouter, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, setDefaultRouter, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, getDefaultLocator, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, setDefaultLocator, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_Communicator, flushBatchRequests, ICE_NULLPTR, ZEND_ACC_PUBLIC)
     {0, 0, 0}
 };
 
@@ -1462,9 +1473,9 @@ static zend_function_entry _vfmInterfaceMethods[] =
 };
 static zend_function_entry _vfmClassMethods[] =
 {
-    ZEND_ME(Ice_ValueFactoryManager, __construct, NULL, ZEND_ACC_PRIVATE|ZEND_ACC_CTOR)
-    ZEND_ME(Ice_ValueFactoryManager, add, NULL, ZEND_ACC_PUBLIC)
-    ZEND_ME(Ice_ValueFactoryManager, find, NULL, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_ValueFactoryManager, __construct, ICE_NULLPTR, ZEND_ACC_PRIVATE|ZEND_ACC_CTOR)
+    ZEND_ME(Ice_ValueFactoryManager, add, ICE_NULLPTR, ZEND_ACC_PUBLIC)
+    ZEND_ME(Ice_ValueFactoryManager, find, ICE_NULLPTR, ZEND_ACC_PUBLIC)
     {0, 0, 0}
 };
 
@@ -1531,7 +1542,7 @@ parseProfiles(const string& file)
     // ice.config = config-file
     // ice.options = args
     //
-    IceUtilInternal::ifstream in(file);
+    ifstream in(IceUtilInternal::streamFilename(file).c_str());
     if(!in)
     {
         php_error_docref(0, E_WARNING, "unable to open Ice profiles in %s", file.c_str());
@@ -1852,7 +1863,7 @@ IcePHP::FactoryWrapper::create(const string& id)
         // When the ID is that of Ice::Object, it indicates that the stream has not
         // found a factory and is providing us an opportunity to preserve the object.
         //
-        cls = getClassInfoById("::Ice::UnknownSlicedObject");
+        cls = getClassInfoById("::Ice::UnknownSlicedValue");
     }
     else
     {
@@ -1937,7 +1948,6 @@ IcePHP::DefaultValueFactory::create(const string& id)
     //
     // Get the TSRM id for the current request.
     //
-
     if(_delegate)
     {
         Ice::ValuePtr v = _delegate->create(id);
@@ -1957,7 +1967,7 @@ IcePHP::DefaultValueFactory::create(const string& id)
         // When the ID is that of Ice::Object, it indicates that the stream has not
         // found a factory and is providing us an opportunity to preserve the object.
         //
-        cls = getClassInfoById("::Ice::UnknownSlicedObject");
+        cls = getClassInfoById("::Ice::UnknownSlicedValue");
     }
     else
     {
@@ -1965,14 +1975,6 @@ IcePHP::DefaultValueFactory::create(const string& id)
     }
 
     if(!cls)
-    {
-        return 0;
-    }
-
-    //
-    // If the requested type is an abstract class, then we give up.
-    //
-    if(cls->isAbstract)
     {
         return 0;
     }
@@ -2065,7 +2067,6 @@ IcePHP::CommunicatorInfoI::addFactory(zval* factory, const string& id, bool isOb
             throwException(ex);
             return false;
         }
-
         _factories.insert(FactoryMap::value_type(id, new FactoryWrapper(factory, isObjectFactory, this)));
     }
 
@@ -2088,7 +2089,6 @@ IcePHP::CommunicatorInfoI::findFactory(const string& id) const
             return p->second;
         }
     }
-
     return 0;
 }
 

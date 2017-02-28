@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,7 +14,6 @@
 #include <Ice/Proxy.h>
 #include <Ice/ConnectionI.h>
 #include <Ice/RouterInfo.h>
-#include <Ice/Outgoing.h>
 #include <Ice/OutgoingAsync.h>
 #include <Ice/Protocol.h>
 #include <Ice/Properties.h>
@@ -43,29 +42,13 @@ ConnectRequestHandler::connect(const Ice::ObjectPrxPtr& proxy)
     {
         _proxies.insert(proxy);
     }
-    return _requestHandler ? _requestHandler : shared_from_this();
+    return _requestHandler ? _requestHandler : ICE_SHARED_FROM_THIS;
 }
 
 RequestHandlerPtr
 ConnectRequestHandler::update(const RequestHandlerPtr& previousHandler, const RequestHandlerPtr& newHandler)
 {
-    return previousHandler.get() == this ? newHandler : shared_from_this();
-}
-
-bool
-ConnectRequestHandler::sendRequest(ProxyOutgoingBase* out)
-{
-    {
-        Lock sync(*this);
-        if(!initialized())
-        {
-            Request req;
-            req.out = out;
-            _requests.push_back(req);
-            return false; // Not sent
-        }
-    }
-    return out->invokeRemote(_connection, _compress, _response) && !_response; // Finished if sent and no response.
+    return previousHandler.get() == this ? newHandler : ICE_SHARED_FROM_THIS;
 }
 
 AsyncStatus
@@ -75,14 +58,12 @@ ConnectRequestHandler::sendAsyncRequest(const ProxyOutgoingAsyncBasePtr& out)
         Lock sync(*this);
         if(!_initialized)
         {
-            out->cancelable(shared_from_this()); // This will throw if the request is canceled
+            out->cancelable(ICE_SHARED_FROM_THIS); // This will throw if the request is canceled
         }
 
         if(!initialized())
         {
-            Request req;
-            req.outAsync = out;
-            _requests.push_back(req);
+            _requests.push_back(out);
             return AsyncStatusQueued;
         }
     }
@@ -90,47 +71,20 @@ ConnectRequestHandler::sendAsyncRequest(const ProxyOutgoingAsyncBasePtr& out)
 }
 
 void
-ConnectRequestHandler::requestCanceled(OutgoingBase* out, const Ice::LocalException& ex)
-{
-    {
-        Lock sync(*this);
-        if(ICE_EXCEPTION_ISSET(_exception))
-        {
-            return; // The request has been notified of a failure already.
-        }
-
-        if(!initialized())
-        {
-            for(deque<Request>::iterator p = _requests.begin(); p != _requests.end(); ++p)
-            {
-                if(p->out == out)
-                {
-                    out->completed(ex);
-                    _requests.erase(p);
-                    return;
-                }
-            }
-            assert(false); // The request has to be queued if it timed out and we're not initialized yet.
-        }
-    }
-    _connection->requestCanceled(out, ex);
-}
-
-void
 ConnectRequestHandler::asyncRequestCanceled(const OutgoingAsyncBasePtr& outAsync, const Ice::LocalException& ex)
 {
     {
         Lock sync(*this);
-        if(ICE_EXCEPTION_ISSET(_exception))
+        if(_exception)
         {
             return; // The request has been notified of a failure already.
         }
 
         if(!initialized())
         {
-            for(deque<Request>::iterator p = _requests.begin(); p != _requests.end(); ++p)
+            for(deque<ProxyOutgoingAsyncBasePtr>::iterator p = _requests.begin(); p != _requests.end(); ++p)
             {
-                if(p->outAsync.get() == outAsync.get())
+                if(p->get() == outAsync.get())
                 {
                     _requests.erase(p);
                     if(outAsync->exception(ex))
@@ -149,9 +103,9 @@ Ice::ConnectionIPtr
 ConnectRequestHandler::getConnection()
 {
     Lock sync(*this);
-    if(ICE_EXCEPTION_ISSET(_exception))
+    if(_exception)
     {
-        ICE_RETHROW_EXCEPTION(_exception);
+        _exception->ice_throw();
         return 0; // Keep the compiler happy.
     }
     else
@@ -164,25 +118,21 @@ Ice::ConnectionIPtr
 ConnectRequestHandler::waitForConnection()
 {
     Lock sync(*this);
-    if(ICE_EXCEPTION_ISSET(_exception))
+    if(_exception)
     {
-#ifdef ICE_CPP11_MAPPING
-        throw RetryException(_exception);
-#else
-        throw RetryException(*_exception.get());
-#endif
+        throw RetryException(*_exception);
     }
     //
     // Wait for the connection establishment to complete or fail.
     //
-    while(!_initialized && !ICE_EXCEPTION_ISSET(_exception))
+    while(!_initialized && !_exception)
     {
         wait();
     }
 
-    if(ICE_EXCEPTION_ISSET(_exception))
+    if(_exception)
     {
-        ICE_RETHROW_EXCEPTION(_exception);
+        _exception->ice_throw();
         return 0; // Keep the compiler happy.
     }
     else
@@ -196,7 +146,7 @@ ConnectRequestHandler::setConnection(const Ice::ConnectionIPtr& connection, bool
 {
     {
         Lock sync(*this);
-        assert(!ICE_EXCEPTION_ISSET(_exception) && !_connection);
+        assert(!_exception && !_connection);
         _connection = connection;
         _compress = compress;
     }
@@ -206,7 +156,7 @@ ConnectRequestHandler::setConnection(const Ice::ConnectionIPtr& connection, bool
     // add this proxy to the router info object.
     //
     RouterInfoPtr ri = _reference->getRouterInfo();
-    if(ri && !ri->addProxy(_proxy, AddProxyCallback::shared_from_this()))
+    if(ri && !ri->addProxy(_proxy, ICE_SHARED_FROM_THIS))
     {
         return; // The request handler will be initialized once addProxy returns.
     }
@@ -221,8 +171,8 @@ void
 ConnectRequestHandler::setException(const Ice::LocalException& ex)
 {
     Lock sync(*this);
-    assert(!_initialized && !ICE_EXCEPTION_ISSET(_exception));
-    ICE_RESET_EXCEPTION(_exception, ex.ice_clone());
+    assert(!_initialized && !_exception);
+    ICE_SET_EXCEPTION_FROM_CLONE(_exception, ex.ice_clone());
 
     _proxies.clear();
     _proxy = 0; // Break cyclic reference count.
@@ -235,34 +185,22 @@ ConnectRequestHandler::setException(const Ice::LocalException& ex)
     //
     try
     {
-        _reference->getInstance()->requestHandlerFactory()->removeRequestHandler(_reference, shared_from_this());
+        _reference->getInstance()->requestHandlerFactory()->removeRequestHandler(_reference, ICE_SHARED_FROM_THIS);
     }
     catch(const Ice::CommunicatorDestroyedException&)
     {
         // Ignore
     }
 
-    try
+
+    for(deque<ProxyOutgoingAsyncBasePtr>::const_iterator p = _requests.begin(); p != _requests.end(); ++p)
     {
-        ICE_RETHROW_EXCEPTION(_exception);
-    }
-    catch(const Ice::LocalException& ex)
-    {
-        for(deque<Request>::const_iterator p = _requests.begin(); p != _requests.end(); ++p)
+        if((*p)->exception(ex))
         {
-            if(p->out)
-            {
-                p->out->completed(ex);
-            }
-            else
-            {
-                if(p->outAsync->exception(ex))
-                {
-                    p->outAsync->invokeExceptionAsync();
-                }
-            }
+            (*p)->invokeExceptionAsync();
         }
     }
+
     _requests.clear();
     notifyAll();
 }
@@ -289,12 +227,12 @@ ConnectRequestHandler::initialized()
     }
     else
     {
-        while(_flushing && !ICE_EXCEPTION_ISSET(_exception))
+        while(_flushing && !_exception)
         {
             wait();
         }
 
-        if(ICE_EXCEPTION_ISSET(_exception))
+        if(_exception)
         {
             if(_connection)
             {
@@ -306,7 +244,7 @@ ConnectRequestHandler::initialized()
                 //
                 return true;
             }
-            ICE_RETHROW_EXCEPTION(_exception);
+            _exception->ice_throw();
             return false; // Keep the compiler happy.
         }
         else
@@ -332,60 +270,36 @@ ConnectRequestHandler::flushRequests()
     }
 
 #ifdef ICE_CPP11_MAPPING
-    std::exception_ptr exception;
+    std::unique_ptr<Ice::LocalException> exception;
 #else
-    IceUtil::UniquePtr<Ice::LocalException> exception;
+    IceInternal::UniquePtr<Ice::LocalException> exception;
 #endif
     while(!_requests.empty()) // _requests is immutable when _flushing = true
     {
-        Request& req = _requests.front();
+        ProxyOutgoingAsyncBasePtr& req = _requests.front();
         try
         {
-            if(req.out)
+            if(req->invokeRemote(_connection, _compress, _response) & AsyncStatusInvokeSentCallback)
             {
-                req.out->invokeRemote(_connection, _compress, _response);
-            }
-            else if(req.outAsync->invokeRemote(_connection, _compress, _response) & AsyncStatusInvokeSentCallback)
-            {
-                req.outAsync->invokeSentAsync();
+                req->invokeSentAsync();
             }
         }
         catch(const RetryException& ex)
         {
-#ifdef ICE_CPP11_MAPPING
-            exception = ex.get();
-#else
-            exception.reset(ex.get()->ice_clone());
-#endif
-            try
-            {
-                ICE_RETHROW_EXCEPTION(exception);
-            }
-            catch(const Ice::LocalException& ee)
-            {
-                // Remove the request handler before retrying.
-                _reference->getInstance()->requestHandlerFactory()->removeRequestHandler(_reference, shared_from_this());
+            ICE_SET_EXCEPTION_FROM_CLONE(exception, ex.get()->ice_clone());
 
-                if(req.out)
-                {
-                    req.out->retryException(ee);
-                }
-                else
-                {
-                    req.outAsync->retryException(ee);
-                }
-            }
+            // Remove the request handler before retrying.
+            _reference->getInstance()->requestHandlerFactory()->removeRequestHandler(_reference, ICE_SHARED_FROM_THIS);
+
+            req->retryException(*exception);
         }
         catch(const Ice::LocalException& ex)
         {
-            ICE_RESET_EXCEPTION(exception, ex.ice_clone());
-            if(req.out)
+            ICE_SET_EXCEPTION_FROM_CLONE(exception, ex.ice_clone());
+
+            if(req->exception(ex))
             {
-                req.out->completed(ex);
-            }
-            else if(req.outAsync->exception(ex))
-            {
-                req.outAsync->invokeExceptionAsync();
+                req->invokeExceptionAsync();
             }
         }
         _requests.pop_front();
@@ -397,12 +311,12 @@ ConnectRequestHandler::flushRequests()
     // request handler to use the more efficient connection request
     // handler.
     //
-    if(_reference->getCacheConnection() && !ICE_EXCEPTION_ISSET(exception))
+    if(_reference->getCacheConnection() && !exception)
     {
         _requestHandler = ICE_MAKE_SHARED(ConnectionRequestHandler, _reference, _connection, _compress);
         for(set<Ice::ObjectPrxPtr>::const_iterator p = _proxies.begin(); p != _proxies.end(); ++p)
         {
-            (*p)->__updateRequestHandler(shared_from_this(), _requestHandler);
+            (*p)->_updateRequestHandler(ICE_SHARED_FROM_THIS, _requestHandler);
         }
     }
 
@@ -414,18 +328,17 @@ ConnectRequestHandler::flushRequests()
 #else
         _exception.swap(exception);
 #endif
-        _initialized = !ICE_EXCEPTION_ISSET(_exception);
+        _initialized = !_exception;
         _flushing = false;
 
         //
         // Only remove once all the requests are flushed to
         // guarantee serialization.
         //
-        _reference->getInstance()->requestHandlerFactory()->removeRequestHandler(_reference, shared_from_this());
+        _reference->getInstance()->requestHandlerFactory()->removeRequestHandler(_reference, ICE_SHARED_FROM_THIS);
 
         _proxies.clear();
         _proxy = ICE_NULLPTR; // Break cyclic reference count.
         notifyAll();
     }
 }
-

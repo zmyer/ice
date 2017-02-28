@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,7 +15,9 @@
 #include <Ice/NativePropertiesAdmin.h>
 
 class RemoteCommunicatorI : public virtual Test::RemoteCommunicator,
+#ifndef ICE_CPP11_MAPPING
                             public virtual Ice::PropertiesAdminUpdateCallback,
+#endif
                             public IceUtil::Monitor<IceUtil::Mutex>
 {
 public:
@@ -24,6 +26,9 @@ public:
 
     virtual Ice::ObjectPrxPtr getAdmin(const Ice::Current&);
     virtual Ice::PropertyDict getChanges(const Ice::Current&);
+
+    virtual void addUpdateCallback(const Ice::Current&);
+    virtual void removeUpdateCallback(const Ice::Current&);
 
     virtual void print(ICE_IN(std::string), const Ice::Current&);
     virtual void trace(ICE_IN(std::string), ICE_IN(std::string), const Ice::Current&);
@@ -40,7 +45,12 @@ private:
 
     Ice::CommunicatorPtr _communicator;
     Ice::PropertyDict _changes;
-    bool _called;
+
+#ifdef ICE_CPP11_MAPPING
+    std::function<void()> _removeCallback;
+#else
+    bool _hasCallback;
+#endif
 };
 ICE_DEFINE_PTR(RemoteCommunicatorIPtr, RemoteCommunicatorI);
 

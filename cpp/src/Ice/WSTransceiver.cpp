@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,7 +18,7 @@
 #include <Ice/LocalException.h>
 #include <Ice/Base64.h>
 #include <IceUtil/Random.h>
-#include <IceUtil/SHA1.h>
+#include <Ice/SHA1.h>
 #include <IceUtil/StringUtil.h>
 
 // Python 2.7 under Windows.
@@ -133,7 +133,7 @@ Long ice_nlltoh(const Byte* src)
     return v;
 }
 
-#if defined(ICE_OS_WINRT)
+#if defined(ICE_OS_UWP)
 Short htons(Short v)
 {
     Short result;
@@ -184,17 +184,11 @@ IceInternal::WSTransceiver::getNativeInfo()
     return _delegate->getNativeInfo();
 }
 
-#if defined(ICE_USE_IOCP)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 AsyncInfo*
 IceInternal::WSTransceiver::getAsyncInfo(SocketOperation status)
 {
     return _delegate->getNativeInfo()->getAsyncInfo(status);
-}
-#elif defined(ICE_OS_WINRT)
-void
-IceInternal::WSTransceiver::setCompletedHandler(IceInternal::SocketOperationCompletedHandler^ handler)
-{
-    _delegate->getNativeInfo()->setCompletedHandler(handler);
 }
 #endif
 
@@ -236,7 +230,7 @@ IceInternal::WSTransceiver::initialize(Buffer& readBuffer, Buffer& writeBuffer)
                 //
                 ostringstream out;
                 out << "GET " << _resource << " HTTP/1.1\r\n"
-                    << "Host: " << _host << ":" << _port << "\r\n"
+                    << "Host: " << _host << "\r\n"
                     << "Upgrade: websocket\r\n"
                     << "Connection: Upgrade\r\n"
                     << "Sec-WebSocket-Protocol: " << _iceProtocol << "\r\n"
@@ -416,11 +410,7 @@ IceInternal::WSTransceiver::initialize(Buffer& readBuffer, Buffer& writeBuffer)
 }
 
 SocketOperation
-#ifdef ICE_CPP11_MAPPING
-IceInternal::WSTransceiver::closing(bool initiator, exception_ptr reason)
-#else
 IceInternal::WSTransceiver::closing(bool initiator, const Ice::LocalException& reason)
-#endif
 {
     if(_instance->traceLevel() >= 1)
     {
@@ -450,38 +440,7 @@ IceInternal::WSTransceiver::closing(bool initiator, const Ice::LocalException& r
     }
 
     _closingInitiator = initiator;
-#ifdef ICE_CPP11_MAPPING
-    if(reason)
-    {
-        try
-        {
-            rethrow_exception(reason);
-        }
-        catch(const Ice::CloseConnectionException&)
-        {
-            _closingReason = CLOSURE_NORMAL;
-        }
-        catch(const Ice::ObjectAdapterDeactivatedException&)
-        {
-            _closingReason = CLOSURE_SHUTDOWN;
-        }
-        catch(Ice::CommunicatorDestroyedException&)
-        {
-            _closingReason = CLOSURE_SHUTDOWN;
-        }
-        catch(const Ice::MemoryLimitException&)
-        {
-            _closingReason = CLOSURE_TOO_BIG;
-        }
-        catch(const Ice::ProtocolException&)
-        {
-            _closingReason  = CLOSURE_PROTOCOL_ERROR;
-        }
-        catch(...)
-        {
-        }
-    }
-#else
+
     if(dynamic_cast<const Ice::CloseConnectionException*>(&reason))
     {
         _closingReason = CLOSURE_NORMAL;
@@ -499,7 +458,6 @@ IceInternal::WSTransceiver::closing(bool initiator, const Ice::LocalException& r
     {
         _closingReason = CLOSURE_TOO_BIG;
     }
-#endif
 
     if(_state == StateOpened)
     {
@@ -688,7 +646,7 @@ IceInternal::WSTransceiver::read(Buffer& buf)
     return s;
 }
 
-#if defined(ICE_USE_IOCP) || defined(ICE_OS_WINRT)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 bool
 IceInternal::WSTransceiver::startWrite(Buffer& buf)
 {
@@ -873,8 +831,10 @@ IceInternal::WSTransceiver::toDetailedString() const
 Ice::ConnectionInfoPtr
 IceInternal::WSTransceiver::getInfo() const
 {
-    assert(dynamic_cast<WSTransceiverDelegate*>(_delegate.get()));
-    return dynamic_cast<WSTransceiverDelegate*>(_delegate.get())->getWSInfo(_parser->getHeaders());
+    WSConnectionInfoPtr info = ICE_MAKE_SHARED(WSConnectionInfo);
+    info->underlying = _delegate->getInfo();
+    info->headers = _parser->getHeaders();
+    return info;
 }
 
 void
@@ -890,11 +850,10 @@ IceInternal::WSTransceiver::setBufferSize(int rcvSize, int sndSize)
 }
 
 IceInternal::WSTransceiver::WSTransceiver(const ProtocolInstancePtr& instance, const TransceiverPtr& del,
-                                          const string& host, int port, const string& resource) :
+                                          const string& host, const string& resource) :
     _instance(instance),
     _delegate(del),
     _host(host),
-    _port(port),
     _resource(resource),
     _incoming(false),
     _state(StateInitializeDelegate),
@@ -924,7 +883,6 @@ IceInternal::WSTransceiver::WSTransceiver(const ProtocolInstancePtr& instance, c
 IceInternal::WSTransceiver::WSTransceiver(const ProtocolInstancePtr& instance, const TransceiverPtr& del) :
     _instance(instance),
     _delegate(del),
-    _port(-1),
     _incoming(true),
     _state(StateInitializeDelegate),
     _parser(new HttpParser),
@@ -1070,7 +1028,7 @@ IceInternal::WSTransceiver::handleRequest(Buffer& responseBuffer)
     out << "Sec-WebSocket-Accept: ";
     string input = key + _wsUUID;
     vector<unsigned char> hash;
-    IceUtilInternal::sha1(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), hash);
+    sha1(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), hash);
     out << IceInternal::Base64::encode(hash) << "\r\n" << "\r\n"; // EOM
 
     string str = out.str();
@@ -1168,7 +1126,7 @@ IceInternal::WSTransceiver::handleResponse()
     }
     string input = _key + _wsUUID;
     vector<unsigned char> hash;
-    IceUtilInternal::sha1(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), hash);
+    sha1(reinterpret_cast<const unsigned char*>(&input[0]), input.size(), hash);
     if(val != IceInternal::Base64::encode(hash))
     {
         throw WebSocketException("invalid value `" + val + "' for Sec-WebSocket-Accept");

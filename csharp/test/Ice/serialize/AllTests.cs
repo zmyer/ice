@@ -1,6 +1,6 @@
 ﻿// **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,9 +12,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
 using Test;
 
-public class AllTests : TestCommon.TestApp
+public class AllTests : TestCommon.AllTests
 {
     //
     // There does not appear to be any way to compare collections
@@ -62,15 +63,16 @@ public class AllTests : TestCommon.TestApp
         return true;
     }
 
-    static public int run(Ice.Communicator communicator)
+    static public int run(TestCommon.Application app)
     {
+        Ice.Communicator communicator = app.communicator();
+
         Write("testing serialization... ");
         Flush();
 
-        MyClassPrx proxy = MyClassPrxHelper.uncheckedCast(communicator.stringToProxy("test"));
+        Ice.ObjectPrx proxy = communicator.stringToProxy("test");
 
         MyException ex, ex2;
-
         ex = new MyException();
         ex.name = "";
         ex.vss = new ValStruct[0];
@@ -87,8 +89,8 @@ public class AllTests : TestCommon.TestApp
         ex.optValStruct = new Ice.Optional<ValStruct>();
         ex.optRefStruct = new Ice.Optional<RefStruct>();
         ex.optEnum = new Ice.Optional<MyEnum>();
-        ex.optProxy = new Ice.Optional<MyClassPrx>();
-        ex2 = inOut(ex);
+        ex.optProxy = new Ice.Optional<Ice.ObjectPrx>();
+        ex2 = inOut(ex, communicator);
         test(ex.Equals(ex2));
 
         ex.name = "MyException";
@@ -97,7 +99,7 @@ public class AllTests : TestCommon.TestApp
         ex.i = 3;
         ex.l = 4;
         ex.vs = new ValStruct(true, 1, 2, 3, 4, MyEnum.enum2);
-        ex.rs = new RefStruct("RefStruct", "prop", null, null);
+        ex.rs = new RefStruct("RefStruct", "prop", proxy, new Ice.ObjectPrx[] { proxy, null, proxy });
         ex.vss = new ValStruct[1];
         ex.vss[0] = ex.vs;
         ex.vsl = new List<ValStruct>();
@@ -112,7 +114,7 @@ public class AllTests : TestCommon.TestApp
         ex.isd[5] = "five";
         ex.ivd = new Dictionary<int, ValStruct>();
         ex.ivd[1] = ex.vs;
-        ex.ipd = new Dictionary<int, MyClassPrx>();
+        ex.ipd = new Dictionary<int, Ice.ObjectPrx>() { { 1, proxy }, { 2, null }, { 3, proxy } };
         ex.issd = new SortedDictionary<int, string>();
         ex.issd[3] = "three";
         ex.optName = new Ice.Optional<string>("MyException");
@@ -120,35 +122,22 @@ public class AllTests : TestCommon.TestApp
         ex.optValStruct = new Ice.Optional<ValStruct>(ex.vs);
         ex.optRefStruct = new Ice.Optional<RefStruct>(ex.rs);
         ex.optEnum = new Ice.Optional<MyEnum>(MyEnum.enum3);
-        ex.optProxy = new Ice.Optional<MyClassPrx>(proxy);
-
-        ex2 = inOut(ex);
-        test(!ex.Equals(ex2));
-        ex.ipd = null; // Not serialized
-        ex.optProxy = Ice.Util.None; // Not serialized
-        test(ex.optName.Equals(ex2.optName));
-        test(ex.optInt.Equals(ex2.optInt));
-        test(ex.optValStruct.Equals(ex2.optValStruct));
-        test(ex.optRefStruct.Equals(ex2.optRefStruct));
-        test(ex.optEnum.Equals(ex2.optEnum));
-        test(ex.optProxy.Equals(ex2.optProxy));
+        ex.optProxy = new Ice.Optional<Ice.ObjectPrx>(proxy);
+        ex2 = inOut(ex, communicator);
         test(ex.Equals(ex2));
 
         RefStruct rs, rs2;
         rs = new RefStruct();
         rs.s = "RefStruct";
         rs.sp = "prop";
-        rs.p = MyClassPrxHelper.uncheckedCast(communicator.stringToProxy("test"));
-        rs.seq = new MyClassPrx[] { rs.p };
-        rs2 = inOut(rs);
-        test(rs2.s.Equals(rs.s));
-        test(rs2.sp.Equals(rs.sp));
-        test(rs2.p == null);
-        test(rs2.seq == null);
+        rs.p = communicator.stringToProxy("test");
+        rs.seq = new Ice.ObjectPrx[] { rs.p };
+        rs2 = inOut(rs, communicator);
+        test(rs.Equals(rs2));
 
         Base b, b2;
         b = new Base(true, 1, 2, 3, 4, MyEnum.enum2);
-        b2 = inOut(b);
+        b2 = inOut(b, communicator);
         test(b2.bo == b.bo);
         test(b2.by == b.by);
         test(b2.sh == b.sh);
@@ -160,7 +149,7 @@ public class AllTests : TestCommon.TestApp
         c = new MyClass(true, 1, 2, 3, 4, MyEnum.enum1, null, null, new ValStruct(true, 1, 2, 3, 4, MyEnum.enum2));
         c.c = c;
         c.o = c;
-        c2 = inOut(c);
+        c2 = inOut(c, communicator);
         test(c2.bo == c.bo);
         test(c2.by == c.by);
         test(c2.sh == c.sh);
@@ -175,9 +164,10 @@ public class AllTests : TestCommon.TestApp
         return 0;
     }
 
-    private static T inOut<T>(T o)
+    private static T inOut<T>(T o, Ice.Communicator communicator)
     {
-        BinaryFormatter bin = new BinaryFormatter();
+        BinaryFormatter bin = new BinaryFormatter(null,
+            new StreamingContext(StreamingContextStates.All, communicator));
         using (MemoryStream mem = new MemoryStream())
         {
             bin.Serialize(mem, o);

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,6 +12,7 @@
 #import <CommunicatorI.h>
 #import <StreamI.h>
 #import <LoggerI.h>
+#import <IdentityI.h>
 #import <DispatcherI.h>
 #import <BatchRequestInterceptorI.h>
 #import <Util.h>
@@ -21,6 +22,7 @@
 #import <objc/Ice/LocalException.h>
 
 #include <Ice/Initialize.h>
+#include <Ice/RegisterPlugins.h>
 #include <IceUtil/UUID.h>
 #include <IceUtil/MutexPtrLock.h>
 
@@ -32,6 +34,21 @@
 #ifdef ICE_NO_KQUEUE
 #  define ICE_USE_CFSTREAM 1
 #endif
+
+extern "C"
+{
+
+Ice::Plugin*
+createIceSSL(const Ice::CommunicatorPtr&, const std::string&, const Ice::StringSeq&);
+Ice::Plugin*
+createIceDiscovery(const Ice::CommunicatorPtr&, const std::string&, const Ice::StringSeq&);
+Ice::Plugin*
+createIceLocatorDiscovery(const Ice::CommunicatorPtr&, const std::string&, const Ice::StringSeq&);
+#if defined(__APPLE__) && TARGET_OS_IPHONE > 0
+Ice::Plugin*
+createIceIAP(const Ice::CommunicatorPtr&, const std::string&, const Ice::StringSeq&);
+#endif
+}
 
 namespace
 {
@@ -170,7 +187,7 @@ private:
 @synthesize logger;
 @synthesize dispatcher;
 @synthesize batchRequestInterceptor;
-@synthesize prefixTable__;
+@synthesize prefixTable_;
 
 -(id) init:(id<ICEProperties>)props logger:(id<ICELogger>)log dispatcher:(void(^)(id<ICEDispatcherCall>,
                                                                                   id<ICEConnection>))d;
@@ -205,7 +222,7 @@ private:
     copy->properties = [properties retain];
     copy->logger = [logger retain];
     copy->dispatcher = [dispatcher copy];
-    copy->prefixTable__ = [prefixTable__ retain];
+    copy->prefixTable_ = [prefixTable_ retain];
     return copy;
 }
 
@@ -214,7 +231,7 @@ private:
     NSUInteger h = 0;
     h = (h << 5 ^ [properties hash]);
     h = (h << 5 ^ [logger hash]);
-    h = (h << 5 ^ [prefixTable__ hash]);
+    h = (h << 5 ^ [prefixTable_ hash]);
     return h;
 }
 
@@ -271,16 +288,16 @@ private:
             return NO;
         }
     }
-    if(!prefixTable__)
+    if(!prefixTable_)
     {
-        if(obj->prefixTable__)
+        if(obj->prefixTable_)
         {
             return NO;
         }
     }
     else
     {
-        if(![prefixTable__ isEqual:obj->prefixTable__])
+        if(![prefixTable_ isEqual:obj->prefixTable_])
         {
             return NO;
         }
@@ -293,7 +310,7 @@ private:
     [properties release];
     [logger release];
     [dispatcher release];
-    [prefixTable__ release];
+    [prefixTable_ release];
     [super dealloc];
 }
 @end
@@ -476,7 +493,7 @@ private:
     return [[ns copy] autorelease];
 }
 
-+(void)stringSeqToArgs:(NSArray*)args argc:(int*)argc argv:(char*[])argv;
++(void)stringSeqToArgs:(NSArray*)args argc:(int*)argc argv:(char*[])argv
 {
     //
     // Shift all elements in argv which are present in args to the
@@ -521,6 +538,43 @@ private:
         argv[*argc] = 0;
     }
 }
+
++(ICEIdentity*) stringToIdentity:(NSString*)str
+{
+    NSException* nsex = nil;
+    try
+    {
+        return [ICEIdentity identityWithIdentity:Ice::stringToIdentity(fromNSString(str))];
+    }
+    catch(const std::exception& ex)
+    {
+        nsex = toObjCException(ex);
+    }
+    @throw nsex;
+    return nil; // Keep the compiler happy.
+}
+
++(NSMutableString*) identityToString:(ICEIdentity*)ident toStringMode:(ICEToStringMode)toStringMode
+{
+    NSException* nsex = nil;
+    try
+    {
+        return [toNSMutableString(Ice::identityToString([ident identity],
+                                                        static_cast<Ice::ToStringMode>(toStringMode))) autorelease];
+    }
+    catch(const std::exception& ex)
+    {
+        nsex = toObjCException(ex);
+    }
+    @throw nsex;
+    return nil; // Keep the compiler happy.
+}
+
++(NSMutableString*) identityToString:(ICEIdentity*)ident
+{
+    return [ICEUtil identityToString:ident toStringMode:ICEUnicode];
+}
+
 @end
 
 @implementation ICEEncodingVersion(StringConv)

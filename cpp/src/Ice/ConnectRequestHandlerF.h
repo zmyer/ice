@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,9 +18,9 @@ namespace IceInternal
 
 class ConnectRequestHandler;
 #ifdef ICE_CPP11_MAPPING
-typedef ::std::shared_ptr<ConnectRequestHandler> ConnectRequestHandlerPtr;
+using ConnectRequestHandlerPtr = ::std::shared_ptr<ConnectRequestHandler>;
 #else
-ICE_API IceUtil::Shared* upCast(ConnectRequestHandler*);
+IceUtil::Shared* upCast(ConnectRequestHandler*);
 typedef IceInternal::Handle<ConnectRequestHandler> ConnectRequestHandlerPtr;
 #endif
 

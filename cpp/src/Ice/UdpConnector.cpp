@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -72,12 +72,6 @@ IceInternal::UdpConnector::operator==(const Connector& r) const
 }
 
 bool
-IceInternal::UdpConnector::operator!=(const Connector& r) const
-{
-    return !operator==(r);
-}
-
-bool
 IceInternal::UdpConnector::operator<(const Connector& r) const
 {
     const UdpConnector* p = dynamic_cast<const UdpConnector*>(&r);
@@ -130,7 +124,7 @@ IceInternal::UdpConnector::UdpConnector(const ProtocolInstancePtr& instance, con
                                         const std::string& connectionId) :
     _instance(instance),
     _addr(addr),
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
     _sourceAddr(sourceAddr),
 #endif
     _mcastInterface(mcastInterface),

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -207,23 +207,25 @@ run(int, char* argv[], const CommunicatorPtr& communicator)
         // Use a separate adapter to ensure a separate connection is used for the subscriber
         // (otherwise, if multiple UDP subscribers use the same connection we might get high
         // packet loss, see bug 1784).
+        communicator->getProperties()->setProperty("UdpAdapter3.ThreadPool.Size", "1");
         ObjectAdapterPtr adpt = communicator->createObjectAdapterWithEndpoints("UdpAdapter3", "udp");
         subscribers.push_back(new SingleI(communicator, "datagram"));
         Ice::ObjectPrx object = adpt->addWithUUID(subscribers.back())->ice_datagram();
         subscriberIdentities.push_back(object->ice_getIdentity());
-        topic->subscribeAndGetPublisher(IceStorm::QoS(), object);
         adpt->activate();
+        topic->subscribeAndGetPublisher(IceStorm::QoS(), object);
     }
     {
         // Use a separate adapter to ensure a separate connection is used for the subscriber
         // (otherwise, if multiple UDP subscribers use the same connection we might get high
         // packet loss, see bug 1784).
+        communicator->getProperties()->setProperty("UdpAdapter4.ThreadPool.Size", "1");
         ObjectAdapterPtr adpt = communicator->createObjectAdapterWithEndpoints("UdpAdapter4", "udp");
         subscribers.push_back(new SingleI(communicator, "batch datagram"));
         Ice::ObjectPrx object = adpt->addWithUUID(subscribers.back())->ice_batchDatagram();
         subscriberIdentities.push_back(object->ice_getIdentity());
-        topic->subscribeAndGetPublisher(IceStorm::QoS(), object);
         adpt->activate();
+        topic->subscribeAndGetPublisher(IceStorm::QoS(), object);
     }
 
     adapter->activate();
@@ -251,7 +253,8 @@ main(int argc, char* argv[])
 
     try
     {
-        communicator = initialize(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
+        communicator = initialize(argc, argv, initData);
         status = run(argc, argv, communicator);
     }
     catch(const Exception& ex)
@@ -262,15 +265,7 @@ main(int argc, char* argv[])
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(const Exception& ex)
-        {
-            cerr << ex << endl;
-            status = EXIT_FAILURE;
-        }
+        communicator->destroy();
     }
 
     return status;

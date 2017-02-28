@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -38,13 +38,13 @@ ICE_API @interface ICEInitializationData : NSObject
     id<ICELogger> logger;
     void(^dispatcher)(id<ICEDispatcherCall>, id<ICEConnection>);
     void(^batchRequestInterceptor)(id<ICEBatchRequest>, int, int);
-    NSDictionary* prefixTable__;
+    NSDictionary* prefixTable_;
 }
 @property(retain, nonatomic) id<ICEProperties> properties;
 @property(retain, nonatomic) id<ICELogger> logger;
 @property(copy, nonatomic) void(^dispatcher)(id<ICEDispatcherCall>, id<ICEConnection>);
 @property(copy, nonatomic) void(^batchRequestInterceptor)(id<ICEBatchRequest>, int, int);
-@property(retain, nonatomic) NSDictionary* prefixTable__;
+@property(retain, nonatomic) NSDictionary* prefixTable_;
 
 -(id) init:(id<ICEProperties>)properties logger:(id<ICELogger>)logger
      dispatcher:(void(^)(id<ICEDispatcherCall>, id<ICEConnection>))d;
@@ -76,6 +76,9 @@ ICE_API @interface ICEUtil : NSObject
 +(NSString*) generateUUID;
 +(NSArray*)argsToStringSeq:(int)argc argv:(char*[])argv;
 +(void)stringSeqToArgs:(NSArray*)args argc:(int*)argc argv:(char*[])argv;
++(ICEIdentity*) stringToIdentity:(NSString*)str;
++(NSMutableString*) identityToString:(ICEIdentity*)ident toStringMode:(ICEToStringMode)toStringMode;
++(NSMutableString*) identityToString:(ICEIdentity*)ident;
 @end
 
 @interface ICEEncodingVersion(StringConv)
@@ -85,3 +88,10 @@ ICE_API @interface ICEUtil : NSObject
 @interface ICEProtocolVersion(StringConv)
 +(ICEProtocolVersion*) protocolVersionWithString:(NSString*)str;
 @end
+
+extern void ICEregisterIceSSL(BOOL);
+extern void ICEregisterIceDiscovery(BOOL);
+extern void ICEregisterIceLocatorDiscovery(BOOL);
+#if defined(__APPLE__) && TARGET_OS_IPHONE > 0
+extern void ICEregisterIceIAP(BOOL);
+#endif

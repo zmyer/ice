@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -41,7 +41,7 @@ class Reference : public IceUtil::Shared
 {
 public:
 
-    class GetConnectionCallback 
+    class GetConnectionCallback
 #ifndef ICE_CPP11_MAPPING
         : public virtual IceUtil::Shared
 #endif
@@ -116,6 +116,8 @@ public:
 
     int hash() const; // Conceptually const.
 
+    bool getCompressOverride(bool&) const;
+
     //
     // Utility methods.
     //
@@ -144,7 +146,6 @@ public:
     virtual BatchRequestQueuePtr getBatchRequestQueue() const = 0;
 
     virtual bool operator==(const Reference&) const;
-    virtual bool operator!=(const Reference&) const;
     virtual bool operator<(const Reference&) const;
 
     virtual ReferencePtr clone() const = 0;
@@ -213,14 +214,12 @@ public:
     virtual bool isWellKnown() const;
 
     virtual void streamWrite(Ice::OutputStream*) const;
-    virtual std::string toString() const;
     virtual Ice::PropertyDict toProperty(const std::string&) const;
 
     virtual RequestHandlerPtr getRequestHandler(const Ice::ObjectPrxPtr&) const;
     virtual BatchRequestQueuePtr getBatchRequestQueue() const;
 
     virtual bool operator==(const Reference&) const;
-    virtual bool operator!=(const Reference&) const;
     virtual bool operator<(const Reference&) const;
 
     virtual ReferencePtr clone() const;
@@ -275,7 +274,6 @@ public:
     virtual Ice::PropertyDict toProperty(const std::string&) const;
 
     virtual bool operator==(const Reference&) const;
-    virtual bool operator!=(const Reference&) const;
     virtual bool operator<(const Reference&) const;
 
     virtual ReferencePtr clone() const;

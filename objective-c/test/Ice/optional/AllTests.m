@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,7 +19,7 @@
 @end
 
 @implementation TestObjectReader
--(void) read__:(id<ICEInputStream>)is
+-(void) iceRead:(id<ICEInputStream>)is
 {
     [is startValue];
     [is startSlice];
@@ -34,7 +34,7 @@
 @end
 
 @implementation BObjectReader
--(void) read__:(id<ICEInputStream>)is
+-(void) iceRead:(id<ICEInputStream>)is
 {
     [is startValue];
     // ::Test::B
@@ -55,7 +55,7 @@
 @end
 
 @implementation CObjectReader
--(void) read__:(id<ICEInputStream>)is
+-(void) iceRead:(id<ICEInputStream>)is
 {
     [is startValue];
     // ::Test::C
@@ -79,7 +79,7 @@
 @end
 
 @implementation DObjectWriter
--(void) write__:(id<ICEOutputStream>)os
+-(void) iceWrite:(id<ICEOutputStream>)os
 {
     [os startValue:0];
     // ::Test::D
@@ -127,7 +127,7 @@
     [super dealloc];
 }
 #endif
--(void) read__:(id<ICEInputStream>)is
+-(void) iceRead:(id<ICEInputStream>)is
 {
     [is startValue];
     // ::Test::D
@@ -178,7 +178,7 @@
     return self;
 }
 
--(void) read__:(id<ICEInputStream>)is
+-(void) iceRead:(id<ICEInputStream>)is
 {
     if(f_ != nil)
     {
@@ -1564,7 +1564,57 @@ optionalAllTests(id<ICECommunicator> communicator)
         [is startEncapsulation];
         [is endEncapsulation];
     }
+    tprintf("ok\n");
 
+    tprintf("testing optional parameters and dictionaries... ");
+    {
+        id p1 = ICENone;
+        id p3 = ICENone;
+        id p2 = [initial opIntIntDict:p1 p3:&p3];
+        test(p2 == ICENone && p3 == ICENone);
+
+        p2 = [initial opIntIntDict:[TestOptionalIntIntDict dictionary] p3:&p3];
+        test(p2 != nil && p3 != nil && [p2 count] == 0 && [p3 count] == 0);
+
+        TestOptionalMutableIntIntDict* iid = [TestOptionalMutableIntIntDict dictionary];
+        [iid setObject:@45 forKey:@1];
+        p1 = iid;
+        p2 = [initial opIntIntDict:p1 p3:&p3];
+        test(p2 != nil && p3 != nil);
+        test([p2 isEqual:iid] && [p3 isEqual:iid]);
+
+        p1 = ICENone;
+        p3 = ICENone;
+        p2 = [initial opStringIntDict:p1 p3:&p3];
+        test(p2 == ICENone && p3 == ICENone);
+
+        p2 = [initial opIntIntDict:[TestOptionalStringIntDict dictionary] p3:&p3];
+        test(p2 != nil && p3 != nil && [p2 count] == 0 && [p3 count] == 0);
+
+        TestOptionalMutableStringIntDict* sid = [TestOptionalMutableStringIntDict dictionary];
+        [sid setObject:@45 forKey:@"1"];
+        p1 = sid;
+        p2 = [initial opStringIntDict:p1 p3:&p3];
+        test(p2 != nil && p3 != nil);
+        test([p2 isEqual:sid] && [p3 isEqual:sid]);
+
+        p1 = ICENone;
+        p3 = ICENone;
+        p2 = [initial opIntOneOptionalDict:p1 p3:&p3];
+        test(p2 == ICENone && p3 == ICENone);
+
+        p2 = [initial opIntOneOptionalDict:[TestOptionalStringIntDict dictionary] p3:&p3];
+        test(p2 != nil && p3 != nil && [p2 count] == 0 && [p3 count] == 0);
+
+        TestOptionalMutableIntOneOptionalDict* iod = [TestOptionalMutableIntOneOptionalDict dictionary];
+        TestOptionalOneOptional* oneOpt = [TestOptionalOneOptional oneOptional:@58];
+        [iod setObject:oneOpt forKey:@1];
+        p1 = iod;
+        p2 = [initial opIntOneOptionalDict:p1 p3:&p3];
+        test(p2 != nil && p3 != nil);
+        test(((TestOptionalOneOptional*)[p2 objectForKey:@1]).a == 58 &&
+             ((TestOptionalOneOptional*)[p3 objectForKey:@1]).a == 58);
+    }
     tprintf("ok\n");
 
     tprintf("testing exception optionals... ");
@@ -1690,6 +1740,53 @@ optionalAllTests(id<ICECommunicator> communicator)
         @catch(TestOptionalOptionalException* ex)
         {
             test(NO);
+        }
+    }
+    tprintf("ok\n");
+
+    tprintf("testing optionals with marshaled results... ");
+    {
+        test([initial opMStruct1]);
+        test([initial opMDict1]);
+        test([initial opMSeq1]);
+        test([initial opMG1]);
+
+        {
+            id p1, p2, p3;
+            p3 = [initial opMStruct2:ICENone p2:&p2];
+            test(p2 == ICENone && p3 == ICENone);
+
+            p1 = [TestOptionalSmallStruct smallStruct];
+            p3 = [initial opMStruct2:p1 p2:&p2];
+            test([p2 isEqual:p1] && [p3 isEqual:p1]);
+        }
+        {
+            id p1, p2, p3;
+            p3 = [initial opMSeq2:ICENone p2:&p2];
+            test(p2 == ICENone && p3 == ICENone);
+
+            p1 = [TestOptionalStringSeq arrayWithObject:@"hello"];
+            p3 = [initial opMSeq2:p1 p2:&p2];
+            test([[p2 objectAtIndex:0] isEqualToString:@"hello"] &&
+                 [[p3 objectAtIndex:0] isEqualToString:@"hello"]);
+        }
+        {
+            id p1, p2, p3;
+            p3 = [initial opMDict2:ICENone p2:&p2];
+            test(p2 == ICENone && p3 == ICENone);
+
+            p1 = [TestOptionalStringIntDict dictionaryWithObjectsAndKeys:@54, @"test", nil];
+            p3 = [initial opMDict2:p1 p2:&p2];
+            test([[p2 objectForKey:@"test"] isEqual:@54] && [[p3 objectForKey:@"test"] isEqual:@54]);
+        }
+        {
+            id p1, p2, p3;
+            p3 = [initial opMG2:ICENone p2:&p2];
+            test(p2 == ICENone && p3 == ICENone);
+
+            p1 = [TestOptionalG g];
+            p3 = [initial opMG2:p1 p2:&p2];
+            test(p2 != ICENone && p3 != ICENone && p3 == p2);
         }
     }
     tprintf("ok\n");

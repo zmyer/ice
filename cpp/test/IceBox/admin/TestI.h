@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,7 +13,9 @@
 #include <Test.h>
 
 class TestFacetI : public virtual ::Test::TestFacet,
+#ifndef ICE_CPP11_MAPPING
                    public virtual Ice::PropertiesAdminUpdateCallback,
+#endif
                    IceUtil::Monitor<IceUtil::Mutex>
 {
 public:
@@ -27,7 +29,6 @@ public:
 private:
 
     Ice::PropertyDict _changes;
-    bool _called;
 };
 ICE_DEFINE_PTR(TestFacetIPtr, TestFacetI);
 

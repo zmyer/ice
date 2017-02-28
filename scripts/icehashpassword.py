@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -10,14 +10,15 @@
 
 import sys, getopt, passlib.hash, passlib.hosts, getpass
 
-usePBKDF2 = sys.platform == "win32" or sys.platform == "darwin"
-useCryptExt = sys.platform.startswith("linux")
+usePBKDF2 = any(sys.platform == p for p in ["win32", "darwin", "cygwin"])
+useCryptExt = any(sys.platform.startswith(p) for p in ["linux", "freebsd", "gnukfreebsd"])
+
 
 def usage():
     print("Usage: icehashpassword [options]")
     print("")
     print("OPTIONS")
-    
+
     if usePBKDF2:
         print("")
         print("  -d MESSAGE_DIGEST_ALGORITHM, --digest=MESSAGE_DIGEST_ALGORITHM")
@@ -105,7 +106,7 @@ def main():
         # Fallback is the OS crypt function
         #
         passScheme = passlib.hosts.host_context
-            
+
     if rounds:
         if not passScheme.min_rounds <= rounds <= passScheme.max_rounds:
             print("Invalid number rounds for the digest algorithm. Value must be an integer between %s and %s" %
@@ -119,7 +120,8 @@ def main():
             usage()
             return 2
 
-    encryptfn = passScheme.encrypt
+    # passlib 1.7 renamed encrypt to hash
+    encryptfn = passScheme.hash if hasattr(passScheme, "hash") else passScheme.encrypt
 
     args = []
     if sys.stdout.isatty():

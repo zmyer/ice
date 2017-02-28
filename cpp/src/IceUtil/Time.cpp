@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -63,7 +63,7 @@ InitializeFrequency frequencyInitializer;
 }
 #endif
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 namespace
 {
 
@@ -137,7 +137,7 @@ IceUtil::Time::now(Clock clock)
 #  endif
             return Time(static_cast<Int64>(tb.time) * ICE_INT64(1000000) + tb.millitm * 1000);
         }
-#elif defined(__hpux)
+#elif defined(__hppa)
         //
         // HP does not support CLOCK_MONOTONIC
         //

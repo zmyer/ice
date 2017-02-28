@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -16,13 +16,13 @@
 #include <IceSSL/Plugin.h>
 
 #include <Ice/Transceiver.h>
+#include <Ice/UniqueRef.h>
 #include <Ice/Network.h>
-#include <Ice/StreamSocket.h>
-#include <Ice/WSTransceiver.h>
 
 #ifdef ICE_USE_SECURE_TRANSPORT
 
 #include <Security/Security.h>
+#include <Security/SecureTransport.h>
 #include <CoreFoundation/CoreFoundation.h>
 
 namespace IceSSL
@@ -31,18 +31,14 @@ namespace IceSSL
 class ConnectorI;
 class AcceptorI;
 
-class TransceiverI : public IceInternal::Transceiver, public IceInternal::WSTransceiverDelegate
+class TransceiverI : public IceInternal::Transceiver
 {
 public:
 
     virtual IceInternal::NativeInfoPtr getNativeInfo();
 
     virtual IceInternal::SocketOperation initialize(IceInternal::Buffer&, IceInternal::Buffer&);
-#ifdef ICE_CPP11_MAPPING
-    virtual IceInternal::SocketOperation closing(bool, std::exception_ptr);
-#else
     virtual IceInternal::SocketOperation closing(bool, const Ice::LocalException&);
-#endif
     virtual void close();
     virtual IceInternal::SocketOperation write(IceInternal::Buffer&);
     virtual IceInternal::SocketOperation read(IceInternal::Buffer&);
@@ -51,7 +47,6 @@ public:
     virtual std::string toString() const;
     virtual std::string toDetailedString() const;
     virtual Ice::ConnectionInfoPtr getInfo() const;
-    virtual Ice::ConnectionInfoPtr getWSInfo(const Ice::HeaderDict&) const;
     virtual void checkSendSize(const IceInternal::Buffer&);
     virtual void setBufferSize(int rcvSize, int sndSize);
 
@@ -60,10 +55,8 @@ public:
 
 private:
 
-    TransceiverI(const InstancePtr&, const IceInternal::StreamSocketPtr&, const std::string&, bool);
+    TransceiverI(const InstancePtr&, const IceInternal::TransceiverPtr&, const std::string&, bool);
     virtual ~TransceiverI();
-
-    void fillConnectionInfo(const ConnectionInfoPtr&, std::vector<CertificatePtr>&) const;
 
     friend class ConnectorI;
     friend class AcceptorI;
@@ -73,13 +66,12 @@ private:
     const std::string _host;
     const std::string _adapterName;
     const bool _incoming;
-    const IceInternal::StreamSocketPtr _stream;
+    const IceInternal::TransceiverPtr _delegate;
 
-    SSLContextRef _ssl;
-    SecTrustRef _trust;
-    bool _verified;
+    IceInternal::UniqueRef<SSLContextRef> _ssl;
+    IceInternal::UniqueRef<SecTrustRef> _trust;
+    bool _connected;
 
-    size_t _buffered;
     enum SSLWantFlags
     {
         SSLWantRead = 0x1,
@@ -89,6 +81,11 @@ private:
     mutable Ice::Byte _flags;
     size_t _maxSendPacketSize;
     size_t _maxRecvPacketSize;
+    std::string _cipher;
+    std::vector<std::string> _certs;
+    bool _verified;
+    std::vector<CertificatePtr> _nativeCerts;
+    size_t _buffered;
 };
 typedef IceUtil::Handle<TransceiverI> TransceiverIPtr;
 

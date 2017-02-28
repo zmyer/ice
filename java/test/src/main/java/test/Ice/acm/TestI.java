@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,11 +8,12 @@
 // **********************************************************************
 
 package test.Ice.acm;
-import test.Ice.acm.Test._TestIntfDisp;
 
-public class TestI extends _TestIntfDisp
+import test.Ice.acm.Test.TestIntf;
+
+public class TestI implements TestIntf
 {
-    public void sleep(int delay, Ice.Current current)
+    public void sleep(int delay, com.zeroc.Ice.Current current)
     {
         synchronized(this)
         {
@@ -26,7 +27,7 @@ public class TestI extends _TestIntfDisp
         }
     }
 
-    public void sleepAndHold(int delay, Ice.Current current)
+    public void sleepAndHold(int delay, com.zeroc.Ice.Current current)
     {
         synchronized(this)
         {
@@ -41,7 +42,7 @@ public class TestI extends _TestIntfDisp
         }
     }
 
-    public void interruptSleep(Ice.Current current)
+    public void interruptSleep(com.zeroc.Ice.Current current)
     {
         synchronized(this)
         {
@@ -49,27 +50,29 @@ public class TestI extends _TestIntfDisp
         }
     }
 
-    public void waitForHeartbeat(int count, Ice.Current current)
+    public void startHeartbeatCount(com.zeroc.Ice.Current current)
     {
-        final Ice.Holder<Integer> c = new Ice.Holder<Integer>(count);
-        Ice.HeartbeatCallback callback = new Ice.HeartbeatCallback()
-        {
-            synchronized public void heartbeat(Ice.Connection connection)
+        _counter = new Counter();
+        current.con.setHeartbeatCallback(con ->
             {
-                --c.value;
-                notifyAll();
-            }
+                synchronized(_counter)
+                {
+                    ++_counter.value;
+                    _counter.notifyAll();
+                }
+            });
+    }
 
-        };
-        current.con.setHeartbeatCallback(callback);
-
-        synchronized(callback)
+    public void waitForHeartbeatCount(int count, com.zeroc.Ice.Current current)
+    {
+        assert(_counter != null);
+        synchronized(_counter)
         {
-            while(c.value > 0)
+            while(_counter.value < count)
             {
                 try
                 {
-                    callback.wait();
+                    _counter.wait();
                 }
                 catch(InterruptedException ex)
                 {
@@ -77,4 +80,11 @@ public class TestI extends _TestIntfDisp
             }
         }
     }
-};
+
+    static class Counter
+    {
+        int value;
+    }
+
+    private Counter _counter;
+}

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -28,7 +28,7 @@ MyDerivedClassI::ice_isA(ICE_IN(string) id, const Ice::Current& current) const
 {
     test(current.mode == ICE_ENUM(OperationMode, Nonmutating));
 #ifdef ICE_CPP11_MAPPING
-    return Test::MyDerivedClassDisp::ice_isA(move(id), current);
+    return Test::MyDerivedClass::ice_isA(move(id), current);
 #else
     return Test::MyDerivedClass::ice_isA(id, current);
 #endif
@@ -38,45 +38,31 @@ void
 MyDerivedClassI::ice_ping(const Ice::Current& current) const
 {
     test(current.mode == ICE_ENUM(OperationMode, Nonmutating));
-#ifdef ICE_CPP11_MAPPING
-    Test::MyDerivedClassDisp::ice_ping(current);
-#else
-    Test::MyDerivedClass::ice_ping(current);    
-#endif
+    Test::MyDerivedClass::ice_ping(current);
 }
 
 std::vector<std::string>
 MyDerivedClassI::ice_ids(const Ice::Current& current) const
 {
     test(current.mode == ICE_ENUM(OperationMode, Nonmutating));
-#ifdef ICE_CPP11_MAPPING
-    return Test::MyDerivedClassDisp::ice_ids(current);
-#else
     return Test::MyDerivedClass::ice_ids(current);
-#endif
 }
 
+#ifdef ICE_CPP11_MAPPING
+std::string
+#else
 const std::string&
+#endif
 MyDerivedClassI::ice_id(const Ice::Current& current) const
 {
     test(current.mode == ICE_ENUM(OperationMode, Nonmutating));
-#ifdef ICE_CPP11_MAPPING
-    return Test::MyDerivedClassDisp::ice_id(current);
-#else
     return Test::MyDerivedClass::ice_id(current);
-#endif
 }
 
 void
 MyDerivedClassI::shutdown(const Ice::Current& current)
 {
     current.adapter->getCommunicator()->shutdown();
-}
-
-void
-MyDerivedClassI::delay(Ice::Int ms, const Ice::Current&)
-{
-    IceUtil::ThreadControl::sleep(IceUtil::Time::milliSeconds(ms));
 }
 
 void
@@ -160,7 +146,7 @@ MyDerivedClassI::opMyClass(ICE_IN(Test::MyClassPrxPtr) p1,
     p2 = p1;
     p3 = ICE_UNCHECKED_CAST(Test::MyClassPrx,
                             current.adapter->createProxy(
-                                current.adapter->getCommunicator()->stringToIdentity("noSuchIdentity")));
+                                stringToIdentity("noSuchIdentity")));
     return ICE_UNCHECKED_CAST(Test::MyClassPrx, current.adapter->createProxy(current.id));
 }
 
@@ -844,3 +830,88 @@ MyDerivedClassI::opWStringLiterals(const Ice::Current&)
 
     return data;
 }
+
+#ifdef ICE_CPP11_MAPPING
+MyDerivedClassI::OpMStruct1MarshaledResult
+MyDerivedClassI::opMStruct1(const Ice::Current& current)
+{
+    Test::Structure s;
+    s.e = ICE_ENUM(MyEnum, enum1); // enum must be initialized
+    return OpMStruct1MarshaledResult(s, current);
+}
+
+
+MyDerivedClassI::OpMStruct2MarshaledResult
+MyDerivedClassI::opMStruct2(ICE_IN(Test::Structure) p1, const Ice::Current& current)
+{
+    return OpMStruct2MarshaledResult(p1, p1, current);
+}
+
+MyDerivedClassI::OpMSeq1MarshaledResult
+MyDerivedClassI::opMSeq1(const Ice::Current& current)
+{
+    return OpMSeq1MarshaledResult(Test::StringS(), current);
+}
+
+MyDerivedClassI::OpMSeq2MarshaledResult
+MyDerivedClassI::opMSeq2(ICE_IN(Test::StringS) p1, const Ice::Current& current)
+{
+    return OpMSeq2MarshaledResult(p1, p1, current);
+}
+
+MyDerivedClassI::OpMDict1MarshaledResult
+MyDerivedClassI::opMDict1(const Ice::Current& current)
+{
+    return OpMDict1MarshaledResult(Test::StringStringD(), current);
+}
+
+MyDerivedClassI::OpMDict2MarshaledResult
+MyDerivedClassI::opMDict2(ICE_IN(Test::StringStringD) p1, const Ice::Current& current)
+{
+    return OpMDict2MarshaledResult(p1, p1, current);
+}
+
+#else
+
+Test::Structure
+MyDerivedClassI::opMStruct1(const Ice::Current&)
+{
+    Test::Structure s;
+    s.e = ICE_ENUM(MyEnum, enum1); // enum must be initialized
+    return s;
+}
+
+Test::Structure
+MyDerivedClassI::opMStruct2(ICE_IN(Test::Structure) p1, Test::Structure& p2, const Ice::Current&)
+{
+    p2 = p1;
+    return p1;
+}
+
+Test::StringS
+MyDerivedClassI::opMSeq1(const Ice::Current&)
+{
+    return Test::StringS();
+}
+
+Test::StringS
+MyDerivedClassI::opMSeq2(ICE_IN(Test::StringS) p1, Test::StringS& p2, const Ice::Current&)
+{
+    p2 = p1;
+    return p1;
+}
+
+Test::StringStringD
+MyDerivedClassI::opMDict1(const Ice::Current&)
+{
+    return Test::StringStringD();
+}
+
+Test::StringStringD
+MyDerivedClassI::opMDict2(ICE_IN(Test::StringStringD) p1, Test::StringStringD& p2, const Ice::Current&)
+{
+    p2 = p1;
+    return p1;
+}
+
+#endif

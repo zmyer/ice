@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -55,16 +55,16 @@ public:
     CtrlCHandlerCallback getCallback() const;
 };
 
-class ICE_API CtrlCHandlerException : public Exception
+class ICE_API CtrlCHandlerException : public ExceptionHelper<CtrlCHandlerException>
 { 
 public:
  
     CtrlCHandlerException(const char*, int);
     virtual std::string ice_id() const;
+
 #ifndef ICE_CPP11_MAPPING
     virtual CtrlCHandlerException* ice_clone() const;
 #endif
-    virtual void ice_throw() const;
 };
 
 }

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,15 +12,14 @@
 
 #include <IceUtil/Mutex.h>
 #include <Ice/Properties.h>
-#include <IceUtil/StringConverter.h>
+#include <Ice/StringConverter.h>
 
 #include <set>
 
 namespace Ice
 {
 
-class PropertiesI : public Properties,
-                    public IceUtil::Mutex
+class PropertiesI : public Properties, public IceUtil::Mutex
 {
 public:
 
@@ -42,16 +41,13 @@ public:
     std::set<std::string> getUnusedProperties();
 
     PropertiesI(const PropertiesI*);
-    
+
+    PropertiesI();
+    PropertiesI(StringSeq&, const PropertiesPtr&);
+
 private:
-    PropertiesI(const IceUtil::StringConverterPtr&);
-    PropertiesI(StringSeq&, const PropertiesPtr&, const IceUtil::StringConverterPtr&);
 
-    friend ICE_API PropertiesPtr createProperties();
-    friend ICE_API PropertiesPtr createProperties(StringSeq&, const PropertiesPtr&);
-    friend ICE_API PropertiesPtr createProperties(int&, char*[], const PropertiesPtr&);
-
-    void parseLine(const std::string&, const IceUtil::StringConverterPtr&);
+    void parseLine(const std::string&, const StringConverterPtr&);
 
     void loadConfig();
 
@@ -72,7 +68,6 @@ private:
         bool used;
     };
     std::map<std::string, PropertyValue> _properties;
-    const IceUtil::StringConverterPtr _converter;
 };
 
 }

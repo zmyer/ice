@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,18 +22,16 @@ run(int argc, char* argv[], const Ice::CommunicatorPtr& communicator)
 
     int num = argc == 2 ? atoi(argv[1]) : 0;
 
-    ostringstream os;
-    os << "tcp -p " << (12010 + num);
-    properties->setProperty("ControlAdapter.Endpoints", os.str());
+    properties->setProperty("ControlAdapter.Endpoints", getTestEndpoint(communicator, num, "tcp"));
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("ControlAdapter");
-    adapter->add(ICE_MAKE_SHARED(TestIntfI), communicator->stringToIdentity("control"));
+    adapter->add(ICE_MAKE_SHARED(TestIntfI), Ice::stringToIdentity("control"));
     adapter->activate();
 
     if(num == 0)
     {
-        properties->setProperty("TestAdapter.Endpoints", "udp -p 12010");
+        properties->setProperty("TestAdapter.Endpoints", getTestEndpoint(communicator, num, "udp"));
         Ice::ObjectAdapterPtr adapter2 = communicator->createObjectAdapter("TestAdapter");
-        adapter2->add(ICE_MAKE_SHARED(TestIntfI), communicator->stringToIdentity("test"));
+        adapter2->add(ICE_MAKE_SHARED(TestIntfI), Ice::stringToIdentity("test"));
         adapter2->activate();
     }
 
@@ -52,7 +50,7 @@ run(int argc, char* argv[], const Ice::CommunicatorPtr& communicator)
     }
     properties->setProperty("McastTestAdapter.Endpoints", endpoint);
     Ice::ObjectAdapterPtr mcastAdapter = communicator->createObjectAdapter("McastTestAdapter");
-    mcastAdapter->add(ICE_MAKE_SHARED(TestIntfI), communicator->stringToIdentity("test"));
+    mcastAdapter->add(ICE_MAKE_SHARED(TestIntfI), Ice::stringToIdentity("test"));
     mcastAdapter->activate();
 
     TEST_READY
@@ -70,8 +68,7 @@ main(int argc, char* argv[])
 
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
         initData.properties->setProperty("Ice.Warn.Connections", "0");
         initData.properties->setProperty("Ice.UDP.SndSize", "16384");
         initData.properties->setProperty("Ice.UDP.RcvSize", "16384");

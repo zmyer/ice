@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -327,7 +327,7 @@ private:
     std::vector<AMD_Node_loadServerPtr> _loadCB;
     bool _clearDir;
     InternalServerDescriptorPtr _desc;
-    IceUtil::UniquePtr<DeploymentException> _exception;
+    IceInternal::UniquePtr<DeploymentException> _exception;
     InternalServerDescriptorPtr _runtime;
     bool _updating;
     TraceLevelsPtr _traceLevels;

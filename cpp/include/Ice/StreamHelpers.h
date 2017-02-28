@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,10 +10,12 @@
 #ifndef ICE_STREAM_HELPERS_H
 #define ICE_STREAM_HELPERS_H
 
-#include <IceUtil/ScopedArray.h>
-#include <IceUtil/Iterator.h>
-
 #include <Ice/ObjectF.h>
+
+#ifndef ICE_CPP11_MAPPING
+#   include <IceUtil/ScopedArray.h>
+#   include <IceUtil/Iterator.h>
+#endif
 
 namespace Ice
 {
@@ -44,19 +46,33 @@ const StreamHelperCategory StreamHelperCategoryUserException = 9;
 // and how it can be skipped by the unmarshaling code if the optional
 // isn't known to the receiver.
 //
+
+#ifdef ICE_CPP11_MAPPING
+enum class OptionalFormat : unsigned char
+{
+    F1 = 0,             // Fixed 1-byte encoding
+    F2 = 1,             // Fixed 2 bytes encoding
+    F4 = 2,             // Fixed 4 bytes encoding
+    F8 = 3,             // Fixed 8 bytes encoding
+    Size = 4,           // "Size encoding" on 1 to 5 bytes, e.g. enum, class identifier
+    VSize = 5,          // "Size encoding" on 1 to 5 bytes followed by data, e.g. string, fixed size
+                        // struct, or containers whose size can be computed prior to marshaling
+    FSize = 6,          // Fixed size on 4 bytes followed by data, e.g. variable-size struct, container.
+    Class = 7
+};
+#else
 enum OptionalFormat
 {
-    OptionalFormatF1 = 0,             // Fixed 1-byte encoding
-    OptionalFormatF2 = 1,             // Fixed 2 bytes encoding
-    OptionalFormatF4 = 2,             // Fixed 4 bytes encoding
-    OptionalFormatF8 = 3,             // Fixed 8 bytes encoding
-    OptionalFormatSize = 4,           // "Size encoding" on 1 to 5 bytes, e.g. enum, class identifier
-    OptionalFormatVSize = 5,          // "Size encoding" on 1 to 5 bytes followed by data, e.g. string, fixed size
-                                      // struct, or containers whose size can be computed prior to marshaling
-    OptionalFormatFSize = 6,          // Fixed size on 4 bytes followed by data, e.g. variable-size struct, container.
+    OptionalFormatF1 = 0,  // see above
+    OptionalFormatF2 = 1,
+    OptionalFormatF4 = 2,
+    OptionalFormatF8 = 3,
+    OptionalFormatSize = 4,
+    OptionalFormatVSize = 5,
+    OptionalFormatFSize = 6,
     OptionalFormatClass = 7
 };
-
+#endif
 
 //
 // Is the provided type a container?
@@ -136,6 +152,17 @@ struct StreamableTraits<T, typename ::std::enable_if<::std::is_base_of<::Ice::Us
     //
 };
 
+//
+// StreamableTraits specialization for arrays (std::pair<const T*, const T*>).
+//
+template<typename T>
+struct StreamableTraits<std::pair<T*, T*>>
+{
+    static const StreamHelperCategory helper = StreamHelperCategorySequence;
+    static const int minWireSize = 1;
+    static const bool fixedLength = false;
+};
+
 #else
 
 //
@@ -175,7 +202,6 @@ struct StreamableTraits<UserException>
     // and no optional UserException (so no need for fixedLength)
     //
 };
-#endif
 
 //
 // StreamableTraits specialization for array / range mapped sequences
@@ -189,6 +215,7 @@ struct StreamableTraits< ::std::pair<T, U> >
     static const int minWireSize = 1;
     static const bool fixedLength = false;
 };
+#endif
 
 //
 // StreamableTraits specialization for builtins (these are needed for sequence
@@ -341,15 +368,35 @@ struct StreamHelper<T, StreamHelperCategoryBuiltin>
     }
 };
 
+//
 // "helpers" for the StreamHelper<T, StreamHelperCategoryStruct[Class]> below
-// We generate specializations, which can be instantiated explicitly and exported from DLLs
+// slice2cpp generates specializations as needed
 //
 
 template<typename T, typename S>
-struct StreamWriter;
+struct StreamWriter
+{
+#ifdef ICE_CPP11_MAPPING
+    static inline void write(S* stream, const T& v)
+    {
+        stream->writeAll(v.ice_tuple());
+    }
+#else
+    static inline void write(S*, const T&)
+    {
+        // Default is to write nothing for C++98
+    }
+#endif
+};
 
 template<typename T, typename S>
-struct StreamReader;
+struct StreamReader
+{
+    static inline void read(S*, T&)
+    {
+        // Default is to read nothing
+    }
+};
 
 // Helper for structs
 template<typename T>
@@ -438,7 +485,7 @@ struct StreamHelper<T, StreamHelperCategorySequence>
     }
 };
 
-// Helper for array and range:array custom sequence parameters
+// Helper for array custom sequence parameters
 template<typename T>
 struct StreamHelper<std::pair<const T*, const T*>, StreamHelperCategorySequence>
 {
@@ -454,6 +501,8 @@ struct StreamHelper<std::pair<const T*, const T*>, StreamHelperCategorySequence>
         stream->read(v);
     }
 };
+
+#ifndef ICE_CPP11_MAPPING
 
 // Helper for range custom sequence parameters
 template<typename T>
@@ -490,8 +539,6 @@ struct StreamHelper<std::pair< ::std::vector<bool>::const_iterator,
             stream->write(static_cast<bool>(*p));
         }
     }
-
-    // no read: only used for marshaling
 };
 
 // Helper for zero-copy array sequence parameters
@@ -506,6 +553,8 @@ struct StreamHelper<std::pair<IceUtil::ScopedArray<T>, std::pair<const T*, const
 
     // no write: only used for unmarshaling
 };
+#endif
+
 
 // Helper for dictionaries
 template<typename T>
@@ -601,43 +650,43 @@ struct GetOptionalFormat;
 template<>
 struct GetOptionalFormat<StreamHelperCategoryBuiltin, 1, true>
 {
-    static const OptionalFormat value = OptionalFormatF1;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, F1);
 };
 
 template<>
 struct GetOptionalFormat<StreamHelperCategoryBuiltin, 2, true>
 {
-    static const OptionalFormat value = OptionalFormatF2;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, F2);
 };
 
 template<>
 struct GetOptionalFormat<StreamHelperCategoryBuiltin, 4, true>
 {
-    static const OptionalFormat value = OptionalFormatF4;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, F4);
 };
 
 template<>
 struct GetOptionalFormat<StreamHelperCategoryBuiltin, 8, true>
 {
-    static const OptionalFormat value = OptionalFormatF8;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, F8);
 };
 
 template<>
 struct GetOptionalFormat<StreamHelperCategoryBuiltin, 1, false>
 {
-    static const OptionalFormat value = OptionalFormatVSize;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, VSize);
 };
 
 template<>
 struct GetOptionalFormat<StreamHelperCategoryClass, 1, false>
 {
-    static const OptionalFormat value = OptionalFormatClass;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, Class);
 };
 
 template<int minWireSize>
 struct GetOptionalFormat<StreamHelperCategoryEnum, minWireSize, false>
 {
-    static const OptionalFormat value = OptionalFormatSize;
+    static const OptionalFormat value = ICE_SCOPED_ENUM(OptionalFormat, Size);
 };
 
 
@@ -671,7 +720,7 @@ struct StreamOptionalHelper
 template<typename T>
 struct StreamOptionalHelper<T, StreamHelperCategoryStruct, true>
 {
-    static const OptionalFormat optionalFormat = OptionalFormatVSize;
+    static const OptionalFormat optionalFormat = ICE_SCOPED_ENUM(OptionalFormat, VSize);
 
     template<class S> static inline void
     write(S* stream, const T& v)
@@ -692,7 +741,7 @@ struct StreamOptionalHelper<T, StreamHelperCategoryStruct, true>
 template<typename T>
 struct StreamOptionalHelper<T, StreamHelperCategoryStruct, false>
 {
-    static const OptionalFormat optionalFormat = OptionalFormatFSize;
+    static const OptionalFormat optionalFormat = ICE_SCOPED_ENUM(OptionalFormat, FSize);
 
     template<class S> static inline void
     write(S* stream, const T& v)
@@ -738,7 +787,7 @@ struct StreamOptionalContainerHelper;
 template<typename T, int sz>
 struct StreamOptionalContainerHelper<T, false, sz>
 {
-    static const OptionalFormat optionalFormat = OptionalFormatFSize;
+    static const OptionalFormat optionalFormat = ICE_SCOPED_ENUM(OptionalFormat, FSize);
 
     template<class S> static inline void
     write(S* stream, const T& v, Int)
@@ -761,7 +810,7 @@ struct StreamOptionalContainerHelper<T, false, sz>
 template<typename T, int sz>
 struct StreamOptionalContainerHelper<T, true, sz>
 {
-    static const OptionalFormat optionalFormat = OptionalFormatVSize;
+    static const OptionalFormat optionalFormat = ICE_SCOPED_ENUM(OptionalFormat, VSize);
 
     template<class S> static inline void
     write(S* stream, const T& v, Int n)
@@ -792,7 +841,7 @@ struct StreamOptionalContainerHelper<T, true, sz>
 template<typename T>
 struct StreamOptionalContainerHelper<T, true, 1>
 {
-    static const OptionalFormat optionalFormat = OptionalFormatVSize;
+    static const OptionalFormat optionalFormat = ICE_SCOPED_ENUM(OptionalFormat, VSize);
 
     template<class S> static inline void
     write(S* stream, const T& v, Int)
@@ -861,6 +910,8 @@ struct StreamOptionalHelper<std::pair<const T*, const T*>, StreamHelperCategoryS
     }
 };
 
+#ifndef ICE_CPP11_MAPPING
+
 template<typename T>
 struct StreamOptionalHelper<std::pair<T, T>, StreamHelperCategorySequence, false>
 {
@@ -906,6 +957,7 @@ struct StreamOptionalHelper<std::pair<IceUtil::ScopedArray<T>, std::pair<const T
 
     // no write: only used for unmarshaling
 };
+#endif
 
 //
 // Helper to write dictionaries, delegates to the optional container

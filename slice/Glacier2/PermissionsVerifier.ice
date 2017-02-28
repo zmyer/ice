@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,10 +9,14 @@
 
 #pragma once
 
-[["cpp:header-ext:h", "objc:header-dir:objc", "js:ice-build"]]
+[["cpp:header-ext:h", "cpp:dll-export:GLACIER2_API", "objc:header-dir:objc", "objc:dll-export:GLACIER2_API", "js:ice-build"]]
 [["cpp:include:Glacier2/Config.h"]]
 
 #include <Glacier2/SSLInfo.ice>
+
+#ifndef __SLICE2JAVA_COMPAT__
+[["java:package:com.zeroc"]]
+#endif
 
 ["objc:prefix:GLACIER2"]
 module Glacier2
@@ -22,9 +26,6 @@ module Glacier2
  *
  * This exception is raised if a client is denied the ability to create
  * a session with the router.
- *
- * @see Router#createSession
- * @see Router#createSessionFromSecureConnection
  *
  **/
 ["preserve-slice"]
@@ -103,4 +104,3 @@ interface SSLPermissionsVerifier
 };
 
 };
-

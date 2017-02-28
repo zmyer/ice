@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -64,7 +64,7 @@ TestIntfI::pingBiDir(ICE_IN(Ice::Identity) id, const Ice::Current& current)
         // Send the reply through the incoming connection.
         //
 #ifdef ICE_CPP11_MAPPING
-        Ice::uncheckedCast<Test::PingReplyPrx>(current.con->createProxy(id))->reply_async();
+        Ice::uncheckedCast<Test::PingReplyPrx>(current.con->createProxy(id))->replyAsync();
 #else
         Test::PingReplyPrx::uncheckedCast(current.con->createProxy(id))->begin_reply();
 #endif

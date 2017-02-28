@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -32,13 +32,13 @@ public:
         called = false;
     }
 
-    virtual void __write(Ice::OutputStream* out) const
+    virtual void _iceWrite(Ice::OutputStream* out) const
     {
-        obj->__write(out);
+        obj->_iceWrite(out);
         const_cast<TestObjectWriter*>(this)->called = true;
     }
 
-    virtual void __read(Ice::InputStream*)
+    virtual void _iceRead(Ice::InputStream*)
     {
         assert(false);
     }
@@ -61,15 +61,15 @@ public:
         called = false;
     }
 
-    virtual void __write(Ice::OutputStream*) const
+    virtual void _iceWrite(Ice::OutputStream*) const
     {
         assert(false);
     }
 
-    virtual void __read(Ice::InputStream* in)
+    virtual void _iceRead(Ice::InputStream* in)
     {
         obj = ICE_MAKE_SHARED(MyClass);
-        obj->__read(in);
+        obj->_iceRead(in);
         called = true;
     }
 
@@ -77,6 +77,33 @@ public:
     bool called;
 };
 ICE_DEFINE_PTR(TestObjectReaderPtr, TestObjectReader);
+
+// Required for ValueHelper<>'s _iceReadImpl and _iceWriteIpml
+#ifdef ICE_CPP11_MAPPING
+namespace Ice
+{
+template<class S>
+struct StreamWriter<TestObjectWriter, S>
+{
+    static void write(S* ostr, const TestObjectWriter&) { assert(false); }
+};
+template<class S>
+struct StreamReader<TestObjectWriter, S>
+{
+    static void read(S* istr, TestObjectWriter&) { assert(false); }
+};
+template<class S>
+struct StreamWriter<TestObjectReader, S>
+{
+    static void write(S* ostr, const TestObjectReader&) { assert(false); }
+};
+template<class S>
+struct StreamReader<TestObjectReader, S>
+{
+    static void read(S* istr, TestObjectReader&) { assert(false); }
+};
+}
+#endif
 
 #ifndef ICE_CPP11_MAPPING
 class TestValueFactory : public Ice::ValueFactory
@@ -104,7 +131,7 @@ public:
 #ifdef ICE_CPP11_MAPPING
 void
 patchObject(void* addr, const Ice::ValuePtr& v)
-{   
+{
     Ice::ValuePtr* p = static_cast<Ice::ValuePtr*>(addr);
     assert(p);
     *p = v;
@@ -112,7 +139,7 @@ patchObject(void* addr, const Ice::ValuePtr& v)
 #else
 void
 patchObject(void* addr, const Ice::ObjectPtr& v)
-{   
+{
     Ice::ObjectPtr* p = static_cast<Ice::ObjectPtr*>(addr);
     assert(p);
     *p = v;
@@ -134,7 +161,7 @@ public:
         return _factory(type);
     }
 
-    void setFactory(function<Ice::ValuePtr (const string&)> f)
+    void setFactory(function<Ice::ValuePtr(const string&)> f)
     {
         _factory = f;
     }
@@ -144,7 +171,7 @@ public:
         _factory = [](const string&) { return ICE_MAKE_SHARED(MyClass); };
     }
 
-    function<Ice::ValuePtr (const string&)> _factory;
+    function<Ice::ValuePtr(const string&)> _factory;
 };
 #else
 class MyClassFactoryWrapper : public Ice::ValueFactory
@@ -205,7 +232,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 {
 #ifdef ICE_CPP11_MAPPING
     MyClassFactoryWrapper factoryWrapper;
-    function<Ice::ValuePtr (const string&)> f =
+    function<Ice::ValuePtr(const string&)> f =
         std::bind(&MyClassFactoryWrapper::create, &factoryWrapper, std::placeholders::_1);
     communicator->getValueFactoryManager()->add(f, MyClass::ice_staticId());
 #else
@@ -370,12 +397,13 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         Ice::InputStream in(communicator, data);
         SmallStruct s2;
         in.read(s2);
-#ifndef ICE_CPP11_MAPPING
-        //
-        // No comparison operator generated in C++11.
-        //
-        test(s2 == s);
+
+#ifdef ICE_CPP11_MAPPING
+        test(targetEqualTo(s2.p, s.p));
+        s2.p = s.p; // otherwise the s2 == s below will fail
 #endif
+
+        test(s2 == s);
     }
 
 #ifndef ICE_CPP11_MAPPING
@@ -731,15 +759,15 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         in.read(arr2);
         in.readPendingValues();
         test(arr2.size() == arr.size());
-#ifndef ICE_CPP11_MAPPING
-        //
-        // No comparison operator generated in C++11.
-        //
+
         for(SmallStructS::size_type j = 0; j < arr2.size(); ++j)
         {
+#ifdef ICE_CPP11_MAPPING
+            test(targetEqualTo(arr[j].p, arr2[j].p));
+            arr2[j].p = arr[j].p;
+#endif
             test(arr[j] == arr2[j]);
         }
-#endif
 
         SmallStructSS arrS;
         arrS.push_back(arr);
@@ -754,9 +782,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         SmallStructSS arr2S;
         in2.read(arr2S);
 #ifndef ICE_CPP11_MAPPING
-        //
-        // No comparison operator generated in C++11.
-        //
+        // With C++11, we need targetEqualTo to compare proxies
         test(arr2S == arrS);
 #endif
     }
@@ -1124,12 +1150,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         Ice::InputStream in(communicator, data);
         NestedStruct s2;
         in.read(s2);
-#ifndef ICE_CPP11_MAPPING
-        //
-        // No comparison operator generated in C++11.
-        //
         test(s2 == s);
-#endif
     }
 
 #ifndef ICE_CPP11_MAPPING
@@ -1196,12 +1217,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         Ice::InputStream in(communicator, data);
         NestedStruct2 s2;
         in.read(s2);
-#ifndef ICE_CPP11_MAPPING
-        //
-        // No comparison operator generated in C++11.
-        //
         test(s2 == s);
-#endif
     }
 
 #ifndef ICE_CPP11_MAPPING
@@ -1290,7 +1306,8 @@ main(int argc, char* argv[])
 
     try
     {
-        communicator = Ice::initialize(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
+        communicator = Ice::initialize(argc, argv, initData);
         status = run(argc, argv, communicator);
     }
     catch(const Ice::Exception& ex)
@@ -1301,15 +1318,7 @@ main(int argc, char* argv[])
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(const Ice::Exception& ex)
-        {
-            cerr << ex << endl;
-            status = EXIT_FAILURE;
-        }
+        communicator->destroy();
     }
 
     return status;

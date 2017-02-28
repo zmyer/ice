@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -21,7 +21,10 @@
 namespace IceBT
 {
 
-class EndpointI : public IceInternal::EndpointI, public Ice::EnableSharedFromThis<EndpointI>
+class EndpointI : public IceInternal::EndpointI
+#ifdef ICE_CPP11_MAPPING
+                , public std::enable_shared_from_this<EndpointI>
+#endif
 {
 public:
 
@@ -30,7 +33,7 @@ public:
     EndpointI(const InstancePtr&);
     EndpointI(const InstancePtr&, Ice::InputStream*);
 
-    virtual void streamWrite(Ice::OutputStream*) const;
+    virtual void streamWriteImpl(Ice::OutputStream*) const;
     virtual Ice::Short type() const;
     virtual const std::string& protocol() const;
     virtual Ice::Int timeout() const;
@@ -49,7 +52,7 @@ public:
 
 #ifdef ICE_CPP11_MAPPING
     virtual bool operator==(const Ice::Endpoint&) const;
-    virtual bool operator<(const Ice::Endpoint&) const;    
+    virtual bool operator<(const Ice::Endpoint&) const;
 #else
     virtual bool operator==(const Ice::LocalObject&) const;
     virtual bool operator<(const Ice::LocalObject&) const;
@@ -70,34 +73,6 @@ private:
     void hashInit();
     bool checkOption(const std::string&, const std::string&, const std::string&);
 
-    void findCompleted(const std::vector<int>&, Ice::EndpointSelectionType);
-    void findException(const Ice::LocalException&);
-
-    class FindCallbackI : public FindServiceCallback
-    {
-    public:
-
-        FindCallbackI(const EndpointIPtr& e, Ice::EndpointSelectionType selType) :
-            _endpoint(e),
-            _selType(selType)
-        {
-        }
-
-        virtual void completed(const std::vector<int>& channels)
-        {
-            _endpoint->findCompleted(channels, _selType);
-        }
-
-        virtual void exception(const Ice::LocalException& ex)
-        {
-            _endpoint->findException(ex);
-        }
-
-        EndpointIPtr _endpoint;
-        Ice::EndpointSelectionType _selType;
-    };
-    friend class FindCallbackI;
-
     const InstancePtr _instance;
     const std::string _addr;
     const std::string _uuid;
@@ -107,9 +82,6 @@ private:
     const std::string _connectionId;
     const bool _compress;
     const Ice::Int _hashValue;
-    IceUtil::Monitor<IceUtil::Mutex> _lock;
-    bool _findPending;
-    std::vector<IceInternal::EndpointI_connectorsPtr> _callbacks;
 };
 
 class EndpointInfoI : public EndpointInfo
@@ -140,7 +112,8 @@ public:
     virtual IceInternal::EndpointIPtr read(Ice::InputStream*) const;
     virtual void destroy();
 
-    virtual IceInternal::EndpointFactoryPtr clone(const IceInternal::ProtocolInstancePtr&) const;
+    virtual IceInternal::EndpointFactoryPtr clone(const IceInternal::ProtocolInstancePtr&,
+                                                  const IceInternal::EndpointFactoryPtr&) const;
 
 private:
 

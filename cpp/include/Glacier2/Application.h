@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -23,7 +23,7 @@ namespace Glacier2
  * This exception is raised if the session should be restarted.
  *
  **/
-class GLACIER2_API RestartSessionException : public IceUtil::Exception
+class GLACIER2_API RestartSessionException : public IceUtil::ExceptionHelper<RestartSessionException>
 {
 public:
 
@@ -31,7 +31,6 @@ public:
 #ifndef ICE_CPP11_MAPPING
     virtual RestartSessionException* ice_clone() const;
 #endif
-    virtual void ice_throw() const;
 };
 
 /**
@@ -69,7 +68,7 @@ public:
  * @see #runWithSession
  **/
 
-class GLACIER2_API Application : public Ice::Application, public Ice::EnableSharedFromThis<Application>
+class GLACIER2_API Application : public Ice::Application
 {
     /**
      * Initializes an instance that calls {@link Communicator#shutdown} if

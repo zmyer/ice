@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -264,6 +264,8 @@ Database::Database(const Ice::ObjectAdapterPtr& registryAdapter,
 
     _nodeObserverTopic = new NodeObserverTopic(_topicManager, _internalAdapter);
     _registryObserverTopic = new RegistryObserverTopic(_topicManager);
+
+    _serverCache.setNodeObserverTopic(_nodeObserverTopic);
 
     // Set all serials to 1 if they have not yet been set.
     Ice::Long serial;
@@ -713,8 +715,8 @@ Database::updateApplication(const ApplicationUpdateInfo& updt, bool noRestart, A
 
     ApplicationInfo oldApp;
     ApplicationUpdateInfo update = updt;
-    IceUtil::UniquePtr<ApplicationHelper> previous;
-    IceUtil::UniquePtr<ApplicationHelper> helper;
+    IceInternal::UniquePtr<ApplicationHelper> previous;
+    IceInternal::UniquePtr<ApplicationHelper> helper;
     try
     {
         Lock sync(*this);
@@ -755,8 +757,8 @@ Database::syncApplicationDescriptor(const ApplicationDescriptor& newDesc, bool n
 
     ApplicationUpdateInfo update;
     ApplicationInfo oldApp;
-    IceUtil::UniquePtr<ApplicationHelper> previous;
-    IceUtil::UniquePtr<ApplicationHelper> helper;
+    IceInternal::UniquePtr<ApplicationHelper> previous;
+    IceInternal::UniquePtr<ApplicationHelper> helper;
     try
     {
         Lock sync(*this);
@@ -800,8 +802,8 @@ Database::instantiateServer(const string& application,
 
     ApplicationUpdateInfo update;
     ApplicationInfo oldApp;
-    IceUtil::UniquePtr<ApplicationHelper> previous;
-    IceUtil::UniquePtr<ApplicationHelper> helper;
+    IceInternal::UniquePtr<ApplicationHelper> previous;
+    IceInternal::UniquePtr<ApplicationHelper> helper;
 
     try
     {
@@ -1777,7 +1779,16 @@ Database::getObjectByTypeOnLeastLoadedNode(const string& type, LoadSample sample
 Ice::ObjectProxySeq
 Database::getObjectsByType(const string& type, const Ice::ConnectionPtr& con, const Ice::Context& ctx)
 {
-    Ice::ObjectProxySeq proxies = _objectCache.getObjectsByType(type);
+    Ice::ObjectProxySeq proxies;
+
+    vector<ObjectEntryPtr> objects = _objectCache.getObjectsByType(type);
+    for(vector<ObjectEntryPtr>::const_iterator q = objects.begin(); q != objects.end(); ++q)
+    {
+        if(_nodeObserverTopic->isServerEnabled((*q)->getServer())) // Only return proxies from enabled servers.
+        {
+            proxies.push_back((*q)->getProxy());
+        }
+    }
 
     IceDB::ReadOnlyTxn txn(_env);
     vector<ObjectInfo> infos = findByType(txn, _objects, _objectsByType, type);
@@ -2162,7 +2173,7 @@ Database::load(const ApplicationHelper& app, ServerEntrySeq& entries, const stri
         _adapterCache.addReplicaGroup(*r, application);
         for(ObjectDescriptorSeq::const_iterator o = r->objects.begin(); o != r->objects.end(); ++o)
         {
-            _objectCache.add(toObjectInfo(_communicator, *o, r->id), application);
+            _objectCache.add(toObjectInfo(_communicator, *o, r->id), application, "");
         }
     }
 
@@ -2305,7 +2316,7 @@ Database::reload(const ApplicationHelper& oldApp,
 
         for(ObjectDescriptorSeq::const_iterator o = r->objects.begin(); o != r->objects.end(); ++o)
         {
-            _objectCache.add(toObjectInfo(_communicator, *o, r->id), application);
+            _objectCache.add(toObjectInfo(_communicator, *o, r->id), application, "");
         }
     }
 
@@ -2761,7 +2772,7 @@ Database::addObject(const IceDB::ReadWriteTxn& txn, const ObjectInfo& info, bool
         catch(const IceDB::KeyTooLongException& ex)
         {
             throw DeploymentException("object identity `" +
-                                      _communicator->identityToString(info.proxy->ice_getIdentity()) 
+                                      _communicator->identityToString(info.proxy->ice_getIdentity())
                                       + "' is too long: " + ex.what());
         }
         try

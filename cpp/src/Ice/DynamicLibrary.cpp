@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,10 +9,14 @@
 
 #include <Ice/DynamicLibrary.h>
 #include <IceUtil/StringUtil.h>
-#include <IceUtil/StringConverter.h>
+#include <Ice/StringConverter.h>
 
 #ifndef _WIN32
 #   include <dlfcn.h>
+#endif
+
+#if defined(ICE_CPP11) && defined(__GNUC__) && (__GNUC__ < 6) && defined(__GLIBCXX__)
+#   define ICE_LIBSUFFIX "++11"
 #endif
 
 using namespace Ice;
@@ -99,13 +103,13 @@ IceInternal::DynamicLibrary::loadEntryPoint(const string& entryPoint, bool useIc
             int patchVersion = ICE_INT_VERSION % 100;
             ostringstream os;
             os << majorVersion * 10 + minorVersion;
-            if(patchVersion > 70)
+            if(patchVersion >= 60)
             {
-                os << 'b' << (patchVersion - 71);
+                os << 'b' << (patchVersion - 60);
             }
-            else if(patchVersion > 50)
+            else if(patchVersion >= 50)
             {
-                os << 'a' << (patchVersion - 51);
+                os << 'a' << (patchVersion - 50);
             }
             version = os.str();
         }
@@ -129,7 +133,7 @@ IceInternal::DynamicLibrary::loadEntryPoint(const string& entryPoint, bool useIc
 #ifdef _WIN32
     lib += libName;
     lib += version;
-#  ifdef ICE_OS_WINRT
+#  ifdef ICE_OS_UWP
     lib += "uwp";
 #  endif
 
@@ -213,10 +217,10 @@ IceInternal::DynamicLibrary::load(const string& lib)
     // Don't need to use a wide string converter as the wide string is passed
     // to Windows API.
     //
-#ifdef ICE_OS_WINRT
-    _hnd = LoadPackagedLibrary(IceUtil::stringToWstring(lib, IceUtil::getProcessStringConverter()).c_str(), 0);
+#ifdef ICE_OS_UWP
+    _hnd = LoadPackagedLibrary(stringToWstring(lib, getProcessStringConverter()).c_str(), 0);
 #elif defined(_WIN32)
-    _hnd = LoadLibraryW(IceUtil::stringToWstring(lib, IceUtil::getProcessStringConverter()).c_str());
+    _hnd = LoadLibraryW(stringToWstring(lib, getProcessStringConverter()).c_str());
 #else
 
     int flags = RTLD_NOW | RTLD_GLOBAL;
@@ -277,6 +281,11 @@ const string&
 IceInternal::DynamicLibrary::getErrorMessage() const
 {
     return _err;
+}
+
+IceInternal::DynamicLibraryList::~DynamicLibraryList()
+{
+    // Out of line to avoid weak vtable
 }
 
 void

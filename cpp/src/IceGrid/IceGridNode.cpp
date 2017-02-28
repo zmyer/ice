@@ -1,17 +1,18 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
 
-#include <IceUtil/UUID.h>
+#include <Ice/UUID.h>
 #include <IceUtil/Timer.h>
 #include <IceUtil/StringUtil.h>
 #include <IceUtil/FileUtil.h>
 #include <Ice/Ice.h>
+#include <Ice/ConsoleUtil.h>
 #include <Ice/Locator.h>
 #include <Ice/Service.h>
 #include <IceGrid/Activator.h>
@@ -33,6 +34,7 @@
 
 using namespace std;
 using namespace Ice;
+using namespace IceInternal;
 using namespace IceGrid;
 
 namespace
@@ -79,7 +81,7 @@ private:
     IceUtil::TimerPtr _timer;
     RegistryIPtr _registry;
     NodeIPtr _node;
-    IceUtil::UniquePtr<NodeSessionManager> _sessions;
+    IceInternal::UniquePtr<NodeSessionManager> _sessions;
     Ice::ObjectAdapterPtr _adapter;
 };
 
@@ -100,7 +102,7 @@ private:
 void
 setNoIndexingAttribute(const string& pa)
 {
-    wstring path = IceUtil::stringToWstring(pa);
+    wstring path = Ice::stringToWstring(pa);
     DWORD attrs = GetFileAttributesW(path.c_str());
     if(attrs == INVALID_FILE_ATTRIBUTES)
     {
@@ -165,16 +167,12 @@ NodeService::~NodeService()
 {
 }
 
-
 bool
 NodeService::shutdown()
 {
-    assert(_activator);
+    assert(_activator && _sessions.get());
     _activator->shutdown();
-    if(_sessions.get())
-    {
-        _sessions->terminate(); // Unblock the main thread if it's blocked on waitForCreate()
-    }
+    _sessions->terminate(); // Unblock the main thread if it's blocked on waitForCreate()
     return true;
 }
 
@@ -452,7 +450,7 @@ NodeService::startImpl(int argc, char* argv[], int& status)
     string instanceName = properties->getProperty("IceGrid.InstanceName");
     if(instanceName.empty())
     {
-        instanceName = properties->getProperty("IceGridDiscovery.InstanceName");
+        instanceName = properties->getProperty("IceLocatorDiscovery.InstanceName");
     }
     if(instanceName.empty())
     {
@@ -470,7 +468,7 @@ NodeService::startImpl(int argc, char* argv[], int& status)
     // for the server and server adapter. It also takes care of installing the
     // evictors and object factories necessary to store these objects.
     //
-    Identity id = communicator()->stringToIdentity(instanceName + "/Node-" + name);
+    Identity id = stringToIdentity(instanceName + "/Node-" + name);
     NodePrx nodeProxy = NodePrx::uncheckedCast(_adapter->createProxy(id));
     _node = new NodeI(_adapter, *_sessions, _activator, _timer, traceLevels, nodeProxy, name, mapper, instanceName);
     _adapter->add(_node, nodeProxy->ice_getIdentity());
@@ -581,14 +579,14 @@ NodeService::startImpl(int argc, char* argv[], int& status)
                 string password = communicator()->getProperties()->getProperty("IceGridAdmin.Password");
                 while(id.empty())
                 {
-                    cout << "user id: " << flush;
+                    consoleOut << "user id: " << flush;
                     getline(cin, id);
                     id = IceUtilInternal::trim(id);
                 }
 
                 if(password.empty())
                 {
-                    cout << "password: " << flush;
+                    consoleOut << "password: " << flush;
                     getline(cin, password);
                     password = IceUtilInternal::trim(password);
                 }
@@ -667,7 +665,6 @@ NodeService::stop()
         {
             assert(false);
         }
-        _activator = 0;
     }
 
     if(_timer)

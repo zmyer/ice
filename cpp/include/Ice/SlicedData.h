@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -66,11 +66,15 @@ class ICE_API SlicedData
 {
 public:
 
+#ifndef ICE_CPP11_MAPPING
+    virtual ~SlicedData();
+#endif
+
     SlicedData(const SliceInfoSeq&);
 
     const SliceInfoSeq slices;
 #ifndef ICE_CPP11_MAPPING
-    void __gcVisitMembers(IceInternal::GCVisitor&);
+    void _iceGcVisitMembers(IceInternal::GCVisitor&);
 #endif
 };
 
@@ -78,13 +82,10 @@ public:
 // Unknown sliced object holds instance of unknown type.
 //
 class ICE_API UnknownSlicedValue :
-#if defined(ICE_CPP11_MAPPING)
-    public ValueHelper<UnknownSlicedValue, Value>
-#elif defined(__IBMCPP__)
-// xlC does not handle properly the public/private multiple inheritance from Object
-    public IceInternal::GCObject
+#ifdef ICE_CPP11_MAPPING
+    public Value
 #else
-    virtual public Object, private IceInternal::GCObject
+    public IceInternal::GCObject
 #endif
 {
 public:
@@ -95,12 +96,22 @@ public:
 
     SlicedDataPtr getSlicedData() const;
 
-#ifndef ICE_CPP11_MAPPING
-    virtual void __gcVisitMembers(IceInternal::GCVisitor&);
-#endif
+#ifdef ICE_CPP11_MAPPING
+    virtual void _iceWrite(::Ice::OutputStream*) const override;
+    virtual void _iceRead(::Ice::InputStream*) override;
 
-    virtual void __write(::Ice::OutputStream*) const;
-    virtual void __read(::Ice::InputStream*);
+    virtual std::string ice_id() const override;
+    std::shared_ptr<UnknownSlicedValue> ice_clone() const;
+
+protected:
+
+    virtual std::shared_ptr<Value> cloneImpl() const override;
+#else
+    virtual void _iceGcVisitMembers(IceInternal::GCVisitor&);
+
+    virtual void _iceWrite(::Ice::OutputStream*) const;
+    virtual void _iceRead(::Ice::InputStream*);
+#endif
 
 private:
 

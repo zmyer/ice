@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,7 +15,7 @@ namespace Ice
     /// thread notification hook  and return the instance from their
     /// PluginFactory implementation.
     /// </summary>
-    public class ThreadHookPlugin : Ice.Plugin
+    public class ThreadHookPlugin : Plugin
     {
         /// <summary>
         /// Installs a custom logger for a communicator.

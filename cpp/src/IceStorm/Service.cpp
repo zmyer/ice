@@ -1,13 +1,13 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
 
-#define ICE_STORM_SERVICE_API_EXPORTS
+#define ICESTORM_SERVICE_API_EXPORTS
 
 #include <Ice/PluginManagerI.h> // For loadPlugin
 
@@ -94,7 +94,7 @@ private:
 extern "C"
 {
 
-ICE_STORM_SERVICE_API ::IceBox::Service*
+ICESTORM_SERVICE_API ::IceBox::Service*
 createIceStorm(CommunicatorPtr communicator)
 {
     return new ServiceI;
@@ -403,7 +403,7 @@ ServiceI::start(
     }
 
     topicAdapter->add(new FinderI(TopicManagerPrx::uncheckedCast(topicAdapter->createProxy(topicManagerId))),
-                      communicator->stringToIdentity("IceStorm/Finder"));
+                      stringToIdentity("IceStorm/Finder"));
 
     topicAdapter->activate();
     publishAdapter->activate();
@@ -535,6 +535,8 @@ ServiceI::validateProperties(const string& name, const PropertiesPtr& properties
         "Trace.Topic",
         "Trace.TopicManager",
         "Send.Timeout",
+        "Send.QueueSizeMax",
+        "Send.QueueSizeMaxPolicy",
         "Discard.Interval",
         "LMDB.Path",
         "LMDB.MapSize"

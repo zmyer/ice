@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,6 +10,11 @@
 #import <objc/Ice.h>
 #import <TestCommon.h>
 #import <ObjectsTest.h>
+
+#if defined(__clang__)
+// For 'Ice::Communicator::findObjectFactory()' deprecation
+#   pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
 
 void breakRetainCycleB();
 void breakRetainCycleC();
@@ -46,6 +51,16 @@ void breakRetainCycleD(TestObjectsD* d1)
     breakRetainCycleB(d1.theB);
 }
 
+@interface TestObjectsAbstractBaseI : TestObjectsAbstractBase<TestObjectsAbstractBase>
+-(void) op:(ICECurrent *)current;
+@end
+
+@implementation TestObjectsAbstractBaseI
+-(void) op:(ICECurrent *)current;
+{
+}
+@end
+
 id<TestObjectsInitialPrx>
 objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
 {
@@ -81,6 +96,15 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     test(ba3.theS == ba2.theS);
     test(ba3.str == ba2.str);
     ba3.theS = nil;
+
+    TestObjectsAbstractBase *abp1 = ICE_AUTORELEASE([[TestObjectsAbstractBaseI alloc] init]);
+    abp1.theS = s;
+    abp1.str = @"foo";
+    TestObjectsAbstractBase *abp2 = ICE_AUTORELEASE([abp1 copy]);
+    test(abp1 != abp2);
+    test(abp1.str == abp2.str);
+    test(abp1.theS == abp2.theS);
+    abp2.theS = nil;
 
 #if 0
     // Can't override assignment operator in Objective-C.
@@ -131,11 +155,11 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     test([((TestObjectsB*)b1.theA).theC isKindOfClass:[TestObjectsC class]]);
     test(((TestObjectsC*)((TestObjectsB*)b1.theA).theC).theB == b1.theA);
     test(b1.preMarshalInvoked);
-    test([(id<TestObjectsB>)b1 postUnmarshalInvoked:nil]);
+    test(b1.postUnmarshalInvoked);
     test(b1.theA.preMarshalInvoked);
-    test([(id<TestObjectsA>)b1.theA postUnmarshalInvoked:nil]);
+    test(b1.theA.postUnmarshalInvoked);
     test(((TestObjectsB*)b1.theA).theC.preMarshalInvoked);
-    test([(id<TestObjectsC>)((TestObjectsB*)b1.theA).theC postUnmarshalInvoked:nil]);
+    test(((TestObjectsB*)b1.theA).theC.postUnmarshalInvoked);
 
     // More tests possible for b2 and d, but I think this is already sufficient.
     test(b2.theA == b2);
@@ -176,13 +200,13 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
 //    if(!collocated)
 //    {
     test(d.preMarshalInvoked);
-    test([(id<TestObjectsD>)d postUnmarshalInvoked:nil]);
+    test(d.postUnmarshalInvoked);
     test(d.theA.preMarshalInvoked);
-    test([(id<TestObjectsA>)d.theA postUnmarshalInvoked:nil]);
+    test(d.theA.postUnmarshalInvoked);
     test(d.theB.preMarshalInvoked);
-    test([(id<TestObjectsA>)d.theB postUnmarshalInvoked:nil]);
+    test(d.theB.postUnmarshalInvoked);
     test(d.theB.theC.preMarshalInvoked);
-    test([(id<TestObjectsC>)d.theB.theC postUnmarshalInvoked:nil]);
+    test(d.theB.theC.postUnmarshalInvoked);
 //    }
 
     breakRetainCycleB(b1);
@@ -194,10 +218,13 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
 
     tprintf("testing protected members... ");
     TestObjectsE* e = [initial getE];
-    test([(id<TestObjectsE>)e checkValues:nil]);
+
+    test(e.i == 1);
+    test([e.s isEqualToString:@"hello"]);
+
     TestObjectsF* f = [initial getF];
-    test([(id<TestObjectsF>)f checkValues:nil]);
-    test([(id<TestObjectsE>)f.e2 checkValues:nil]);
+    test(f.e1 && f.e1 == f.e2);
+    test(f.e1.i == 1 && [e.s isEqualToString:@"hello"]);
     tprintf("ok\n");
 
     tprintf("getting I, J and H... ");
@@ -235,8 +262,15 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     }
     tprintf("ok\n");
 
-//     if(!collocated)
-//     {
+    tprintf("testing marshaled results...");
+    b1 = [initial getMB];
+    test(b1 != nil && b1.theB == b1);
+    b1.theB = nil;
+    b1 = [initial end_getAMDMB:[initial begin_getAMDMB]];
+    test(b1 != nil && b1.theB == b1);
+    b1.theB = nil;
+    tprintf("ok\n");
+
     tprintf("testing UnexpectedObjectException... ");
     ref = @"uoet:default -p 12010";
     base = [communicator stringToProxy:ref];
@@ -519,6 +553,39 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
         test([[communicator getValueFactoryManager] find:@"TestOF"] != nil);
         tprintf("ok\n");
     }
+
+    @try
+    {
+        NSString* ref = @"test:default -p 12010";
+        id<TestObjectsTestIntfPrx> p = [TestObjectsTestIntfPrx checkedCast:[communicator stringToProxy:ref]];
+
+        {
+               tprintf("testing getting ObjectFactory registration... ");
+               TestObjectsBase *base = [p opDerived];
+               test(base);
+               test([[base ice_id] isEqualToString:@"::Test::Derived"]);
+               tprintf("ok\n");
+        }
+
+        {
+            tprintf("testing getting ExceptionFactory registration... ");
+            @try
+            {
+                [p throwDerived];
+                test(NO);
+            }
+            @catch(TestObjectsBaseEx* ex)
+            {
+                test([[ex ice_id] isEqualToString:@"::Test::DerivedEx"]);
+            }
+            tprintf("ok\n");
+        }
+    }
+    @catch(ICEObjectNotExistException*)
+    {
+        // cross-test server does not implement this object
+    }
+
 
     return initial;
 }

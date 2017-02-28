@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,22 +10,21 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Diagnostics;
 
 namespace IceInternal
 {
-    public sealed class ParamPatcher<T>
+    public sealed class ParamPatcher<T> where T : Ice.Value
     {
         public ParamPatcher(string type)
         {
             _type = type;
         }
 
-        public void patch(Ice.Object v)
+        public void patch(Ice.Value v)
         {
             if(v != null && !typeof(T).IsAssignableFrom(v.GetType()))
             {
-                IceInternal.Ex.throwUOE(_type, v.ice_id());
+                Ex.throwUOE(_type, v.ice_id());
             }
             value = (T)v;
         }
@@ -34,7 +33,7 @@ namespace IceInternal
         private string _type;
     }
 
-    public sealed class CustomSeqPatcher<T>
+    public sealed class CustomSeqPatcher<T> where T : Ice.Value
     {
         public CustomSeqPatcher(string type, IEnumerable<T> seq, int index)
         {
@@ -46,11 +45,11 @@ namespace IceInternal
            setInvokeInfo(_seqType);
         }
 
-        public void patch(Ice.Object v)
+        public void patch(Ice.Value v)
         {
             if(v != null && !typeof(T).IsAssignableFrom(v.GetType()))
             {
-                IceInternal.Ex.throwUOE(_type, v.ice_id());
+                Ex.throwUOE(_type, v.ice_id());
             }
 
             InvokeInfo info = getInvokeInfo(_seqType);
@@ -186,7 +185,7 @@ namespace IceInternal
         private int _index; // The index at which to patch the sequence.
     }
 
-    public sealed class ArrayPatcher<T>
+    public sealed class ArrayPatcher<T> where T : Ice.Value
     {
         public ArrayPatcher(string type, T[] seq, int index)
         {
@@ -195,11 +194,11 @@ namespace IceInternal
             _index = index;
         }
 
-        public void patch(Ice.Object v)
+        public void patch(Ice.Value v)
         {
             if(v != null && !typeof(T).IsAssignableFrom(v.GetType()))
             {
-                IceInternal.Ex.throwUOE(_type, v.ice_id());
+                Ex.throwUOE(_type, v.ice_id());
             }
 
             _seq[_index] = (T)v;
@@ -210,7 +209,7 @@ namespace IceInternal
         private int _index; // The index at which to patch the array.
     }
 
-    public sealed class ListPatcher<T>
+    public sealed class ListPatcher<T> where T : Ice.Value
     {
         public ListPatcher(string type, List<T> seq, int index)
         {
@@ -219,11 +218,11 @@ namespace IceInternal
             _index = index;
         }
 
-        public void patch(Ice.Object v)
+        public void patch(Ice.Value v)
         {
             if(v != null && !typeof(T).IsAssignableFrom(v.GetType()))
             {
-                IceInternal.Ex.throwUOE(_type, v.ice_id());
+                Ex.throwUOE(_type, v.ice_id());
             }
 
             int count = _seq.Count;

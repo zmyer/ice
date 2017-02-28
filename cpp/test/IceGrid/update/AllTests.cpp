@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -70,7 +70,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(registry);
     AdminSessionPrx session = registry->createAdminSession("foo", "bar");
 
-    session->ice_getConnection()->setACM(registry->getACMTimeout(), IceUtil::None, Ice::HeartbeatAlways);
+    session->ice_getConnection()->setACM(registry->getACMTimeout(), IceUtil::None, Ice::ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
 
     AdminPrx admin = session->getAdmin();
     test(admin);
@@ -106,7 +106,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         adapter.serverLifetime = false;
         addProperty(server, "Server.Endpoints", "default");
         ObjectDescriptor object;
-        object.id = communicator->stringToIdentity("test");
+        object.id = Ice::stringToIdentity("test");
         object.type = "::Test::TestIntf";
         adapter.objects.push_back(object);
         server->adapters.push_back(adapter);
@@ -145,7 +145,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             test(false);
         }
 
-        update.nodes[0].servers[0]->adapters[0].objects[0].id = communicator->stringToIdentity("test2");
+        update.nodes[0].servers[0]->adapters[0].objects[0].id = Ice::stringToIdentity("test2");
         try
         {
             admin->updateApplication(update);
@@ -173,7 +173,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         adapter.serverLifetime = false;
         addProperty(server, "Server.Endpoints", "default");
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("${server}");
+        object.id = Ice::stringToIdentity("${server}");
         object.type = "::Test::TestIntf";
         adapter.objects.push_back(object);
         server->adapters.push_back(adapter);
@@ -400,7 +400,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         adapter.serverLifetime = false;
         adapter.registerProcess = false;
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("test");
+        object.id = Ice::stringToIdentity("test");
         adapter.objects.push_back(object);
         info.descriptor->adapters.push_back(adapter);
         update = empty;
@@ -423,7 +423,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         info = admin->getServerInfo("Server");
         test(info.descriptor);
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("test");
+        object.id = Ice::stringToIdentity("test");
         info.descriptor->adapters[0].objects.push_back(object);
         update = empty;
         update.nodes[0].servers.push_back(info.descriptor);
@@ -445,7 +445,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         info = admin->getServerInfo("Server");
         test(info.descriptor);
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("test1");
+        object.id = Ice::stringToIdentity("test1");
         info.descriptor->adapters[0].allocatables.push_back(object);
         update = empty;
         update.nodes[0].servers.push_back(info.descriptor);
@@ -463,7 +463,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         info = admin->getServerInfo("Server");
         test(info.descriptor);
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("test1");
+        object.id = Ice::stringToIdentity("test1");
         info.descriptor->adapters[0].allocatables.push_back(object);
         update = empty;
         update.nodes[0].servers.push_back(info.descriptor);
@@ -485,7 +485,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         info = admin->getServerInfo("Server");
         test(info.descriptor);
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("test");
+        object.id = Ice::stringToIdentity("test");
         info.descriptor->adapters[0].allocatables.push_back(object);
         update = empty;
         update.nodes[0].servers.push_back(info.descriptor);
@@ -503,7 +503,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         info = admin->getServerInfo("Server");
         test(info.descriptor);
         object = ObjectDescriptor();
-        object.id = communicator->stringToIdentity("test");
+        object.id = Ice::stringToIdentity("test");
         info.descriptor->adapters[0].allocatables.push_back(object);
         update = empty;
         update.nodes[0].servers.push_back(info.descriptor);
@@ -554,21 +554,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
         IceBoxDescriptorPtr server = new IceBoxDescriptor();
         server->id = "IceBox";
-
-        string iceboxExe = "/icebox";
-#if defined(__linux)
-#  if defined(__i386)
-        iceboxExe += "32";
-#  endif
-#  if defined(ICE_CPP11_COMPILER)
-        iceboxExe += "++11";
-#  endif
-#endif
-
-#if defined(_WIN32) && !defined(NDEBUG)
-        iceboxExe += "d";
-#endif
-        server->exe = properties->getProperty("IceBinDir") + iceboxExe;
+        server->exe = properties->getProperty("IceBoxExe");
 
         server->applicationDistrib = false;
         server->allocatable = false;
@@ -1115,7 +1101,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
         ServerDescriptorPtr server = new ServerDescriptor();
         server->id = "node-${index}";
-        server->exe = properties->getProperty("IceBinDir") + "/icegridnode";
+        server->exe = properties->getProperty("IceGridNodeExe");
         server->pwd = ".";
         server->applicationDistrib = false;
         server->allocatable = false;

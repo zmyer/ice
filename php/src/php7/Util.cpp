@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,7 +8,7 @@
 // **********************************************************************
 
 #include <Util.h>
-#include <IceUtil/UUID.h>
+#include <Ice/UUID.h>
 #include <Slice/PHPUtil.h>
 #include <algorithm>
 #include <ctype.h>
@@ -80,7 +80,7 @@ getVersion(zval* zv, T& v, const char* type)
     zend_class_entry* ce = Z_OBJCE_P(zv);
     if(ce != cls)
     {
-        invalidArgument("expected an instance of %s", ce->name);
+        invalidArgument("expected an instance of %s", ce->name->val);
         return false;
     }
 
@@ -125,7 +125,7 @@ createVersion(zval* zv, const T& version, const char* type)
 
     if(object_init_ex(zv, cls) != SUCCESS)
     {
-        runtimeError("unable to initialize %s", cls->name);
+        runtimeError("unable to initialize %s", cls->name->val);
         return false;
     }
 
@@ -255,7 +255,7 @@ IcePHP::extractIdentity(zval* zv, Ice::Identity& id)
     zend_class_entry* ce = Z_OBJCE_P(zv);
     if(ce != cls)
     {
-        invalidArgument("expected an identity but received %s", ce->name);
+        invalidArgument("expected an identity but received %s", ce->name->val);
         return false;
     }
 
@@ -565,6 +565,10 @@ convertLocalException(const Ice::LocalException& ex, zval* zex)
     {
         setStringMember(zex, "reason", e.reason);
     }
+    catch(const Ice::ConnectionManuallyClosedException& e)
+    {
+        add_property_bool(zex, "graceful", e.graceful ? 1 : 0);
+    }
     catch(const Ice::LocalException&)
     {
         //
@@ -595,7 +599,7 @@ IcePHP::convertException(zval* zex, const Ice::Exception& ex)
         {
             if(object_init_ex(zex, cls) != SUCCESS)
             {
-                runtimeError("unable to create exception %s", cls->name);
+                runtimeError("unable to create exception %s", cls->name->val);
                 return;
             }
             if(!convertLocalException(e, zex))
@@ -609,7 +613,7 @@ IcePHP::convertException(zval* zex, const Ice::Exception& ex)
             assert(cls);
             if(object_init_ex(zex, cls) != SUCCESS)
             {
-                runtimeError("unable to create exception %s", cls->name);
+                runtimeError("unable to create exception %s", cls->name->val);
                 return;
             }
             setStringMember(zex, "unknown", str);
@@ -621,7 +625,7 @@ IcePHP::convertException(zval* zex, const Ice::Exception& ex)
         assert(cls);
         if(object_init_ex(zex, cls) != SUCCESS)
         {
-            runtimeError("unable to create exception %s", cls->name);
+            runtimeError("unable to create exception %s", cls->name->val);
             return;
         }
         setStringMember(zex, "unknown", str);
@@ -632,7 +636,7 @@ IcePHP::convertException(zval* zex, const Ice::Exception& ex)
         assert(cls);
         if(object_init_ex(zex, cls) != SUCCESS)
         {
-            runtimeError("unable to create exception %s", cls->name);
+            runtimeError("unable to create exception %s", cls->name->val);
             return;
         }
         setStringMember(zex, "unknown", str);
@@ -862,7 +866,7 @@ ZEND_FUNCTION(Ice_generateUUID)
         WRONG_PARAM_COUNT;
     }
 
-    string uuid = IceUtil::generateUUID();
+    string uuid = Ice::generateUUID();
     RETURN_STRINGL(STRCAST(uuid.c_str()), static_cast<int>(uuid.size()));
 }
 

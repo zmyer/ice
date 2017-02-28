@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,6 +22,12 @@ class EmptyI : public virtual Empty
 GPrxPtr
 allTests(const Ice::CommunicatorPtr& communicator)
 {
+#ifdef ICE_OS_UWP
+    bool uwp = true;
+#else
+    bool uwp = false;
+#endif
+
     cout << "testing Ice.Admin.Facets property... " << flush;
     test(communicator->getProperties()->getPropertyAsList("Ice.Admin.Facets").empty());
     communicator->getProperties()->setProperty("Ice.Admin.Facets", "foobar");
@@ -58,58 +64,62 @@ allTests(const Ice::CommunicatorPtr& communicator)
         localOAEndpoint = ostr.str();
     }
     communicator->getProperties()->setProperty("FacetExceptionTestAdapter.Endpoints", localOAEndpoint);
-    Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("FacetExceptionTestAdapter");
-    Ice::ObjectPtr obj = ICE_MAKE_SHARED(EmptyI);
-    adapter->add(obj, communicator->stringToIdentity("d"));
-    adapter->addFacet(obj, communicator->stringToIdentity("d"), "facetABCD");
-    try
+    if(uwp || (communicator->getProperties()->getProperty("Ice.Default.Protocol") != "ssl" &&
+                 communicator->getProperties()->getProperty("Ice.Default.Protocol") != "wss"))
     {
-        adapter->addFacet(obj, communicator->stringToIdentity("d"), "facetABCD");
-        test(false);
-    }
-    catch(const Ice::AlreadyRegisteredException&)
-    {
-    }
-    adapter->removeFacet(communicator->stringToIdentity("d"), "facetABCD");
-    try
-    {
-        adapter->removeFacet(communicator->stringToIdentity("d"), "facetABCD");
-        test(false);
-    }
-    catch(const Ice::NotRegisteredException&)
-    {
-    }
-    cout << "ok" << endl;
+        Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("FacetExceptionTestAdapter");
+        Ice::ObjectPtr obj = ICE_MAKE_SHARED(EmptyI);
+        adapter->add(obj, Ice::stringToIdentity("d"));
+        adapter->addFacet(obj, Ice::stringToIdentity("d"), "facetABCD");
+        try
+        {
+            adapter->addFacet(obj, Ice::stringToIdentity("d"), "facetABCD");
+            test(false);
+        }
+        catch(const Ice::AlreadyRegisteredException&)
+        {
+        }
+        adapter->removeFacet(Ice::stringToIdentity("d"), "facetABCD");
+        try
+        {
+            adapter->removeFacet(Ice::stringToIdentity("d"), "facetABCD");
+            test(false);
+        }
+        catch(const Ice::NotRegisteredException&)
+        {
+        }
+        cout << "ok" << endl;
 
-    cout << "testing removeAllFacets... " << flush;
-    Ice::ObjectPtr obj1 = ICE_MAKE_SHARED(EmptyI);
-    Ice::ObjectPtr obj2 = ICE_MAKE_SHARED(EmptyI);
-    adapter->addFacet(obj1, communicator->stringToIdentity("id1"), "f1");
-    adapter->addFacet(obj2, communicator->stringToIdentity("id1"), "f2");
-    Ice::ObjectPtr obj3 = ICE_MAKE_SHARED(EmptyI);
-    adapter->addFacet(obj1, communicator->stringToIdentity("id2"), "f1");
-    adapter->addFacet(obj2, communicator->stringToIdentity("id2"), "f2");
-    adapter->addFacet(obj3, communicator->stringToIdentity("id2"), "");
-    Ice::FacetMap fm = adapter->removeAllFacets(communicator->stringToIdentity("id1"));
-    test(fm.size() == 2);
-    test(fm["f1"] == obj1);
-    test(fm["f2"] == obj2);
-    try
-    {
-        adapter->removeAllFacets(communicator->stringToIdentity("id1"));
-        test(false);
-    }
-    catch(const Ice::NotRegisteredException&)
-    {
-    }
-    fm = adapter->removeAllFacets(communicator->stringToIdentity("id2"));
-    test(fm.size() == 3);
-    test(fm["f1"] == obj1);
-    test(fm["f2"] == obj2);
-    test(fm[""] == obj3);
-    cout << "ok" << endl;
+        cout << "testing removeAllFacets... " << flush;
+        Ice::ObjectPtr obj1 = ICE_MAKE_SHARED(EmptyI);
+        Ice::ObjectPtr obj2 = ICE_MAKE_SHARED(EmptyI);
+        adapter->addFacet(obj1, Ice::stringToIdentity("id1"), "f1");
+        adapter->addFacet(obj2, Ice::stringToIdentity("id1"), "f2");
+        Ice::ObjectPtr obj3 = ICE_MAKE_SHARED(EmptyI);
+        adapter->addFacet(obj1, Ice::stringToIdentity("id2"), "f1");
+        adapter->addFacet(obj2, Ice::stringToIdentity("id2"), "f2");
+        adapter->addFacet(obj3, Ice::stringToIdentity("id2"), "");
+        Ice::FacetMap fm = adapter->removeAllFacets(Ice::stringToIdentity("id1"));
+        test(fm.size() == 2);
+        test(fm["f1"] == obj1);
+        test(fm["f2"] == obj2);
+        try
+        {
+            adapter->removeAllFacets(Ice::stringToIdentity("id1"));
+            test(false);
+        }
+        catch(const Ice::NotRegisteredException&)
+        {
+        }
+        fm = adapter->removeAllFacets(Ice::stringToIdentity("id2"));
+        test(fm.size() == 3);
+        test(fm["f1"] == obj1);
+        test(fm["f2"] == obj2);
+        test(fm[""] == obj3);
+        cout << "ok" << endl;
 
-    adapter->deactivate();
+        adapter->deactivate();
+    }
 
     cout << "testing stringToProxy... " << flush;
     string ref = "d:" + getTestEndpoint(communicator, 0);
@@ -192,7 +202,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     d = ICE_CHECKED_CAST(DPrx, db);
     test(d);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(d, db));
+    test(Ice::targetEqualTo(d, db));
 #else
     test(d == db);
 #endif

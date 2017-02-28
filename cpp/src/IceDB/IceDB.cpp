@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -21,9 +21,11 @@ LMDBException::LMDBException(const char* file, int line, int err) :
 {
 }
 
-LMDBException::~LMDBException() ICE_NOEXCEPT
+#ifndef ICE_CPP11_COMPILER
+LMDBException::~LMDBException() throw()
 {
 }
+#endif
 
 string
 LMDBException::ice_id() const
@@ -64,9 +66,11 @@ KeyTooLongException::KeyTooLongException(const char* file, int line, size_t size
 {
 }
 
-KeyTooLongException::~KeyTooLongException() ICE_NOEXCEPT
+#ifndef ICE_CPP11_COMPILER
+KeyTooLongException::~KeyTooLongException() throw()
 {
 }
+#endif
 
 string
 KeyTooLongException::ice_id() const
@@ -106,9 +110,11 @@ BadEnvException::BadEnvException(const char* file, int line, size_t size) :
 {
 }
 
-BadEnvException::~BadEnvException() ICE_NOEXCEPT
+#ifndef ICE_CPP11_COMPILER
+BadEnvException::~BadEnvException() throw()
 {
 }
+#endif
 
 string
 BadEnvException::ice_id() const
@@ -263,6 +269,11 @@ Txn::mtxn() const
     return _mtxn;
 }
 
+ReadOnlyTxn::~ReadOnlyTxn()
+{
+    // Out of line to avoid weak vtable
+}
+
 ReadOnlyTxn::ReadOnlyTxn(const Env& env) :
     Txn(env, MDB_RDONLY)
 {
@@ -282,6 +293,11 @@ ReadOnlyTxn::renew()
     {
         throw LMDBException(__FILE__, __LINE__, rc);
     }
+}
+
+ReadWriteTxn::~ReadWriteTxn()
+{
+    // Out of line to avoid weak vtable
 }
 
 ReadWriteTxn::ReadWriteTxn(const Env& env) :
@@ -472,11 +488,11 @@ CursorBase::renew(const ReadOnlyTxn& txn)
 
 
 //
-// On Windows, we use a default LMDB map size of 10MB, whereas on other platforms 
+// On Windows, we use a default LMDB map size of 10MB, whereas on other platforms
 // (Linux, OS X), we use a default of 100MB.
 //
 // On Windows, LMDB does not use sparse files and allocates immediately the file
-// with the given (max) size. This is why we need a fairly small default map size 
+// with the given (max) size. This is why we need a fairly small default map size
 // on Windows, and a larger value on other platforms.
 
 size_t
@@ -490,4 +506,3 @@ IceDB::getMapSize(int configValue)
 
    return ((configValue <= 0) ? defaultMapSize : configValue) * 1024 * 1024;
 }
-

@@ -3,7 +3,7 @@
   <Import Project="..\..\..\..\..\msbuild\ice.tests.props" />
   <Import Project="$(IceBuilderPhpProps)" />
   <ItemGroup>
-      <IceBuilder Include="..\Test.ice" />
+      <IceBuilder Include="..\*.ice" />
   </ItemGroup>
   <Import Project="$(IceBuilderPhpTargets)" />
 </Project>

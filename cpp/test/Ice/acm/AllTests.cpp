@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -24,9 +24,12 @@ toString(int value)
     return os.str();
 }
 
-class LoggerI : public Ice::EnableSharedFromThis<LoggerI>,
-                public Ice::Logger,
+class LoggerI : public Ice::Logger,
                 private IceUtil::Mutex
+#ifdef ICE_CPP11_MAPPING
+              , public std::enable_shared_from_this<LoggerI>
+#endif
+
 {
 public:
 
@@ -532,6 +535,32 @@ public:
     }
 };
 
+class HeartbeatManualTest : public TestCase
+{
+public:
+
+    HeartbeatManualTest(const RemoteCommunicatorPrxPtr& com) : TestCase("manual heartbeats", com)
+    {
+        //
+        // Disable heartbeats.
+        //
+        setClientACM(10, -1, 0);
+        setServerACM(10, -1, 0);
+    }
+
+    virtual void runTestCase(const RemoteObjectAdapterPrxPtr& adapter, const TestIntfPrxPtr& proxy)
+    {
+        proxy->startHeartbeatCount();
+        Ice::ConnectionPtr con = proxy->ice_getConnection();
+        con->heartbeat();
+        con->heartbeat();
+        con->heartbeat();
+        con->heartbeat();
+        con->heartbeat();
+        proxy->waitForHeartbeatCount(5);
+    }
+};
+
 class SetACMTest : public TestCase
 {
 public:
@@ -546,23 +575,25 @@ public:
         Ice::ACM acm;
         acm = proxy->ice_getCachedConnection()->getACM();
         test(acm.timeout == 15);
-        test(acm.close == Ice::CloseOnIdleForceful);
-        test(acm.heartbeat == Ice::HeartbeatOff);
+        test(acm.close == Ice::ICE_ENUM(ACMClose, CloseOnIdleForceful));
+        test(acm.heartbeat == Ice::ICE_ENUM(ACMHeartbeat, HeartbeatOff));
 
         proxy->ice_getCachedConnection()->setACM(IceUtil::None, IceUtil::None, IceUtil::None);
         acm = proxy->ice_getCachedConnection()->getACM();
         test(acm.timeout == 15);
-        test(acm.close == Ice::CloseOnIdleForceful);
-        test(acm.heartbeat == Ice::HeartbeatOff);
+        test(acm.close == Ice::ICE_ENUM(ACMClose, CloseOnIdleForceful));
+        test(acm.heartbeat == Ice::ICE_ENUM(ACMHeartbeat, HeartbeatOff));
 
-        proxy->ice_getCachedConnection()->setACM(1, Ice::CloseOnInvocationAndIdle, Ice::HeartbeatAlways);
+        proxy->ice_getCachedConnection()->setACM(1, Ice::ICE_ENUM(ACMClose, CloseOnInvocationAndIdle),
+                                                 Ice::ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
         acm = proxy->ice_getCachedConnection()->getACM();
         test(acm.timeout == 1);
-        test(acm.close == Ice::CloseOnInvocationAndIdle);
-        test(acm.heartbeat == Ice::HeartbeatAlways);
+        test(acm.close == Ice::ICE_ENUM(ACMClose, CloseOnInvocationAndIdle));
+        test(acm.heartbeat == Ice::ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
 
-        // Make sure the client sends few heartbeats to the server
-        proxy->waitForHeartbeat(2);
+        // Make sure the client sends a few heartbeats to the server.
+        proxy->startHeartbeatCount();
+        proxy->waitForHeartbeatCount(2);
     }
 };
 
@@ -588,6 +619,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     tests.push_back(ICE_MAKE_SHARED(HeartbeatOnIdleTest, com));
     tests.push_back(ICE_MAKE_SHARED(HeartbeatAlwaysTest, com));
+    tests.push_back(ICE_MAKE_SHARED(HeartbeatManualTest, com));
     tests.push_back(ICE_MAKE_SHARED(SetACMTest, com));
 
     for(vector<TestCasePtr>::const_iterator p = tests.begin(); p != tests.end(); ++p)

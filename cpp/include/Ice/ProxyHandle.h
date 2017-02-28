@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,12 +10,13 @@
 #ifndef ICE_PROXY_HANDLE_H
 #define ICE_PROXY_HANDLE_H
 
+#ifndef ICE_CPP11_MAPPING // C++98 mapping
+
 #include <IceUtil/Handle.h>
 #include <Ice/Config.h>
 
 #include <iosfwd>
 
-#ifndef ICE_CPP11_MAPPING // C++98 mapping
 namespace IceInternal
 {
 
@@ -246,7 +247,7 @@ public:
         return *this;
     }
 
-    ::IceProxy::Ice::Object* __upCast() const
+    ::IceProxy::Ice::Object* _upCast() const
     {
         return upCast(this->_ptr);
     }

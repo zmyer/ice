@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,13 +11,12 @@
 {
     var Ice = require("ice").Ice;
     var Test = require("Test").Test;
-    var Promise = Ice.Promise;
     var ArrayUtil = Ice.ArrayUtil;
 
     var allTests = function(out, communicator)
     {
         var failCB = function(){ test(false); };
-        var p = new Promise();
+        var p = new Ice.Promise();
         var test = function(b)
         {
             if(!b)
@@ -28,7 +27,7 @@
                 }
                 catch(err)
                 {
-                    p.fail(err);
+                    p.reject(err);
                     throw err;
                 }
             }
@@ -36,8 +35,7 @@
 
         var ref, base, prx;
 
-        Promise.try(
-            function()
+        Ice.Promise.try(() =>
             {
                 out.write("testing stringToProxy... ");
                 ref = "Test:default -p 12010 -t 10000";
@@ -48,8 +46,7 @@
                 out.write("testing checked cast... ");
                 return Test.TestIntfPrx.checkedCast(base);
             }
-        ).then(
-            function(obj)
+        ).then(obj =>
             {
                 prx = obj;
                 test(prx !== null);
@@ -60,7 +57,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.Base.prototype);
                 test(ex.b == "Base.b");
@@ -72,7 +69,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.Base.prototype);
                 test(ex.b == "UnknownDerived.b");
@@ -84,7 +81,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownDerived.prototype);
                 test(ex.b == "KnownDerived.b");
@@ -97,7 +94,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownDerived.prototype);
                 test(ex.b == "KnownDerived.b");
@@ -110,7 +107,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.Base.prototype);
                 test(ex.b == "UnknownIntermediate.b");
@@ -122,7 +119,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownIntermediate.prototype);
                 test(ex.b == "KnownIntermediate.b");
@@ -135,7 +132,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownMostDerived.prototype);
                 test(ex.b == "KnownMostDerived.b");
@@ -150,7 +147,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownIntermediate.prototype);
                 test(ex.b == "KnownIntermediate.b");
@@ -162,7 +159,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownMostDerived.prototype);
                 test(ex.b == "KnownMostDerived.b");
@@ -176,7 +173,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownMostDerived.prototype);
                 test(ex.b == "KnownMostDerived.b");
@@ -190,7 +187,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownIntermediate.prototype);
                 test(ex.b == "UnknownMostDerived1.b");
@@ -202,7 +199,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.KnownIntermediate.prototype);
                 test(ex.b == "UnknownMostDerived1.b");
@@ -216,7 +213,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(Object.getPrototypeOf(ex) === Test.Base.prototype);
                 test(ex.b == "UnknownMostDerived2.b");
@@ -229,7 +226,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 if(Object.getPrototypeOf(ex) === Test.Base.prototype)
                 {
@@ -253,17 +250,13 @@
                 out.writeLine("ok");
                 return prx.shutdown();
             }
-        ).then(
-            function()
-            {
-                p.succeed();
-            });
+        ).then(p.resolve, p.reject);
         return p;
     };
 
     var run = function(out, id)
     {
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 var c = Ice.initialize(id);
@@ -278,9 +271,9 @@
             });
     };
 
-    exports.__test__ = run;
-    exports.__runServer__ = true;
+    exports._test = run;
+    exports._runServer = true;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

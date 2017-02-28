@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -32,7 +32,7 @@ namespace Ice
         /// The proxy used to invoke the batch request.
         /// </summary>
         /// <returns>The request proxy.</returns>
-        Ice.ObjectPrx getProxy();
+        ObjectPrx getProxy();
     }
 
     /// <summary>
@@ -52,6 +52,6 @@ namespace Ice
         /// <param name="request">The batch request.</param>
         /// <param name="queueBatchRequestCount">The number of batch request queued.</param>
         /// <param name="queueBatchRequestSize">The size of the queued batch requests.</param>
-        void enqueue(Ice.BatchRequest request, int queueBatchRequestCount, int queueBatchRequestSize);
+        void enqueue(BatchRequest request, int queueBatchRequestCount, int queueBatchRequestSize);
     }
 }

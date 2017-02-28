@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,7 +19,6 @@
 #include <Ice/ObjectAdapterF.h>
 #include <Ice/LoggerF.h>
 #include <Ice/TraceLevelsF.h>
-#include <Ice/VirtualShared.h>
 
 namespace Ice
 {
@@ -32,15 +31,12 @@ ICE_DEFINE_PTR(ObjectAdapterIPtr, ObjectAdapterI);
 namespace IceInternal
 {
 
-class OutgoingBase;
-class Outgoing;
 class OutgoingAsyncBase;
 class OutgoingAsync;
 
 class CollocatedRequestHandler : public RequestHandler,
                                  public ResponseHandler,
-                                 private IceUtil::Monitor<IceUtil::Mutex>,
-                                 public Ice::EnableSharedFromThis<CollocatedRequestHandler>
+                                 private IceUtil::Monitor<IceUtil::Mutex>
 {
 public:
 
@@ -49,10 +45,8 @@ public:
 
     virtual RequestHandlerPtr update(const RequestHandlerPtr&, const RequestHandlerPtr&);
 
-    virtual bool sendRequest(ProxyOutgoingBase*);
     virtual AsyncStatus sendAsyncRequest(const ProxyOutgoingAsyncBasePtr&);
 
-    virtual void requestCanceled(OutgoingBase*, const Ice::LocalException&);
     virtual void asyncRequestCanceled(const OutgoingAsyncBasePtr&, const Ice::LocalException&);
 
     virtual void sendResponse(Ice::Int, Ice::OutputStream*, Ice::Byte, bool);
@@ -65,15 +59,18 @@ public:
     virtual Ice::ConnectionIPtr getConnection();
     virtual Ice::ConnectionIPtr waitForConnection();
 
-    void invokeRequest(OutgoingBase*, int);
     AsyncStatus invokeAsyncRequest(OutgoingAsyncBase*, int, bool);
 
-    bool sent(OutgoingBase*);
     bool sentAsync(OutgoingAsyncBase*);
 
     void invokeAll(Ice::OutputStream*, Ice::Int, Ice::Int);
 
-    using Ice::EnableSharedFromThis<CollocatedRequestHandler>::shared_from_this;
+#ifdef ICE_CPP11_MAPPING
+    std::shared_ptr<CollocatedRequestHandler> shared_from_this()
+    {
+        return std::static_pointer_cast<CollocatedRequestHandler>(ResponseHandler::shared_from_this());
+    }
+#endif
 
 private:
 
@@ -85,11 +82,7 @@ private:
     const TraceLevelsPtr _traceLevels;
 
     int _requestId;
-
-    std::map<OutgoingBase*, Ice::Int> _sendRequests;
     std::map<OutgoingAsyncBasePtr, Ice::Int> _sendAsyncRequests;
-
-    std::map<Ice::Int, OutgoingBase*> _requests;
     std::map<Ice::Int, OutgoingAsyncBasePtr> _asyncRequests;
 };
 ICE_DEFINE_PTR(CollocatedRequestHandlerPtr, CollocatedRequestHandler);

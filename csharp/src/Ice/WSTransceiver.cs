@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,19 +11,9 @@ namespace IceInternal
 {
     using System;
     using System.Diagnostics;
-    using System.Collections.Generic;
     using System.Net.Sockets;
     using System.Security.Cryptography;
     using System.Text;
-
-    //
-    // Delegate interface implemented by TcpTransceiver or IceSSL.TransceiverI or any endpoint that WS can
-    // delegate to.
-    //
-    public interface WSTransceiverDelegate
-    {
-        Ice.ConnectionInfo getWSInfo(Dictionary<string, string> headers);
-    }
 
     sealed class WSTransceiver : Transceiver
     {
@@ -70,9 +60,7 @@ namespace IceInternal
                         //
                         StringBuilder @out = new StringBuilder();
                         @out.Append("GET " + _resource + " HTTP/1.1\r\n");
-                        @out.Append("Host: " + _host + ":");
-                        @out.Append(_port);
-                        @out.Append("\r\n");
+                        @out.Append("Host: " + _host + "\r\n");
                         @out.Append("Upgrade: websocket\r\n");
                         @out.Append("Connection: Upgrade\r\n");
                         @out.Append("Sec-WebSocket-Protocol: " + _iceProtocol + "\r\n");
@@ -85,7 +73,7 @@ namespace IceInternal
                         //
                         byte[] key = new byte[16];
                         _rand.NextBytes(key);
-                        _key = IceUtilInternal.Base64.encode(key);
+                        _key = System.Convert.ToBase64String(key);
                         @out.Append(_key + "\r\n\r\n"); // EOM
 
                         byte[] bytes = _utf8.GetBytes(@out.ToString());
@@ -665,8 +653,10 @@ namespace IceInternal
 
         public Ice.ConnectionInfo getInfo()
         {
-            Debug.Assert(_delegate is WSTransceiverDelegate);
-            return ((WSTransceiverDelegate)_delegate).getWSInfo(_parser.getHeaders());
+            Ice.WSConnectionInfo info = new Ice.WSConnectionInfo();
+            info.headers = _parser.getHeaders();
+            info.underlying = _delegate.getInfo();
+            return info;
         }
 
         public void checkSendSize(Buffer buf)
@@ -690,11 +680,10 @@ namespace IceInternal
         }
 
         internal
-        WSTransceiver(ProtocolInstance instance, Transceiver del, string host, int port, string resource)
+        WSTransceiver(ProtocolInstance instance, Transceiver del, string host, string resource)
         {
             init(instance, del);
             _host = host;
-            _port = port;
             _resource = resource;
             _incoming = false;
 
@@ -718,7 +707,6 @@ namespace IceInternal
         {
             init(instance, del);
             _host = "";
-            _port = -1;
             _resource = "";
             _incoming = true;
 
@@ -840,7 +828,7 @@ namespace IceInternal
                 throw new WebSocketException("missing value for WebSocket key");
             }
 
-            byte[] decodedKey = IceUtilInternal.Base64.decode(key);
+            byte[] decodedKey = Convert.FromBase64String(key);
             if(decodedKey.Length != 16)
             {
                 throw new WebSocketException("invalid value `" + key + "' for WebSocket key");
@@ -876,7 +864,7 @@ namespace IceInternal
             @out.Append("Sec-WebSocket-Accept: ");
             string input = key + _wsUUID;
             byte[] hash = SHA1.Create().ComputeHash(_utf8.GetBytes(input));
-            @out.Append(IceUtilInternal.Base64.encode(hash) + "\r\n" + "\r\n"); // EOM
+            @out.Append(Convert.ToBase64String(hash) + "\r\n" + "\r\n"); // EOM
 
             byte[] bytes = _utf8.GetBytes(@out.ToString());
             Debug.Assert(bytes.Length == @out.Length);
@@ -978,7 +966,7 @@ namespace IceInternal
 
             string input = _key + _wsUUID;
             byte[] hash = SHA1.Create().ComputeHash(_utf8.GetBytes(input));
-            if(!val.Equals(IceUtilInternal.Base64.encode(hash)))
+            if(!val.Equals(Convert.ToBase64String(hash)))
             {
                 throw new WebSocketException("invalid value `" + val + "' for Sec-WebSocket-Accept");
             }
@@ -1592,7 +1580,7 @@ namespace IceInternal
                 //
                 // Use an extra 16 bits to encode the payload length.
                 //
-                _writeBuffer.b.put((byte)126);
+                _writeBuffer.b.put(126);
                 _writeBuffer.b.putShort((short)payloadLength);
             }
             else if(payloadLength > 65535)
@@ -1600,7 +1588,7 @@ namespace IceInternal
                 //
                 // Use an extra 64 bits to encode the payload length.
                 //
-                _writeBuffer.b.put((byte)127);
+                _writeBuffer.b.put(127);
                 _writeBuffer.b.putLong(payloadLength);
             }
 
@@ -1619,7 +1607,6 @@ namespace IceInternal
         private ProtocolInstance _instance;
         private Transceiver _delegate;
         private string _host;
-        private int _port;
         private string _resource;
         private bool _incoming;
 
@@ -1710,6 +1697,6 @@ namespace IceInternal
         private const string _iceProtocol = "ice.zeroc.com";
         private const string _wsUUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-        private static System.Text.UTF8Encoding _utf8 = new System.Text.UTF8Encoding(false, true);
+        private static UTF8Encoding _utf8 = new UTF8Encoding(false, true);
     }
 }

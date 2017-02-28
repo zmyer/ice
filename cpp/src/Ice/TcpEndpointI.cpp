@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -62,21 +62,19 @@ IceInternal::TcpEndpointI::TcpEndpointI(const ProtocolInstancePtr& instance, Inp
     s->read(const_cast<bool&>(_compress));
 }
 
-EndpointInfoPtr
-IceInternal::TcpEndpointI::getInfo() const
+void
+IceInternal::TcpEndpointI::streamWriteImpl(OutputStream* s) const
 {
-    TCPEndpointInfoPtr info = ICE_MAKE_SHARED(InfoI<Ice::TCPEndpointInfo>,
-                                              ICE_DYNAMIC_CAST(TcpEndpointI, shared_from_this()));
-    fillEndpointInfo(info.get());
-    return info;
+    IPEndpointI::streamWriteImpl(s);
+    s->write(_timeout);
+    s->write(_compress);
 }
 
 EndpointInfoPtr
-IceInternal::TcpEndpointI::getWSInfo(const string& resource) const
+IceInternal::TcpEndpointI::getInfo() const
 {
-    WSEndpointInfoPtr info = ICE_MAKE_SHARED(InfoI<Ice::WSEndpointInfo>, shared_from_this());
+    TCPEndpointInfoPtr info = ICE_MAKE_SHARED(InfoI<Ice::TCPEndpointInfo>, ICE_SHARED_FROM_CONST_THIS(TcpEndpointI));
     fillEndpointInfo(info.get());
-    info->resource = resource;
     return info;
 }
 
@@ -91,7 +89,7 @@ IceInternal::TcpEndpointI::timeout(Int timeout) const
 {
     if(timeout == _timeout)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(TcpEndpointI);
     }
     else
     {
@@ -110,7 +108,7 @@ IceInternal::TcpEndpointI::compress(bool compress) const
 {
     if(compress == _compress)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(TcpEndpointI);
     }
     else
     {
@@ -133,7 +131,7 @@ IceInternal::TcpEndpointI::transceiver() const
 AcceptorPtr
 IceInternal::TcpEndpointI::acceptor(const string&) const
 {
-    return new TcpAcceptor(ICE_DYNAMIC_CAST(TcpEndpointI, shared_from_this()), _instance, _host, _port);
+    return new TcpAcceptor(ICE_DYNAMIC_CAST(TcpEndpointI, ICE_SHARED_FROM_CONST_THIS(TcpEndpointI)), _instance, _host, _port);
 }
 
 TcpEndpointIPtr
@@ -251,14 +249,6 @@ IceInternal::TcpEndpointI::operator<(const LocalObject& r) const
     }
 
     return IPEndpointI::operator<(r);
-}
-
-void
-IceInternal::TcpEndpointI::streamWriteImpl(OutputStream* s) const
-{
-    IPEndpointI::streamWriteImpl(s);
-    s->write(_timeout);
-    s->write(_compress);
 }
 
 void
@@ -385,7 +375,7 @@ IceInternal::TcpEndpointFactory::destroy()
 }
 
 EndpointFactoryPtr
-IceInternal::TcpEndpointFactory::clone(const ProtocolInstancePtr& instance) const
+IceInternal::TcpEndpointFactory::clone(const ProtocolInstancePtr& instance, const EndpointFactoryPtr&) const
 {
     return new TcpEndpointFactory(instance);
 }

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -49,7 +49,7 @@ namespace IceInternal
         {
             SocketError error = socketErrorCode(ex);
             return error == SocketError.NoBufferSpaceAvailable ||
-                      error == SocketError.Fault;
+                   error == SocketError.Fault;
         }
 
         public static bool wouldBlock(SocketException ex)
@@ -155,7 +155,7 @@ namespace IceInternal
             return ex.Message.IndexOf("period of time", StringComparison.Ordinal) >= 0;
         }
 
-        public static bool noMoreFds(System.Exception ex)
+        public static bool noMoreFds(Exception ex)
         {
             try
             {
@@ -176,13 +176,13 @@ namespace IceInternal
                 string[] arr = ip.Split(splitChars);
                 try
                 {
-                    int i = System.Int32.Parse(arr[0], CultureInfo.InvariantCulture);
+                    int i = int.Parse(arr[0], CultureInfo.InvariantCulture);
                     if(i >= 223 && i <= 239)
                     {
                         return true;
                     }
                 }
-                catch(System.FormatException)
+                catch(FormatException)
                 {
                     return false;
                 }
@@ -313,7 +313,7 @@ namespace IceInternal
             {
                 socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, 1);
             }
-            catch(System.Exception ex)
+            catch(Exception ex)
             {
                 closeSocketNoThrow(socket);
                 throw new Ice.SocketException(ex);
@@ -324,12 +324,12 @@ namespace IceInternal
         {
             const int SIO_LOOPBACK_FAST_PATH = (-1744830448);
 
-            Byte[] OptionInValue = BitConverter.GetBytes(1);
+            byte[] OptionInValue = BitConverter.GetBytes(1);
             try
             {
                 socket.IOControl(SIO_LOOPBACK_FAST_PATH, OptionInValue, null);
             }
-            catch(System.Exception)
+            catch(Exception)
             {
                 // Expected on platforms that do not support TCP Loopback Fast Path
             }
@@ -354,7 +354,7 @@ namespace IceInternal
             {
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, 1);
             }
-            catch(System.Exception ex)
+            catch(Exception ex)
             {
                 closeSocketNoThrow(socket);
                 throw new Ice.SocketException(ex);
@@ -435,22 +435,9 @@ namespace IceInternal
             try
             {
                 int ifaceIndex = getInterfaceIndex(iface, family);
-                if(ifaceIndex == -1)
-                {
-                    try
-                    {
-                        ifaceIndex = System.Int32.Parse(iface, CultureInfo.InvariantCulture);
-                    }
-                    catch(System.FormatException ex)
-                    {
-                        closeSocketNoThrow(socket);
-                        throw new Ice.SocketException(ex);
-                    }
-                }
-
                 if(family == AddressFamily.InterNetwork)
                 {
-                    ifaceIndex = (int)IPAddress.HostToNetworkOrder(ifaceIndex);
+                    ifaceIndex = IPAddress.HostToNetworkOrder(ifaceIndex);
                     socket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastInterface, ifaceIndex);
                 }
                 else
@@ -469,33 +456,40 @@ namespace IceInternal
         {
             try
             {
-                int index = getInterfaceIndex(iface, group.AddressFamily);
-                if(group.AddressFamily == AddressFamily.InterNetwork)
+                var indexes = new HashSet<int>();
+                foreach(string intf in getInterfacesForMulticast(iface, group))
                 {
-                    MulticastOption option;
-                    if(index == -1)
+                    int index = getInterfaceIndex(intf, group.AddressFamily);
+                    if(!indexes.Contains(index))
                     {
-                        option = new MulticastOption(group);
+                        indexes.Add(index);
+                        if(group.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            MulticastOption option;
+                            if(index == -1)
+                            {
+                                option = new MulticastOption(group);
+                            }
+                            else
+                            {
+                                option = new MulticastOption(group, index);
+                            }
+                            s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, option);
+                        }
+                        else
+                        {
+                            IPv6MulticastOption option;
+                            if(index == -1)
+                            {
+                                option = new IPv6MulticastOption(group);
+                            }
+                            else
+                            {
+                                option = new IPv6MulticastOption(group, index);
+                            }
+                            s.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.AddMembership, option);
+                        }
                     }
-
-                    else
-                    {
-                        option = new MulticastOption(group, index);
-                    }
-                    s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, option);
-                }
-                else
-                {
-                    IPv6MulticastOption option;
-                    if(index == -1)
-                    {
-                        option = new IPv6MulticastOption(group);
-                    }
-                    else
-                    {
-                        option = new IPv6MulticastOption(group, index);
-                    }
-                    s.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.AddMembership, option);
                 }
             }
             catch(Exception ex)
@@ -610,19 +604,6 @@ namespace IceInternal
             // after the asynchronous connect. Seems like a bug in .NET.
             //
             setBlock(fd, fd.Blocking);
-
-            if(AssemblyUtil.platform_ == AssemblyUtil.Platform.NonWindows)
-            {
-                //
-                // Prevent self connect (self connect happens on Linux when a client tries to connect to
-                // a server which was just deactivated if the client socket re-uses the same ephemeral
-                // port as the server).
-                //
-                if(addr.Equals(getLocalAddress(fd)))
-                {
-                    throw new Ice.ConnectionRefusedException();
-                }
-            }
             return true;
         }
 
@@ -704,20 +685,6 @@ namespace IceInternal
             // after the asynchronous connect. Seems like a bug in .NET.
             //
             setBlock(fd, fd.Blocking);
-
-            if(AssemblyUtil.platform_ == AssemblyUtil.Platform.NonWindows)
-            {
-                //
-                // Prevent self connect (self connect happens on Linux when a client tries to connect to
-                // a server which was just deactivated if the client socket re-uses the same ephemeral
-                // port as the server).
-                //
-                EndPoint remoteAddr = getRemoteAddress(fd);
-                if(remoteAddr != null && remoteAddr.Equals(getLocalAddress(fd)))
-                {
-                    throw new Ice.ConnectionRefusedException();
-                }
-            }
         }
 
         public static EndPoint getAddressForServer(string host, int port, int protocol, bool preferIPv6)
@@ -823,7 +790,7 @@ namespace IceInternal
                 e.host = host;
                 throw e;
             }
-            catch(System.Exception ex)
+            catch(Exception ex)
             {
                 Ice.DNSException e = new Ice.DNSException(ex);
                 e.host = host;
@@ -868,18 +835,6 @@ namespace IceInternal
                         }
                     }
                 }
-
-                foreach(IPAddress a in Dns.GetHostAddresses(Dns.GetHostName()))
-                {
-                    if((a.AddressFamily == AddressFamily.InterNetwork && protocol != EnableIPv6) ||
-                       (a.AddressFamily == AddressFamily.InterNetworkV6 && protocol != EnableIPv4))
-                    {
-                        if(includeLoopback || !IPAddress.IsLoopback(a))
-                        {
-                            addresses.Add(a);
-                        }
-                    }
-                }
             }
             catch(SocketException ex)
             {
@@ -891,7 +846,7 @@ namespace IceInternal
                 e.host = "0.0.0.0";
                 throw e;
             }
-            catch(System.Exception ex)
+            catch(Exception ex)
             {
                 Ice.DNSException e = new Ice.DNSException(ex);
                 e.host = "0.0.0.0";
@@ -910,7 +865,7 @@ namespace IceInternal
             }
             else if (addr.AddressFamily == AddressFamily.InterNetwork)
             {
-                Byte[] bytes = addr.GetAddressBytes();
+                byte[] bytes = addr.GetAddressBytes();
                 return bytes[0] == 169 && bytes[1] == 254;
             }
             return false;
@@ -920,15 +875,8 @@ namespace IceInternal
         setTcpBufSize(Socket socket, ProtocolInstance instance)
         {
             //
-            // By default, on Windows we use a 128KB buffer size. On Unix
-            // platforms, we use the system defaults.
-            //
-            int dfltBufSize = 0;
-            if(AssemblyUtil.platform_ == AssemblyUtil.Platform.Windows)
-            {
-                dfltBufSize = 128 * 1024;
-            }
-
+            // By default, on Windows we use a 128KB buffer size.
+            int dfltBufSize = 128 * 1024;
             int rcvSize = instance.properties().getPropertyAsIntWithDefault("Ice.TCP.RcvSize", dfltBufSize);
             int sndSize = instance.properties().getPropertyAsIntWithDefault("Ice.TCP.SndSize", dfltBufSize);
 
@@ -987,26 +935,11 @@ namespace IceInternal
 
         public static List<string> getHostsForEndpointExpand(string host, int protocol, bool includeLoopback)
         {
-            bool wildcard = host.Length == 0;
-            bool ipv4Wildcard = false;
-            if(!wildcard)
-            {
-                try
-                {
-                    IPAddress addr = IPAddress.Parse(host);
-                    ipv4Wildcard = addr.Equals(IPAddress.Any);
-                    wildcard = ipv4Wildcard || addr.Equals(IPAddress.IPv6Any);
-                }
-                catch(Exception)
-                {
-                }
-            }
-
             List<string> hosts = new List<string>();
-            if(wildcard)
+            bool ipv4Wildcard = false;
+            if(isWildcard(host, out ipv4Wildcard))
             {
-                IPAddress[] addrs =
-                    getLocalAddresses(ipv4Wildcard ? Network.EnableIPv4 : protocol, includeLoopback);
+                IPAddress[] addrs = getLocalAddresses(ipv4Wildcard ? EnableIPv4 : protocol, includeLoopback);
                 foreach(IPAddress a in addrs)
                 {
                     if(!isLinklocal(a))
@@ -1016,6 +949,26 @@ namespace IceInternal
                 }
             }
             return hosts;
+        }
+
+        public static List<string> getInterfacesForMulticast(string intf, IPAddress group)
+        {
+            List<string> interfaces = new List<string>();
+            bool ipv4Wildcard = false;
+            int protocol = group.AddressFamily == AddressFamily.InterNetwork ? EnableIPv4 : EnableIPv6;
+            if(isWildcard(intf, out ipv4Wildcard))
+            {
+                IPAddress[] addrs = getLocalAddresses(ipv4Wildcard ? EnableIPv4 : protocol, true);
+                foreach(IPAddress a in addrs)
+                {
+                    interfaces.Add(a.ToString());
+                }
+            }
+            if(interfaces.Count == 0)
+            {
+                interfaces.Add(intf);
+            }
+            return interfaces;
         }
 
         public static string fdToString(Socket socket, NetworkProxy proxy, EndPoint target)
@@ -1124,7 +1077,7 @@ namespace IceInternal
         {
             try
             {
-                return (EndPoint)socket.RemoteEndPoint;
+                return socket.RemoteEndPoint;
             }
             catch(SocketException)
             {
@@ -1149,9 +1102,9 @@ namespace IceInternal
             //
             try
             {
-                return System.Int32.Parse(iface, CultureInfo.InvariantCulture);
+                return int.Parse(iface, CultureInfo.InvariantCulture);
             }
-            catch(System.FormatException)
+            catch(FormatException)
             {
             }
 
@@ -1213,23 +1166,50 @@ namespace IceInternal
                     }
                 }
             }
-            return -1;
+
+            throw new ArgumentException("couldn't find interface `" + iface + "'");
         }
 
         public static EndPoint
         getNumericAddress(string sourceAddress)
         {
             EndPoint addr = null;
-            if(!String.IsNullOrEmpty(sourceAddress))
+            if(!string.IsNullOrEmpty(sourceAddress))
             {
-                List<EndPoint> addrs = getAddresses(sourceAddress, 0, Network.EnableBoth,
-                                                    Ice.EndpointSelectionType.Ordered, false, false);
+                List<EndPoint> addrs = getAddresses(sourceAddress, 0, EnableBoth, Ice.EndpointSelectionType.Ordered,
+                                                    false, false);
                 if(addrs.Count != 0)
                 {
                     return addrs[0];
                 }
             }
             return addr;
+        }
+
+        private static bool
+        isWildcard(string address, out bool ipv4Wildcard)
+        {
+            ipv4Wildcard = false;
+            if(address.Length == 0)
+            {
+                return true;
+            }
+
+            try
+            {
+                IPAddress addr = IPAddress.Parse(address);
+                if(addr.Equals(IPAddress.Any))
+                {
+                    ipv4Wildcard = true;
+                    return true;
+                }
+                return addr.Equals(IPAddress.IPv6Any);
+            }
+            catch(Exception)
+            {
+            }
+
+            return false;
         }
 
         public static bool

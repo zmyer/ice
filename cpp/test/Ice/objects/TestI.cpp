@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,17 +13,6 @@
 using namespace Test;
 using namespace std;
 
-BI::BI() :
-    _postUnmarshalInvoked(false)
-{
-}
-
-bool
-BI::postUnmarshalInvoked(const Ice::Current&)
-{
-    return _postUnmarshalInvoked;
-}
-
 void
 BI::ice_preMarshal()
 {
@@ -33,18 +22,7 @@ BI::ice_preMarshal()
 void
 BI::ice_postUnmarshal()
 {
-    _postUnmarshalInvoked = true;
-}
-
-CI::CI() :
-    _postUnmarshalInvoked(false)
-{
-}
-
-bool
-CI::postUnmarshalInvoked(const Ice::Current&)
-{
-    return _postUnmarshalInvoked;
+    postUnmarshalInvoked = true;
 }
 
 void
@@ -56,18 +34,7 @@ CI::ice_preMarshal()
 void
 CI::ice_postUnmarshal()
 {
-    _postUnmarshalInvoked = true;
-}
-
-DI::DI() :
-    _postUnmarshalInvoked(false)
-{
-}
-
-bool
-DI::postUnmarshalInvoked(const Ice::Current&)
-{
-    return _postUnmarshalInvoked;
+    postUnmarshalInvoked = true;
 }
 
 void
@@ -79,7 +46,7 @@ DI::ice_preMarshal()
 void
 DI::ice_postUnmarshal()
 {
-    _postUnmarshalInvoked = true;
+    postUnmarshalInvoked = true;
 }
 
 EI::EI() :
@@ -88,7 +55,7 @@ EI::EI() :
 }
 
 bool
-EI::checkValues(const Ice::Current&)
+EI::checkValues()
 {
     return i == 1 && s == "hello";
 }
@@ -103,7 +70,7 @@ FI::FI(const EPtr& e) :
 }
 
 bool
-FI::checkValues(const Ice::Current&)
+FI::checkValues()
 {
     return e1 && e1 == e2;
 }
@@ -193,6 +160,34 @@ InitialI::getF(const Ice::Current&)
 {
     return _f;
 }
+
+#ifdef ICE_CPP11_MAPPING
+InitialI::GetMBMarshaledResult
+InitialI::getMB(const Ice::Current& current)
+{
+    return GetMBMarshaledResult(_b1, current);
+}
+
+void
+InitialI::getAMDMBAsync(function<void(const GetAMDMBMarshaledResult&)> response,
+                        function<void(exception_ptr)>,
+                        const Ice::Current& current)
+{
+    response(GetAMDMBMarshaledResult(_b1, current));
+}
+#else
+Test::BPtr
+InitialI::getMB(const Ice::Current&)
+{
+    return _b1;
+}
+
+void
+InitialI::getAMDMB_async(const Test::AMD_Initial_getAMDMBPtr& cb, const Ice::Current&)
+{
+    cb->ice_response(_b1);
+}
+#endif
 
 void
 InitialI::getAll(BPtr& b1, BPtr& b2, CPtr& c, DPtr& d, const Ice::Current&)
@@ -320,8 +315,8 @@ UnexpectedObjectExceptionTestI::ice_invoke(const std::vector<Ice::Byte>&,
 {
     Ice::CommunicatorPtr communicator = current.adapter->getCommunicator();
     Ice::OutputStream out(communicator);
-    out.startEncapsulation(current.encoding, Ice::DefaultFormat);
-    AlsoEmptyPtr obj = ICE_MAKE_SHARED(AlsoEmpty); 
+    out.startEncapsulation(current.encoding, Ice::ICE_ENUM(FormatType, DefaultFormat));
+    AlsoEmptyPtr obj = ICE_MAKE_SHARED(AlsoEmpty);
     out.write(obj);
     out.writePendingValues();
     out.endEncapsulation();

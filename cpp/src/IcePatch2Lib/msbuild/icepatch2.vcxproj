@@ -22,8 +22,9 @@
     <ProjectGuid>{994ADD25-20A0-4715-A3EC-9F86AFD481D0}</ProjectGuid>
     <RootNamespace>IcePatch2</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
-    <IceBuilderCppProps Condition="!Exists('$(IceBuilderCppProps)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Cpp.props', SearchOption.AllDirectories))</IceBuilderCppProps>
-    <IceBuilderCppTargets Condition="!Exists('$(IceBuilderCppTargets)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Cpp.targets', SearchOption.AllDirectories))</IceBuilderCppTargets>
+    <IceBuilderInstallDir>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\SOFTWARE\ZeroC\IceBuilder', 'InstallDir.$(VisualStudioVersion)'))</IceBuilderInstallDir>
+    <IceBuilderCppProps>$(IceBuilderInstallDir)\Resources\IceBuilder.Cpp.props</IceBuilderCppProps>
+    <IceBuilderCppTargets>$(IceBuilderInstallDir)\Resources\IceBuilder.Cpp.targets</IceBuilderCppTargets>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -68,29 +69,28 @@
   <PropertyGroup Label="IceBuilder">
     <IceBuilderHeaderOutputDir>$(Ice_SrcRootDir)\include\generated\cpp98\$(Platform)\$(Configuration)\IcePatch2\</IceBuilderHeaderOutputDir>
     <IceBuilderBaseDirectoryForGeneratedInclude>IcePatch2</IceBuilderBaseDirectoryForGeneratedInclude>
-    <IceBuilderDLLExport>ICE_PATCH2_API</IceBuilderDLLExport>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PreprocessorDefinitions>ICE_PATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ICEPATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>ICE_PATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ICEPATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <PreprocessorDefinitions>ICE_PATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ICEPATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>ICE_PATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ICEPATCH2_API_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -199,6 +199,7 @@
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\..\msbuild\packages\bzip2.v140.1.0.6.4\build\native\bzip2.v140.targets" Condition="Exists('..\..\..\msbuild\packages\bzip2.v140.1.0.6.4\build\native\bzip2.v140.targets')" />
     <Import Project="..\..\..\msbuild\packages\bzip2.v120.1.0.6.4\build\native\bzip2.v120.targets" Condition="Exists('..\..\..\msbuild\packages\bzip2.v120.1.0.6.4\build\native\bzip2.v120.targets')" />
+    <Import Project="..\..\..\msbuild\packages\bzip2.v141.1.0.6.4\build\native\bzip2.v141.targets" Condition="Exists('..\..\..\msbuild\packages\bzip2.v141.1.0.6.4\build\native\bzip2.v141.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -206,5 +207,13 @@
     </PropertyGroup>
     <Error Condition="!Exists('..\..\..\msbuild\packages\bzip2.v140.1.0.6.4\build\native\bzip2.v140.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\msbuild\packages\bzip2.v140.1.0.6.4\build\native\bzip2.v140.targets'))" />
     <Error Condition="!Exists('..\..\..\msbuild\packages\bzip2.v120.1.0.6.4\build\native\bzip2.v120.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\msbuild\packages\bzip2.v120.1.0.6.4\build\native\bzip2.v120.targets'))" />
+    <Error Condition="!Exists('..\..\..\msbuild\packages\bzip2.v141.1.0.6.4\build\native\bzip2.v141.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\msbuild\packages\bzip2.v141.1.0.6.4\build\native\bzip2.v141.targets'))" />
+  </Target>
+  <Import Project="$(MSBuildThisFileDirectory)..\..\..\..\config\ice.sign.targets" />
+  <Target Name="EnsureIceBuilderImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project requires the Ice Builder for Visual Studio extension. Use "Tools &amp;gt; Extensions and Updates" to install it. For more information, see https://visualstudiogallery.msdn.microsoft.com/1a64e701-63f2-4740-8004-290e6c682ce0.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(IceBuilderCppProps)')" Text="$(ErrorText)" />
   </Target>
 </Project>

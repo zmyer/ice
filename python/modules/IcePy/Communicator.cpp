@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -701,13 +701,24 @@ communicatorIdentityToString(CommunicatorObject* self, PyObject* args)
 extern "C"
 #endif
 static PyObject*
-communicatorFlushBatchRequests(CommunicatorObject* self)
+communicatorFlushBatchRequests(CommunicatorObject* self, PyObject* args)
 {
+    PyObject* compressBatchType = lookupType("Ice.CompressBatch");
+    PyObject* compressBatch;
+    if(!PyArg_ParseTuple(args, STRCAST("O!"), compressBatchType, &compressBatch))
+    {
+        return 0;
+    }
+
+    PyObjectHandle v = PyObject_GetAttrString(compressBatch, STRCAST("_value"));
+    assert(v.get());
+    Ice::CompressBatch cb = static_cast<Ice::CompressBatch>(PyLong_AsLong(v.get()));
+
     assert(self->communicator);
     try
     {
         AllowThreads allowThreads; // Release Python's global interpreter lock to avoid a potential deadlock.
-        (*self->communicator)->flushBatchRequests();
+        (*self->communicator)->flushBatchRequests(cb);
     }
     catch(const Ice::Exception& ex)
     {
@@ -723,22 +734,87 @@ communicatorFlushBatchRequests(CommunicatorObject* self)
 extern "C"
 #endif
 static PyObject*
+communicatorFlushBatchRequestsAsync(CommunicatorObject* self, PyObject* args, PyObject* /*kwds*/)
+{
+    PyObject* compressBatchType = lookupType("Ice.CompressBatch");
+    PyObject* compressBatch;
+    if(!PyArg_ParseTuple(args, STRCAST("O!"), compressBatchType, &compressBatch))
+    {
+        return 0;
+    }
+
+    PyObjectHandle v = PyObject_GetAttrString(compressBatch, STRCAST("_value"));
+    assert(v.get());
+    Ice::CompressBatch cb = static_cast<Ice::CompressBatch>(PyLong_AsLong(v.get()));
+
+    assert(self->communicator);
+    const string op = "flushBatchRequests";
+
+    FlushAsyncCallbackPtr d = new FlushAsyncCallback(op);
+    Ice::Callback_Communicator_flushBatchRequestsPtr callback =
+        Ice::newCallback_Communicator_flushBatchRequests(d, &FlushAsyncCallback::exception, &FlushAsyncCallback::sent);
+
+    Ice::AsyncResultPtr result;
+
+    try
+    {
+        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
+
+        result = (*self->communicator)->begin_flushBatchRequests(cb, callback);
+    }
+    catch(const Ice::Exception& ex)
+    {
+        setPythonException(ex);
+        return 0;
+    }
+
+    PyObjectHandle asyncResultObj = createAsyncResult(result, 0, 0, self->wrapper);
+    if(!asyncResultObj.get())
+    {
+        return 0;
+    }
+
+    PyObjectHandle future = createFuture(op, asyncResultObj.get());
+    if(!future.get())
+    {
+        return 0;
+    }
+    d->setFuture(future.get());
+    return future.release();
+}
+
+#ifdef WIN32
+extern "C"
+#endif
+static PyObject*
 communicatorBeginFlushBatchRequests(CommunicatorObject* self, PyObject* args, PyObject* kwds)
 {
     assert(self->communicator);
 
     static char* argNames[] =
     {
+        const_cast<char*>("compress"),
         const_cast<char*>("_ex"),
         const_cast<char*>("_sent"),
         0
     };
+    PyObject* compressBatch;
     PyObject* ex = Py_None;
     PyObject* sent = Py_None;
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, STRCAST("|OO"), argNames, &ex, &sent))
+    if(!PyArg_ParseTupleAndKeywords(args, kwds, STRCAST("O|OO"), argNames, &compressBatch, &ex, &sent))
     {
         return 0;
     }
+
+    PyObject* compressBatchType = lookupType("Ice.CompressBatch");
+    if(!PyObject_IsInstance(compressBatch, reinterpret_cast<PyObject*>(compressBatchType)))
+    {
+        return 0;
+    }
+
+    PyObjectHandle v = PyObject_GetAttrString(compressBatch, STRCAST("_value"));
+    assert(v.get());
+    Ice::CompressBatch cb = static_cast<Ice::CompressBatch>(PyLong_AsLong(v.get()));
 
     if(ex == Py_None)
     {
@@ -756,11 +832,11 @@ communicatorBeginFlushBatchRequests(CommunicatorObject* self, PyObject* args, Py
         return 0;
     }
 
-    Ice::Callback_Communicator_flushBatchRequestsPtr cb;
+    Ice::Callback_Communicator_flushBatchRequestsPtr callback;
     if(ex || sent)
     {
         FlushCallbackPtr d = new FlushCallback(ex, sent, "flushBatchRequests");
-        cb = Ice::newCallback_Communicator_flushBatchRequests(d, &FlushCallback::exception, &FlushCallback::sent);
+        callback = Ice::newCallback_Communicator_flushBatchRequests(d, &FlushCallback::exception, &FlushCallback::sent);
     }
 
     Ice::AsyncResultPtr result;
@@ -768,13 +844,13 @@ communicatorBeginFlushBatchRequests(CommunicatorObject* self, PyObject* args, Py
     {
         AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
 
-        if(cb)
+        if(callback)
         {
-            result = (*self->communicator)->begin_flushBatchRequests(cb);
+            result = (*self->communicator)->begin_flushBatchRequests(cb, callback);
         }
         else
         {
-            result = (*self->communicator)->begin_flushBatchRequests();
+            result = (*self->communicator)->begin_flushBatchRequests(cb);
         }
     }
     catch(const Ice::Exception& ex)
@@ -1606,11 +1682,13 @@ static PyMethodDef CommunicatorMethods[] =
         PyDoc_STR(STRCAST("getDefaultLocator() -> proxy")) },
     { STRCAST("setDefaultLocator"), reinterpret_cast<PyCFunction>(communicatorSetDefaultLocator), METH_VARARGS,
         PyDoc_STR(STRCAST("setDefaultLocator(proxy) -> None")) },
-    { STRCAST("flushBatchRequests"), reinterpret_cast<PyCFunction>(communicatorFlushBatchRequests), METH_NOARGS,
-        PyDoc_STR(STRCAST("flushBatchRequests() -> None")) },
+    { STRCAST("flushBatchRequests"), reinterpret_cast<PyCFunction>(communicatorFlushBatchRequests), METH_VARARGS,
+        PyDoc_STR(STRCAST("flushBatchRequests(compress) -> None")) },
+    { STRCAST("flushBatchRequestsAsync"), reinterpret_cast<PyCFunction>(communicatorFlushBatchRequestsAsync),
+        METH_VARARGS, PyDoc_STR(STRCAST("flushBatchRequestsAsync(compress) -> Ice.Future")) },
     { STRCAST("begin_flushBatchRequests"), reinterpret_cast<PyCFunction>(communicatorBeginFlushBatchRequests),
         METH_VARARGS | METH_KEYWORDS,
-        PyDoc_STR(STRCAST("begin_flushBatchRequests([_ex][, _sent]) -> Ice.AsyncResult")) },
+        PyDoc_STR(STRCAST("begin_flushBatchRequests(compress[, _ex][, _sent]) -> Ice.AsyncResult")) },
     { STRCAST("end_flushBatchRequests"), reinterpret_cast<PyCFunction>(communicatorEndFlushBatchRequests),
         METH_VARARGS, PyDoc_STR(STRCAST("end_flushBatchRequests(Ice.AsyncResult) -> None")) },
     { STRCAST("createAdmin"), reinterpret_cast<PyCFunction>(communicatorCreateAdmin), METH_VARARGS,
@@ -1734,25 +1812,51 @@ IcePy::getCommunicatorWrapper(const Ice::CommunicatorPtr& communicator)
     CommunicatorMap::iterator p = _communicatorMap.find(communicator);
     assert(p != _communicatorMap.end());
     CommunicatorObject* obj = reinterpret_cast<CommunicatorObject*>(p->second);
-    Py_INCREF(obj->wrapper);
-    return obj->wrapper;
+    if(obj->wrapper)
+    {
+        Py_INCREF(obj->wrapper);
+        return obj->wrapper;
+    }
+    else
+    {
+        //
+        // Communicator must have been destroyed already.
+        //
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
 }
 
 extern "C"
 PyObject*
-IcePy_identityToString(PyObject* /*self*/, PyObject* obj)
+IcePy_identityToString(PyObject* /*self*/, PyObject* args)
 {
+    PyObject* identityType = lookupType("Ice.Identity");
+    PyObject* obj;
+    PyObject* mode = 0;
+    if(!PyArg_ParseTuple(args, STRCAST("O!O"), identityType, &obj, &mode))
+    {
+        return 0;
+    }
+
     Ice::Identity id;
     if(!getIdentity(obj, id))
     {
         return 0;
     }
-    
+
+    Ice::ToStringMode toStringMode = Ice::Unicode;
+    if(mode != Py_None && PyObject_HasAttrString(mode, STRCAST("value")))
+    {
+        PyObjectHandle modeValue = PyObject_GetAttrString(mode, STRCAST("value"));
+        toStringMode = static_cast<Ice::ToStringMode>(PyLong_AsLong(modeValue.get()));
+    }
+
     string str;
 
     try
     {
-        str = Ice::identityToString(id);
+        str = identityToString(id, toStringMode);
     }
     catch(const Ice::Exception& ex)
     {

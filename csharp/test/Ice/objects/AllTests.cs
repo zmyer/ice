@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,9 +11,9 @@ using System;
 using System.Diagnostics;
 using Test;
 
-public class AllTests : TestCommon.TestApp
+public class AllTests : TestCommon.AllTests
 {
-    public static Ice.Object MyValueFactory(string type)
+    public static Ice.Value MyValueFactory(string type)
     {
         if (type.Equals("::Test::B"))
         {
@@ -63,7 +63,7 @@ public class AllTests : TestCommon.TestApp
             Debug.Assert(_destroyed);
         }
 
-        public Ice.Object create(string type)
+        public Ice.Value create(string type)
         {
             return null;
         }
@@ -77,8 +77,9 @@ public class AllTests : TestCommon.TestApp
         private bool _destroyed;
     }
 
-    public static InitialPrx allTests(Ice.Communicator communicator)
+    public static InitialPrx allTests(TestCommon.Application app)
     {
+        Ice.Communicator communicator = app.communicator();
         communicator.getValueFactoryManager().add(MyValueFactory, "::Test::B");
         communicator.getValueFactoryManager().add(MyValueFactory, "::Test::C");
         communicator.getValueFactoryManager().add(MyValueFactory, "::Test::D");
@@ -96,7 +97,7 @@ public class AllTests : TestCommon.TestApp
 
         Write("testing stringToProxy... ");
         Flush();
-        String @ref = "initial:default -p 12010";
+        String @ref = "initial:" + app.getTestEndpoint(0);
         Ice.ObjectPrx @base = communicator.stringToProxy(@ref);
         test(@base != null);
         WriteLine("ok");
@@ -148,11 +149,11 @@ public class AllTests : TestCommon.TestApp
         //test(((B)b1.theA).theC is C); // Redundant -- theC is always of type C
         test(((C) (((B) b1.theA).theC)).theB == b1.theA);
         test(b1.preMarshalInvoked);
-        test(b1.postUnmarshalInvoked());
+        test(b1.postUnmarshalInvoked);
         test(b1.theA.preMarshalInvoked);
-        test(b1.theA.postUnmarshalInvoked());
+        test(b1.theA.postUnmarshalInvoked);
         test(((B)b1.theA).theC.preMarshalInvoked);
-        test(((B)b1.theA).theC.postUnmarshalInvoked());
+        test(((B)b1.theA).theC.postUnmarshalInvoked);
 
         // More tests possible for b2 and d, but I think this is already
         // sufficient.
@@ -187,40 +188,40 @@ public class AllTests : TestCommon.TestApp
         test(dout.theB == b2out);
         test(dout.theC == null);
         test(dout.preMarshalInvoked);
-        test(dout.postUnmarshalInvoked());
+        test(dout.postUnmarshalInvoked);
         test(dout.theA.preMarshalInvoked);
-        test(dout.theA.postUnmarshalInvoked());
+        test(dout.theA.postUnmarshalInvoked);
         test(dout.theB.preMarshalInvoked);
-        test(dout.theB.postUnmarshalInvoked());
+        test(dout.theB.postUnmarshalInvoked);
         test(dout.theB.theC.preMarshalInvoked);
-        test(dout.theB.theC.postUnmarshalInvoked());
+        test(dout.theB.theC.postUnmarshalInvoked);
 
         WriteLine("ok");
 
         Write("testing protected members... ");
         Flush();
-        E e = initial.getE();
-        test(e.checkValues());
+        EI e = (EI)initial.getE();
+        test(e != null && e.checkValues());
         System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.NonPublic |
                                                System.Reflection.BindingFlags.Public |
                                                System.Reflection.BindingFlags.Instance;
         test(!typeof(E).GetField("i", flags).IsPublic && !typeof(E).GetField("i", flags).IsPrivate);
         test(!typeof(E).GetField("s", flags).IsPublic && !typeof(E).GetField("s", flags).IsPrivate);
-        F f = initial.getF();
+        FI f = (FI)initial.getF();
         test(f.checkValues());
-        test(f.e2.checkValues());
+        test(((EI)f.e2).checkValues());
         test(!typeof(F).GetField("e1", flags).IsPublic && !typeof(F).GetField("e1", flags).IsPrivate);
         test(typeof(F).GetField("e2", flags).IsPublic && !typeof(F).GetField("e2", flags).IsPrivate);
         WriteLine("ok");
 
         Write("getting I, J and H... ");
         Flush();
-        I i = initial.getI();
+        var i = initial.getI();
         test(i != null);
-        I j = initial.getJ();
-        test(j != null && ((J)j) != null);
-        I h = initial.getH();
-        test(h != null && ((H)h) != null);
+        var j = initial.getJ();
+        test(j != null);
+        var h = initial.getH();
+        test(h != null);
         WriteLine("ok");
 
         Write("getting D1... ");
@@ -286,9 +287,17 @@ public class AllTests : TestCommon.TestApp
         }
         WriteLine("ok");
 
+        Write("testing marshaled results...");
+        Flush();
+        b1 = initial.getMB();
+        test(b1 != null && b1.theB == b1);
+        b1 = initial.getAMDMBAsync().Result;
+        test(b1 != null && b1.theB == b1);
+        WriteLine("ok");
+
         Write("testing UnexpectedObjectException...");
         Flush();
-        @ref = "uoet:default -p 12010";
+        @ref = "uoet:" + app.getTestEndpoint(0);
         @base = communicator.stringToProxy(@ref);
         test(@base != null);
         UnexpectedObjectExceptionTestPrx uoet = UnexpectedObjectExceptionTestPrxHelper.uncheckedCast(@base);

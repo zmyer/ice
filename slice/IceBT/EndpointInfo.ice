@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,9 +9,13 @@
 
 #pragma once
 
-[["cpp:header-ext:h", "objc:header-dir:objc", "js:ice-build"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICEBT_API", "objc:header-dir:objc", "js:ice-build"]]
 
 #include <Ice/Endpoint.ice>
+
+#ifndef __SLICE2JAVA_COMPAT__
+[["java:package:com.zeroc"]]
+#endif
 
 /**
  *
@@ -21,15 +25,6 @@
 ["objc:prefix:ICEBT"]
 module IceBT
 {
-
-/**
- *
- * Uniquely identifies Bluetooth endpoints.
- *
- **/
-#ifndef __SLICE2OBJC__
-const short EndpointType = 6;
-#endif
 
 /**
  *

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,11 +12,13 @@ using System.Collections.Generic;
 using Test;
 
 
-public class AllTests : TestCommon.TestApp
+public class AllTests : TestCommon.AllTests
 {
-    public static GPrx allTests(Ice.Communicator communicator)
+    public static GPrx allTests(TestCommon.Application app)
     {
-        
+
+        Ice.Communicator communicator = app.communicator();
+
         Write("testing Ice.Admin.Facets property... ");
         test(communicator.getProperties().getPropertyAsList("Ice.Admin.Facets").Length == 0);
         communicator.getProperties().setProperty("Ice.Admin.Facets", "foobar");
@@ -42,20 +44,20 @@ public class AllTests : TestCommon.TestApp
         communicator.getProperties().setProperty("FacetExceptionTestAdapter.Endpoints", "default");
         Ice.ObjectAdapter adapter = communicator.createObjectAdapter("FacetExceptionTestAdapter");
         Ice.Object obj = new EmptyI();
-        adapter.add(obj, communicator.stringToIdentity("d"));
-        adapter.addFacet(obj, communicator.stringToIdentity("d"), "facetABCD");
+        adapter.add(obj, Ice.Util.stringToIdentity("d"));
+        adapter.addFacet(obj, Ice.Util.stringToIdentity("d"), "facetABCD");
         try
         {
-            adapter.addFacet(obj, communicator.stringToIdentity("d"), "facetABCD");
+            adapter.addFacet(obj, Ice.Util.stringToIdentity("d"), "facetABCD");
             test(false);
         }
         catch(Ice.AlreadyRegisteredException)
         {
         }
-        adapter.removeFacet(communicator.stringToIdentity("d"), "facetABCD");
+        adapter.removeFacet(Ice.Util.stringToIdentity("d"), "facetABCD");
         try
         {
-            adapter.removeFacet(communicator.stringToIdentity("d"), "facetABCD");
+            adapter.removeFacet(Ice.Util.stringToIdentity("d"), "facetABCD");
             test(false);
         }
         catch(Ice.NotRegisteredException)
@@ -66,26 +68,26 @@ public class AllTests : TestCommon.TestApp
         Write("testing removeAllFacets... ");
         Ice.Object obj1 = new EmptyI();
         Ice.Object obj2 = new EmptyI();
-        adapter.addFacet(obj1, communicator.stringToIdentity("id1"), "f1");
-        adapter.addFacet(obj2, communicator.stringToIdentity("id1"), "f2");
+        adapter.addFacet(obj1, Ice.Util.stringToIdentity("id1"), "f1");
+        adapter.addFacet(obj2, Ice.Util.stringToIdentity("id1"), "f2");
         Ice.Object obj3 = new EmptyI();
-        adapter.addFacet(obj1, communicator.stringToIdentity("id2"), "f1");
-        adapter.addFacet(obj2, communicator.stringToIdentity("id2"), "f2");
-        adapter.addFacet(obj3, communicator.stringToIdentity("id2"), "");
+        adapter.addFacet(obj1, Ice.Util.stringToIdentity("id2"), "f1");
+        adapter.addFacet(obj2, Ice.Util.stringToIdentity("id2"), "f2");
+        adapter.addFacet(obj3, Ice.Util.stringToIdentity("id2"), "");
         Dictionary<string, Ice.Object> fm
-            = adapter.removeAllFacets(communicator.stringToIdentity("id1"));
+            = adapter.removeAllFacets(Ice.Util.stringToIdentity("id1"));
         test(fm.Count == 2);
         test(fm["f1"] == obj1);
         test(fm["f2"] == obj2);
         try
         {
-            adapter.removeAllFacets(communicator.stringToIdentity("id1"));
+            adapter.removeAllFacets(Ice.Util.stringToIdentity("id1"));
             test(false);
         }
         catch(Ice.NotRegisteredException)
         {
         }
-        fm = adapter.removeAllFacets(communicator.stringToIdentity("id2"));
+        fm = adapter.removeAllFacets(Ice.Util.stringToIdentity("id2"));
         test(fm.Count == 3);
         test(fm["f1"] == obj1);
         test(fm["f2"] == obj2);
@@ -96,7 +98,7 @@ public class AllTests : TestCommon.TestApp
 
         Write("testing stringToProxy... ");
         Flush();
-        string @ref = "d:default -p 12010";
+        string @ref = "d:" + app.getTestEndpoint(0);
         Ice.ObjectPrx db = communicator.stringToProxy(@ref);
         test(db != null);
         WriteLine("ok");
@@ -151,7 +153,7 @@ public class AllTests : TestCommon.TestApp
         test(d.callC().Equals("C"));
         test(d.callD().Equals("D"));
         WriteLine("ok");
-     
+
         Write("testing facets A, B, C, and D... ");
         Flush();
         df = DPrxHelper.checkedCast(d, "facetABCD");
@@ -161,7 +163,7 @@ public class AllTests : TestCommon.TestApp
         test(df.callC().Equals("C"));
         test(df.callD().Equals("D"));
         WriteLine("ok");
-        
+
         Write("testing facets E and F... ");
         Flush();
         FPrx ff = FPrxHelper.checkedCast(d, "facetEF");
@@ -169,14 +171,14 @@ public class AllTests : TestCommon.TestApp
         test(ff.callE().Equals("E"));
         test(ff.callF().Equals("F"));
         WriteLine("ok");
-        
+
         Write("testing facet G... ");
         Flush();
         GPrx gf = GPrxHelper.checkedCast(ff, "facetGH");
         test(gf != null);
         test(gf.callG().Equals("G"));
         WriteLine("ok");
-        
+
         Write("testing whether casting preserves the facet... ");
         Flush();
         HPrx hf = HPrxHelper.checkedCast(gf);

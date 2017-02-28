@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -23,12 +23,19 @@
 #include <Ice/TraceLevels.h>
 #include <Ice/LoggerUtil.h>
 #include <Ice/SlicedData.h>
-#include <IceUtil/StringConverter.h>
+#include <Ice/StringConverter.h>
 #include <iterator>
+
+#ifndef ICE_UNALIGNED
+#   if defined(__i386) || defined(_M_IX86) || defined(__x86_64) || defined(_M_X64)
+#       define ICE_UNALIGNED
+#   endif
+#endif
 
 using namespace std;
 using namespace Ice;
 using namespace IceInternal;
+
 
 Ice::InputStream::InputStream()
 {
@@ -156,9 +163,6 @@ Ice::InputStream::initialize(Instance* instance, const EncodingVersion& encoding
 
     _instance = instance;
 
-    _stringConverter = _instance->getStringConverter();
-    _wstringConverter = _instance->getWstringConverter();
-
 #ifndef ICE_CPP11_MAPPING
     _collectObjects = _instance->collectObjects();
 #endif
@@ -196,13 +200,6 @@ Ice::InputStream::clear()
 }
 
 void
-Ice::InputStream::setStringConverters(const IceUtil::StringConverterPtr& sc, const IceUtil::WstringConverterPtr& wsc)
-{
-    _stringConverter = sc;
-    _wstringConverter = wsc;
-}
-
-void
 Ice::InputStream::setValueFactoryManager(const ValueFactoryManagerPtr& vfm)
 {
     _valueFactoryManager = vfm;
@@ -216,7 +213,7 @@ Ice::InputStream::setLogger(const LoggerPtr& logger)
 
 void
 #ifdef ICE_CPP11_MAPPING
-Ice::InputStream::setCompactIdResolver(std::function<std::string (int)> r)
+Ice::InputStream::setCompactIdResolver(std::function<std::string(int)> r)
 #else
 Ice::InputStream::setCompactIdResolver(const CompactIdResolverPtr& r)
 #endif
@@ -283,8 +280,6 @@ Ice::InputStream::swap(InputStream& other)
     std::swap(_startSeq, other._startSeq);
     std::swap(_minSeqSize, other._minSeqSize);
 
-    std::swap(_stringConverter, other._stringConverter);
-    std::swap(_wstringConverter, other._wstringConverter);
     std::swap(_valueFactoryManager, other._valueFactoryManager);
     std::swap(_logger, other._logger);
     std::swap(_compactIdResolver, other._compactIdResolver);
@@ -500,6 +495,27 @@ struct ReadBoolHelper<1>
 
 }
 
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(pair<const bool*, const bool*>& v)
+{
+    Int sz = readAndCheckSeqSize(1);
+    if(sz > 0)
+    {
+        auto boolArray = ReadBoolHelper<sizeof(bool)>::read(v, sz, i);
+        if(boolArray)
+        {
+            _deleters.push_back([boolArray] { delete[] boolArray; });
+        }
+        i += sz;
+    }
+    else
+    {
+        v.first = v.second = reinterpret_cast<bool*>(i);
+    }
+}
+
+#else
 void
 Ice::InputStream::read(pair<const bool*, const bool*>& v, IceUtil::ScopedArray<bool>& result)
 {
@@ -515,6 +531,7 @@ Ice::InputStream::read(pair<const bool*, const bool*>& v, IceUtil::ScopedArray<b
         v.first = v.second = reinterpret_cast<bool*>(i);
     }
 }
+#endif
 
 void
 Ice::InputStream::read(Short& v)
@@ -564,20 +581,32 @@ Ice::InputStream::read(vector<Short>& v)
     }
 }
 
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(pair<const short*, const short*>& v)
+#else
 void
 Ice::InputStream::read(pair<const Short*, const Short*>& v, IceUtil::ScopedArray<Short>& result)
+#endif
 {
     Int sz = readAndCheckSeqSize(static_cast<int>(sizeof(Short)));
     if(sz > 0)
     {
-#if defined(__i386) || defined(_M_IX86) || defined(__x86_64) || defined(_M_X64)
+#ifdef ICE_UNALIGNED
         v.first = reinterpret_cast<Short*>(i);
         i += sz * static_cast<int>(sizeof(Short));
         v.second = reinterpret_cast<Short*>(i);
 #else
+#  ifdef ICE_CPP11_MAPPING
+        auto result = new short[sz];
+        _deleters.push_back([result] { delete[] result; });
+        v.first = result;
+        v.second = result + sz;
+#  else
         result.reset(new Short[sz]);
         v.first = result.get();
         v.second = result.get() + sz;
+#   endif
 
         Container::iterator begin = i;
         i += sz * static_cast<int>(sizeof(Short));
@@ -597,7 +626,9 @@ Ice::InputStream::read(pair<const Short*, const Short*>& v, IceUtil::ScopedArray
     }
     else
     {
+#ifndef ICE_CPP11_MAPPING
         result.reset();
+#endif
         v.first = v.second = 0;
     }
 }
@@ -632,20 +663,33 @@ Ice::InputStream::read(vector<Int>& v)
     }
 }
 
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(pair<const Int*, const Int*>& v)
+#else
 void
 Ice::InputStream::read(pair<const Int*, const Int*>& v, ::IceUtil::ScopedArray<Int>& result)
+#endif
 {
     Int sz = readAndCheckSeqSize(static_cast<int>(sizeof(Int)));
     if(sz > 0)
     {
-#if defined(__i386) || defined(_M_IX86) || defined(__x86_64) || defined(_M_X64)
+#ifdef ICE_UNALIGNED
         v.first = reinterpret_cast<Int*>(i);
         i += sz * static_cast<int>(sizeof(Int));
         v.second = reinterpret_cast<Int*>(i);
 #else
+
+#  ifdef ICE_CPP11_MAPPING
+        auto result = new int[sz];
+        _deleters.push_back([result] { delete[] result; });
+        v.first = result;
+        v.second = result + sz;
+#  else
         result.reset(new Int[sz]);
         v.first = result.get();
         v.second = result.get() + sz;
+#  endif
 
         Container::iterator begin = i;
         i += sz * static_cast<int>(sizeof(Int));
@@ -667,7 +711,9 @@ Ice::InputStream::read(pair<const Int*, const Int*>& v, ::IceUtil::ScopedArray<I
     }
     else
     {
+#ifndef ICE_CPP11_MAPPING
         result.reset();
+#endif
         v.first = v.second = 0;
     }
 }
@@ -738,20 +784,33 @@ Ice::InputStream::read(vector<Long>& v)
     }
 }
 
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(pair<const Long*, const Long*>& v)
+#else
 void
 Ice::InputStream::read(pair<const Long*, const Long*>& v, IceUtil::ScopedArray<Long>& result)
+#endif
 {
     Int sz = readAndCheckSeqSize(static_cast<int>(sizeof(Long)));
     if(sz > 0)
     {
-#if defined(__i386) || defined(_M_IX86) || defined(__x86_64) || defined(_M_X64)
+#ifdef ICE_UNALIGNED
         v.first = reinterpret_cast<Long*>(i);
         i += sz * static_cast<int>(sizeof(Long));
         v.second = reinterpret_cast<Long*>(i);
 #else
+
+#  ifdef ICE_CPP11_MAPPING
+        auto result = new long long[sz];
+        _deleters.push_back([result] { delete[] result; });
+        v.first = result;
+        v.second = result + sz;
+#  else
         result.reset(new Long[sz]);
         v.first = result.get();
         v.second = result.get() + sz;
+#  endif
 
         Container::iterator begin = i;
         i += sz * static_cast<int>(sizeof(Long));
@@ -777,7 +836,9 @@ Ice::InputStream::read(pair<const Long*, const Long*>& v, IceUtil::ScopedArray<L
     }
     else
     {
+#ifndef ICE_CPP11_MAPPING
         result.reset();
+#endif
         v.first = v.second = 0;
     }
 }
@@ -836,20 +897,33 @@ Ice::InputStream::read(vector<Float>& v)
     }
 }
 
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(pair<const Float*, const Float*>& v)
+#else
 void
 Ice::InputStream::read(pair<const Float*, const Float*>& v, IceUtil::ScopedArray<Float>& result)
+#endif
 {
     Int sz = readAndCheckSeqSize(static_cast<int>(sizeof(Float)));
     if(sz > 0)
     {
-#if defined(__i386) || defined(_M_IX86) || defined(__x86_64) || defined(_M_X64)
+#ifdef ICE_UNALIGNED
         v.first = reinterpret_cast<Float*>(i);
         i += sz * static_cast<int>(sizeof(Float));
         v.second = reinterpret_cast<Float*>(i);
 #else
+
+#  ifdef ICE_CPP11_MAPPING
+        auto result = new float[sz];
+        _deleters.push_back([result] { delete[] result; });
+        v.first = result;
+        v.second = result + sz;
+#  else
         result.reset(new Float[sz]);
         v.first = result.get();
         v.second = result.get() + sz;
+#  endif
 
         Container::iterator begin = i;
         i += sz * static_cast<int>(sizeof(Float));
@@ -871,7 +945,9 @@ Ice::InputStream::read(pair<const Float*, const Float*>& v, IceUtil::ScopedArray
     }
     else
     {
+#ifndef ICE_CPP11_MAPPING
         result.reset();
+#endif
         v.first = v.second = 0;
     }
 }
@@ -968,20 +1044,34 @@ Ice::InputStream::read(vector<Double>& v)
     }
 }
 
+
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(pair<const Double*, const Double*>& v)
+#else
 void
 Ice::InputStream::read(pair<const Double*, const Double*>& v, IceUtil::ScopedArray<Double>& result)
+#endif
 {
     Int sz = readAndCheckSeqSize(static_cast<int>(sizeof(Double)));
     if(sz > 0)
     {
-#if defined(__i386) || defined(_M_IX86) || defined(__x86_64) || defined(_M_X64)
+#ifdef ICE_UNALIGNED
         v.first = reinterpret_cast<Double*>(i);
         i += sz * static_cast<int>(sizeof(Double));
         v.second = reinterpret_cast<Double*>(i);
 #else
+
+#  ifdef ICE_CPP11_MAPPING
+        auto result = new double[sz];
+        _deleters.push_back([result] { delete[] result; });
+        v.first = result;
+        v.second = result + sz;
+#  else
         result.reset(new Double[sz]);
         v.first = result.get();
         v.second = result.get() + sz;
+#  endif
 
         Container::iterator begin = i;
         i += sz * static_cast<int>(sizeof(Double));
@@ -1023,24 +1113,181 @@ Ice::InputStream::read(pair<const Double*, const Double*>& v, IceUtil::ScopedArr
     }
     else
     {
+#ifndef ICE_CPP11_MAPPING
         result.reset();
+#endif
         v.first = v.second = 0;
     }
 }
 
 void
+Ice::InputStream::read(std::string& v, bool convert)
+{
+    Int sz = readSize();
+    if(sz > 0)
+    {
+        if(b.end() - i < sz)
+        {
+            throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
+        }
+
+        if(!convert || !readConverted(v, sz))
+        {
+            string(reinterpret_cast<const char*>(&*i), reinterpret_cast<const char*>(&*i) + sz).swap(v);
+        }
+        i += sz;
+    }
+    else
+    {
+        v.clear();
+    }
+}
+
+#ifdef ICE_CPP11_MAPPING
+void
+Ice::InputStream::read(const char*& vdata, size_t& vsize, bool convert)
+{
+    int sz = readSize();
+    if(sz > 0)
+    {
+        if(b.end() - i < sz)
+        {
+            throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
+        }
+
+        if(convert == false)
+        {
+            vdata = reinterpret_cast<const char*>(&*i);
+            vsize = static_cast<size_t>(sz);
+            i += sz;
+        }
+        else
+        {
+            string converted;
+            if(readConverted(converted, sz))
+            {
+                if(converted.size() <= static_cast<size_t>(sz))
+                {
+                    //
+                    // Write converted string directly into buffer
+                    //
+                    std::memcpy(i, converted.data(), converted.size());
+                    vdata = reinterpret_cast<const char*>(&*i);
+                    vsize = converted.size();
+                }
+                else
+                {
+                    auto holder = new string(std::move(converted));
+                    _deleters.push_back([holder] { delete holder; });
+                    vdata = holder->data();
+                    vsize = holder->size();
+                }
+            }
+            else
+            {
+                vdata = reinterpret_cast<const char*>(&*i);
+                vsize = static_cast<size_t>(sz);
+            }
+            i += sz;
+        }
+    }
+    else
+    {
+        vdata = 0;
+        vsize = 0;
+    }
+}
+
+#else
+
+void
+Ice::InputStream::read(const char*& vdata, size_t& vsize)
+{
+    Int sz = readSize();
+    if(sz > 0)
+    {
+        if(b.end() - i < sz)
+        {
+            throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
+        }
+
+        vdata = reinterpret_cast<const char*>(&*i);
+        vsize = static_cast<size_t>(sz);
+        i += sz;
+    }
+    else
+    {
+        vdata = 0;
+        vsize = 0;
+    }
+}
+
+void
+Ice::InputStream::read(const char*& vdata, size_t& vsize, string& holder)
+{
+    Int sz = readSize();
+    if(sz > 0)
+    {
+        if(b.end() - i < sz)
+        {
+            throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
+        }
+
+        if(readConverted(holder, sz))
+        {
+            vdata = holder.data();
+            vsize = holder.size();
+        }
+        else
+        {
+            vdata = reinterpret_cast<const char*>(&*i);
+            vsize = static_cast<size_t>(sz);
+        }
+        i += sz;
+    }
+    else
+    {
+        holder.clear();
+        vdata = 0;
+        vsize = 0;
+    }
+}
+#endif
+
+bool
 Ice::InputStream::readConverted(string& v, int sz)
 {
-    if(!_stringConverter)
-    {
-        throw MarshalException(__FILE__, __LINE__, "no string converter provided");
-    }
-
     try
     {
-        _stringConverter->fromUTF8(i, i + sz, v);
+        bool converted = false;
+
+        //
+        // NOTE: When using an _instance, we get a const& on the string reference to
+        // not have to increment unecessarily its reference count.
+        //
+
+        if(_instance)
+        {
+            const StringConverterPtr& stringConverter = _instance->getStringConverter();
+            if(stringConverter)
+            {
+                stringConverter->fromUTF8(i, i + sz, v);
+                converted = true;
+            }
+        }
+        else
+        {
+            StringConverterPtr stringConverter = getProcessStringConverter();
+            if(stringConverter)
+            {
+                stringConverter->fromUTF8(i, i + sz, v);
+                converted = true;
+            }
+        }
+
+        return converted;
     }
-    catch(const IceUtil::IllegalConversionException& ex)
+    catch(const IllegalConversionException& ex)
     {
         throw StringConversionException(__FILE__, __LINE__, ex.reason());
     }
@@ -1067,11 +1314,6 @@ Ice::InputStream::read(vector<string>& v, bool convert)
 void
 Ice::InputStream::read(wstring& v)
 {
-    if(!_wstringConverter)
-    {
-        throw MarshalException(__FILE__, __LINE__, "no wstring converter provided");
-    }
-
     Int sz = readSize();
     if(sz > 0)
     {
@@ -1082,10 +1324,20 @@ Ice::InputStream::read(wstring& v)
 
         try
         {
-            _wstringConverter->fromUTF8(i, i + sz, v);
+            if(_instance)
+            {
+                const WstringConverterPtr& wstringConverter = _instance->getWstringConverter();
+                wstringConverter->fromUTF8(i, i + sz, v);
+            }
+            else
+            {
+                WstringConverterPtr wstringConverter = getProcessWstringConverter();
+                wstringConverter->fromUTF8(i, i + sz, v);
+            }
+
             i += sz;
         }
-        catch(const IceUtil::IllegalConversionException& ex)
+        catch(const IllegalConversionException& ex)
         {
             throw StringConversionException(__FILE__, __LINE__, ex.reason());
         }
@@ -1169,7 +1421,7 @@ Ice::InputStream::readEnum(Int maxValue)
 }
 
 void
-Ice::InputStream::throwException(const UserExceptionFactoryPtr& factory)
+Ice::InputStream::throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY) factory)
 {
     initEncaps();
     _currentEncaps->decoder->throwException(factory);
@@ -1233,52 +1485,52 @@ Ice::InputStream::skipOptional(OptionalFormat type)
 {
     switch(type)
     {
-    case Ice::OptionalFormatF1:
-    {
-        skip(1);
-        break;
-    }
-    case Ice::OptionalFormatF2:
-    {
-        skip(2);
-        break;
-    }
-    case Ice::OptionalFormatF4:
-    {
-        skip(4);
-        break;
-    }
-    case Ice::OptionalFormatF8:
-    {
-        skip(8);
-        break;
-    }
-    case Ice::OptionalFormatSize:
-    {
-        skipSize();
-        break;
-    }
-    case Ice::OptionalFormatVSize:
-    {
-        skip(readSize());
-        break;
-    }
-    case Ice::OptionalFormatFSize:
-    {
-        Int sz;
-        read(sz);
-        if(sz < 0)
+        case ICE_SCOPED_ENUM(OptionalFormat, F1):
         {
-            throw UnmarshalOutOfBoundsException(__FILE__, __LINE__);
+            skip(1);
+            break;
         }
-        skip(sz);
-        break;
-    }
-    case Ice::OptionalFormatClass:
-    {
-        read(0, 0);
-        break;
-    }
+        case ICE_SCOPED_ENUM(OptionalFormat, F2):
+        {
+            skip(2);
+            break;
+        }
+        case ICE_SCOPED_ENUM(OptionalFormat, F4):
+        {
+            skip(4);
+            break;
+        }
+        case ICE_SCOPED_ENUM(OptionalFormat, F8):
+        {
+            skip(8);
+            break;
+        }
+        case ICE_SCOPED_ENUM(OptionalFormat, Size):
+        {
+            skipSize();
+            break;
+        }
+        case ICE_SCOPED_ENUM(OptionalFormat, VSize):
+        {
+            skip(readSize());
+            break;
+        }
+        case ICE_SCOPED_ENUM(OptionalFormat, FSize):
+        {
+            Int sz;
+            read(sz);
+            if(sz < 0)
+            {
+                throw UnmarshalOutOfBoundsException(__FILE__, __LINE__);
+            }
+            skip(sz);
+            break;
+        }
+        case ICE_SCOPED_ENUM(OptionalFormat, Class):
+        {
+            read(0, 0);
+            break;
+        }
     }
 }
 
@@ -1329,7 +1581,7 @@ Ice::InputStream::resolveCompactId(int id) const
     string type;
 
 #ifdef ICE_CPP11_MAPPING
-    function<string (int)> resolver = compactIdResolver();
+    function<string(int)> resolver = compactIdResolver();
 #else
     CompactIdResolverPtr resolver = compactIdResolver();
 #endif
@@ -1442,7 +1694,7 @@ Ice::InputStream::logger() const
 }
 
 #ifdef ICE_CPP11_MAPPING
-function<string (int)>
+function<string(int)>
 Ice::InputStream::compactIdResolver() const
 {
     if(_compactIdResolver)
@@ -1497,6 +1749,11 @@ Ice::InputStream::initEncaps()
     }
 }
 
+Ice::InputStream::EncapsDecoder::~EncapsDecoder()
+{
+    // Out of line to avoid weak vtable
+}
+
 string
 Ice::InputStream::EncapsDecoder::readTypeId(bool isIndex)
 {
@@ -1528,7 +1785,7 @@ Ice::InputStream::EncapsDecoder::newInstance(const string& typeId)
     // Try to find a factory registered for the specific type.
     //
 #ifdef ICE_CPP11_MAPPING
-    function<ValuePtr (const string&)> userFactory;
+    function<ValuePtr(const string&)> userFactory;
     if(_valueFactoryManager)
     {
         userFactory = _valueFactoryManager->find(typeId);
@@ -1571,7 +1828,7 @@ Ice::InputStream::EncapsDecoder::newInstance(const string& typeId)
     if(!v)
     {
 #ifdef ICE_CPP11_MAPPING
-        function<ValuePtr (const string&)> of = IceInternal::factoryTable->getValueFactory(typeId);
+        function<ValuePtr(const string&)> of = IceInternal::factoryTable->getValueFactory(typeId);
         if(of)
         {
             v = of(typeId);
@@ -1642,7 +1899,7 @@ Ice::InputStream::EncapsDecoder::unmarshal(Int index, const Ice::ValuePtr& v)
     //
     // Read the object.
     //
-    v->__read(_stream);
+    v->_iceRead(_stream);
 
     //
     // Patch all instances now that the object is unmarshaled.
@@ -1724,7 +1981,7 @@ Ice::InputStream::EncapsDecoder10::read(PatchFunc patchFunc, void* patchAddr)
 }
 
 void
-Ice::InputStream::EncapsDecoder10::throwException(const UserExceptionFactoryPtr& factory)
+Ice::InputStream::EncapsDecoder10::throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY) factory)
 {
     assert(_sliceType == NoSlice);
 
@@ -1746,7 +2003,7 @@ Ice::InputStream::EncapsDecoder10::throwException(const UserExceptionFactoryPtr&
     //
     startSlice();
     const string mostDerivedId = _typeId;
-    UserExceptionFactoryPtr exceptionFactory = factory;
+    ICE_USER_EXCEPTION_FACTORY exceptionFactory = factory;
     while(true)
     {
         //
@@ -1769,11 +2026,15 @@ Ice::InputStream::EncapsDecoder10::throwException(const UserExceptionFactoryPtr&
             //
             try
             {
+#ifdef ICE_CPP11_MAPPING
+                exceptionFactory(_typeId);
+#else
                 exceptionFactory->createAndThrow(_typeId);
+#endif
             }
             catch(UserException& ex)
             {
-                ex.__read(_stream);
+                ex._read(_stream);
                 if(usesClasses)
                 {
                     readPendingValues();
@@ -2026,7 +2287,7 @@ Ice::InputStream::EncapsDecoder11::read(PatchFunc patchFunc, void* patchAddr)
 }
 
 void
-Ice::InputStream::EncapsDecoder11::throwException(const UserExceptionFactoryPtr& factory)
+Ice::InputStream::EncapsDecoder11::throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY) factory)
 {
     assert(!_current);
 
@@ -2037,7 +2298,7 @@ Ice::InputStream::EncapsDecoder11::throwException(const UserExceptionFactoryPtr&
     //
     startSlice();
     const string mostDerivedId = _current->typeId;
-    UserExceptionFactoryPtr exceptionFactory = factory;
+    ICE_USER_EXCEPTION_FACTORY exceptionFactory = factory;
     while(true)
     {
         //
@@ -2060,11 +2321,15 @@ Ice::InputStream::EncapsDecoder11::throwException(const UserExceptionFactoryPtr&
             //
             try
             {
+#ifdef ICE_CPP11_MAPPING
+                exceptionFactory(_current->typeId);
+#else
                 exceptionFactory->createAndThrow(_current->typeId);
+#endif
             }
             catch(UserException& ex)
             {
-                ex.__read(_stream);
+                ex._read(_stream);
                 throw;
 
                 // Never reached.

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,7 +9,6 @@
 
 namespace Ice
 {
-    using System.Collections;
     using System.Collections.Generic;
     using System.Threading;
 
@@ -34,8 +33,7 @@ namespace Ice
             }
             else
             {
-                throw new Ice.InitializationException(
-                    "'" + kind + "' is not a valid value for Ice.ImplicitContext"); 
+                throw new InitializationException("'" + kind + "' is not a valid value for Ice.ImplicitContext");
             }
         }
         
@@ -210,7 +208,7 @@ namespace Ice
             {
                 if(_map.ContainsKey(currentThread))
                 {
-                    threadContext = (Dictionary<string, string>)_map[currentThread];
+                    threadContext = _map[currentThread];
                 }
             }
 

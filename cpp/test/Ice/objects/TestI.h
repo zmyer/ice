@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,48 +17,24 @@ class BI : public Test::B
 {
 public:
 
-    BI();
-
-    virtual bool postUnmarshalInvoked(const Ice::Current&);
-
     virtual void ice_preMarshal();
     virtual void ice_postUnmarshal();
-
-private:
-
-    bool _postUnmarshalInvoked;
 };
 
 class CI : public Test::C
 {
 public:
 
-    CI();
-
-    virtual bool postUnmarshalInvoked(const Ice::Current&);
-
     virtual void ice_preMarshal();
     virtual void ice_postUnmarshal();
-
-private:
-
-    bool _postUnmarshalInvoked;
 };
 
 class DI : public Test::D
 {
 public:
 
-    DI();
-
-    virtual bool postUnmarshalInvoked(const Ice::Current&);
-
     virtual void ice_preMarshal();
     virtual void ice_postUnmarshal();
-
-private:
-
-    bool _postUnmarshalInvoked;
 };
 
 class EI : public Test::E
@@ -67,8 +43,9 @@ public:
 
     EI();
 
-    virtual bool checkValues(const Ice::Current&);
+    bool checkValues();
 };
+ICE_DEFINE_PTR(EIPtr, EI);
 
 class FI : public Test::F
 {
@@ -77,8 +54,9 @@ public:
     FI();
     FI(const Test::EPtr&);
 
-    virtual bool checkValues(const Ice::Current&);
+    bool checkValues();
 };
+ICE_DEFINE_PTR(FIPtr, FI);
 
 #ifdef ICE_CPP11_MAPPING
 class II : public ::Ice::InterfaceByValue<Test::I>
@@ -102,12 +80,7 @@ class HI : public Test::H
 {
 };
 
-class InitialI :
-#ifdef ICE_CPP11_MAPPING
-    public Test::InitialDisp
-#else
-    public Test::Initial
-#endif
+class InitialI : public Test::Initial
 {
 public:
 
@@ -120,8 +93,19 @@ public:
     virtual Test::DPtr getD(const Ice::Current&);
     virtual Test::EPtr getE(const Ice::Current&);
     virtual Test::FPtr getF(const Ice::Current&);
+
+#ifdef ICE_CPP11_MAPPING
+    virtual GetMBMarshaledResult getMB(const Ice::Current&);
+    virtual void getAMDMBAsync(std::function<void(const GetAMDMBMarshaledResult&)>,
+                               std::function<void(std::exception_ptr)>,
+                               const Ice::Current&);
+#else
+    virtual Test::BPtr getMB(const Ice::Current&);
+    virtual void getAMDMB_async(const Test::AMD_Initial_getAMDMBPtr&, const Ice::Current&);
+#endif
+
     virtual void getAll(Test::BPtr&, Test::BPtr&, Test::CPtr&, Test::DPtr&, const Ice::Current&);
-    
+
 #ifdef ICE_CPP11_MAPPING
     virtual ::std::shared_ptr<::Ice::Value> getI(const Ice::Current&);
     virtual ::std::shared_ptr<::Ice::Value> getJ(const Ice::Current&);
@@ -143,13 +127,13 @@ public:
     virtual Test::BaseSeq opBaseSeq(ICE_IN(Test::BaseSeq), Test::BaseSeq&, const Ice::Current&);
 
     virtual Test::CompactPtr getCompact(const Ice::Current&);
-    
+
     virtual Test::Inner::APtr getInnerA(const Ice::Current&);
     virtual Test::Inner::Sub::APtr getInnerSubA(const Ice::Current&);
-    
+
     virtual void throwInnerEx(const Ice::Current&);
     virtual void throwInnerSubEx(const Ice::Current&);
-    
+
 private:
 
     Ice::ObjectAdapterPtr _adapter;

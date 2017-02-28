@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -101,7 +101,8 @@ testExceptions(const TestIntfPrxPtr& obj)
     }
     catch(const UnknownLocalException& ex)
     {
-        test(ex.unknown.find("Ice::SocketException") != string::npos);
+        test(ex.unknown.find("Ice::SocketException") != string::npos ||
+             ex.unknown.find("Ice.SocketException") != string::npos);
     }
     catch(...)
     {
@@ -226,7 +227,7 @@ allTests(const CommunicatorPtr& communicator)
     TestIntfPrxPtr obj = ICE_CHECKED_CAST(TestIntfPrx, base);
     test(obj);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(obj, base));
+    test(Ice::targetEqualTo(obj, base));
 #else
     test(obj == base);
 #endif

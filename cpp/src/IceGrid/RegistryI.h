@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,6 +11,7 @@
 #define ICE_GRID_REGISTRYI_H
 
 #include <IceUtil/Timer.h>
+#include <Ice/UniquePtr.h>
 #include <IceGrid/Registry.h>
 #include <IceGrid/Internal.h>
 #include <IceGrid/PlatformInfo.h>
@@ -119,7 +120,7 @@ private:
     IceUtil::TimerPtr _timer;
     SessionServantManagerPtr _servantManager;
     int _sessionTimeout;
-    IceUtil::UniquePtr<ReplicaSessionManager> _session;
+    IceInternal::UniquePtr<ReplicaSessionManager> _session;
     mutable PlatformInfo _platform;
     
     ClientSessionFactoryPtr _clientSessionFactory;

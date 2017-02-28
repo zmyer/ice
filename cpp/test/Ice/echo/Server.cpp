@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -50,9 +50,9 @@ run(int argc, char* argv[], const Ice::CommunicatorPtr& communicator)
 {
     communicator->getProperties()->setProperty("TestAdapter.Endpoints", getTestEndpoint(communicator, 0));
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter");
-    BlobjectIPtr blob = new BlobjectI;
+    BlobjectIPtr blob = ICE_MAKE_SHARED(BlobjectI);
     adapter->addDefaultServant(blob, "");
-    adapter->add(new EchoI(blob), communicator->stringToIdentity("__echo"));
+    adapter->add(ICE_MAKE_SHARED(EchoI, blob), Ice::stringToIdentity("__echo"));
     adapter->activate();
 
     TEST_READY
@@ -69,8 +69,7 @@ main(int argc, char* argv[])
 
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
         communicator = Ice::initialize(argc, argv, initData);
         status = run(argc, argv, communicator);
     }
@@ -82,15 +81,7 @@ main(int argc, char* argv[])
 
     if(communicator)
     {
-        try
-        {
-            communicator->destroy();
-        }
-        catch(const Ice::Exception& ex)
-        {
-            cerr << ex << endl;
-            status = EXIT_FAILURE;
-        }
+        communicator->destroy();
     }
 
     return status;

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -44,11 +44,9 @@ ServantLocatorI::locate(const Ice::Current& current, Ice::LocalObjectPtr& cookie
 
 void
 #ifdef ICE_CPP11_MAPPING
-ServantLocatorI::finished(const Ice::Current&, const Ice::ObjectPtr&,
-                          const std::shared_ptr<void>& cookie)
+ServantLocatorI::finished(const Ice::Current&, const Ice::ObjectPtr&, const std::shared_ptr<void>& cookie)
 #else
-ServantLocatorI::finished(const Ice::Current&, const Ice::ObjectPtr&,
-                          const Ice::LocalObjectPtr& cookie)
+ServantLocatorI::finished(const Ice::Current&, const Ice::ObjectPtr&, const Ice::LocalObjectPtr& cookie)
 #endif
 {
     test(!_deactivated);

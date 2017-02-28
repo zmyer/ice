@@ -1,16 +1,11 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
-
-using System;
-using System.Diagnostics;
-using System.Collections.Generic;
-using Ice.Instrumentation;
 
 namespace IceInternal
 {
@@ -41,9 +36,9 @@ namespace IceInternal
             return this;
         }
 
-        public bool sendAsyncRequest(ProxyOutgoingAsyncBase outAsync, out Ice.AsyncCallback sentCallback)
+        public int sendAsyncRequest(ProxyOutgoingAsyncBase outAsync)
         {
-            return outAsync.invokeRemote(_connection, _compress, _response, out sentCallback);
+            return outAsync.invokeRemote(_connection, _compress, _response);
         }
 
         public void asyncRequestCanceled(OutgoingAsyncBase outAsync, Ice.LocalException ex)

@@ -1,3 +1,6 @@
+// **********************************************************************
+//
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,27 +20,16 @@
 namespace IceUtil
 {
 
-enum ConversionFlags
-{
-    strictConversion = 0,
-    lenientConversion
-};
-
-typedef unsigned char Byte;
-
-ICE_API bool
-isLegalUTF8Sequence(const Byte* source, const Byte* end);
-
 //
-// Provides bytes to toUTF8. Can raise std::bad_alloc or Ice::MemoryLimitException 
+// Provides bytes to toUTF8. Can raise std::bad_alloc or Ice::MemoryLimitException
 // when too many bytes are requested.
 //
 class ICE_API UTF8Buffer
 {
 public:
     virtual Byte* getMoreBytes(size_t howMany, Byte* firstUnused) = 0;
-    
-    virtual ~UTF8Buffer() {}
+
+    virtual ~UTF8Buffer();
 };
 
 //
@@ -46,8 +38,12 @@ public:
 // It report errors by raising IllegalConversionException or an exception raised
 // by UTF8Buffer
 //
+
 template<typename charT>
-class BasicStringConverter : public IceUtil::Shared
+class BasicStringConverter
+#ifndef ICE_CPP11_MAPPING
+    : public IceUtil::Shared
+#endif
 {
 public:
     //
@@ -62,51 +58,33 @@ public:
     //
     virtual void fromUTF8(const Byte* sourceStart, const Byte* sourceEnd,
                           std::basic_string<charT>& target) const = 0;
+
+    virtual ~BasicStringConverter()
+    {
+    }
 };
+
+#ifdef __clang__
+//
+// Explicit template instantiation so that dynamic_cast of derived exported
+// classes works well with clang, see ICE-7473.
+//
+template class ICE_API BasicStringConverter<char>;
+template class ICE_API BasicStringConverter<wchar_t>;
+#endif
 
 typedef BasicStringConverter<char> StringConverter;
-typedef IceUtil::Handle<StringConverter> StringConverterPtr;
+ICE_DEFINE_PTR(StringConverterPtr, StringConverter);
 
 typedef BasicStringConverter<wchar_t> WstringConverter;
-typedef IceUtil::Handle<WstringConverter> WstringConverterPtr;
+ICE_DEFINE_PTR(WstringConverterPtr, WstringConverter);
 
 //
-// Converts to and from UTF-16 or UTF-32 depending on sizeof(wchar_t)
+// Create a WstringConverter that converts to and from UTF-16 or UTF-32
+// depending on sizeof(wchar_t).
 //
-class ICE_API UnicodeWstringConverter : public WstringConverter
-{
-public:
-
-    UnicodeWstringConverter(ConversionFlags = lenientConversion);
-
-    virtual Byte* toUTF8(const wchar_t*, const wchar_t*, UTF8Buffer&) const;
-
-    virtual void fromUTF8(const Byte*, const Byte*, std::wstring&) const;
-
-private:
-    const ConversionFlags _conversionFlags;
-};
-
-#ifdef _WIN32
-
 //
-// Converts to/from UTF-8 using MultiByteToWideChar and WideCharToMultiByte
-//
-class ICE_API WindowsStringConverter : public StringConverter
-{
-public:
-
-    explicit WindowsStringConverter(unsigned int);
-
-    virtual Byte* toUTF8(const char*, const char*, UTF8Buffer&) const;
-
-    virtual void fromUTF8(const Byte*, const Byte*, std::string& target) const;
-
-private:
-    unsigned int _cp;
-    UnicodeWstringConverter _unicodeWstringConverter;
-};
-#endif
+ICE_API WstringConverterPtr createUnicodeWstringConverter();
 
 //
 // Retrieve the per process narrow string converter.
@@ -132,26 +110,28 @@ ICE_API void setProcessWstringConverter(const WstringConverterPtr&);
 //
 // Converts the given wide string to a narrow string
 //
-// If the StringConverter parameter is null, the result's narrow 
-// string encoding is UTF-8.  
-// If the WstringConverter parameter is null, the input's wstring 
+// If the StringConverter parameter is null, the result's narrow
+// string encoding is UTF-8.
+// If the WstringConverter parameter is null, the input's wstring
 // encoding is UTF-16 or UTF-32 depending on the size of wchar_t.
 //
 ICE_API std::string
-wstringToString(const std::wstring&, const StringConverterPtr& = 0, 
-                const WstringConverterPtr& = 0, ConversionFlags = lenientConversion);
+wstringToString(const std::wstring&,
+                const StringConverterPtr& = 0,
+                const WstringConverterPtr& = 0);
 
 //
 // Converts the given narrow string to a wide string
 //
-// If the StringConverter parameter is null, the input's narrow string 
-// encoding is UTF-8.  
-// If the WstringConverter parameter is null, the result's wstring 
+// If the StringConverter parameter is null, the input's narrow string
+// encoding is UTF-8.
+// If the WstringConverter parameter is null, the result's wstring
 // encoding is UTF-16 or UTF-32 depending on the size of wchar_t.
 //
 ICE_API std::wstring
-stringToWstring(const std::string&, const StringConverterPtr& = 0, 
-                const WstringConverterPtr& = 0, ConversionFlags = lenientConversion);
+stringToWstring(const std::string&,
+                const StringConverterPtr& = 0,
+                const WstringConverterPtr& = 0);
 
 
 //
@@ -171,5 +151,32 @@ ICE_API std::string
 UTF8ToNative(const std::string&, const StringConverterPtr&);
 
 }
+
+namespace IceUtilInternal
+{
+//
+// Convert from UTF-8 to UTF-16/32
+//
+ICE_API std::vector<unsigned short> toUTF16(const std::vector<IceUtil::Byte>&);
+ICE_API std::vector<unsigned int> toUTF32(const std::vector<IceUtil::Byte>&);
+
+//
+// Convert from UTF-32 to UTF-8
+//
+ICE_API std::vector<IceUtil::Byte> fromUTF32(const std::vector<unsigned int>&);
+
+}
+
+#ifdef _WIN32
+namespace IceUtil
+{
+//
+// Create a StringConverter that converts to and from narrow chars
+// in the given code page, using MultiByteToWideChar and WideCharToMultiByte
+//
+ICE_API StringConverterPtr createWindowsStringConverter(unsigned int);
+
+}
+#endif
 
 #endif

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -16,17 +16,16 @@
 #include <Ice/CommunicatorF.h>
 #include <Ice/ConnectionIF.h>
 #include <Ice/ObjectAdapterF.h>
-#include <Ice/VirtualShared.h>
 #include <Ice/RequestHandlerF.h>
 #include <Ice/ConnectionF.h>
 #include <Ice/OutputStream.h>
 #include <Ice/InputStream.h>
 #include <Ice/ObserverHelper.h>
 #include <Ice/LocalException.h>
+#include <Ice/UniquePtr.h>
 
 #ifndef ICE_CPP11_MAPPING
 #    include <Ice/AsyncResult.h>
-#    include <IceUtil/UniquePtr.h>
 #endif
 
 #include <exception>
@@ -39,6 +38,9 @@ class CollocatedRequestHandler;
 
 class ICE_API OutgoingAsyncCompletionCallback
 {
+public:
+    virtual ~OutgoingAsyncCompletionCallback();
+
 protected:
 
     virtual bool handleSent(bool, bool) = 0;
@@ -56,10 +58,11 @@ protected:
 // invocation observer.
 //
 class ICE_API OutgoingAsyncBase : virtual public OutgoingAsyncCompletionCallback,
-#ifndef ICE_CPP11_MAPPING
-                                  public Ice::AsyncResult,
+#ifdef ICE_CPP11_MAPPING
+                                  public std::enable_shared_from_this<OutgoingAsyncBase>
+#else
+                                  public Ice::AsyncResult
 #endif
-                                  public Ice::EnableSharedFromThis<OutgoingAsyncBase>
 {
 public:
 
@@ -98,12 +101,14 @@ public:
 
     virtual void throwLocalException() const;
 
-    virtual bool __wait();
-    virtual Ice::InputStream* __startReadParams();
-    virtual void __endReadParams();
-    virtual void __readEmptyParams();
-    virtual void __readParamEncaps(const ::Ice::Byte*&, ::Ice::Int&);
-    virtual void __throwUserException();
+    virtual bool waitForResponse();
+    virtual Ice::InputStream* startReadParams();
+    virtual void endReadParams();
+    virtual void readEmptyParams();
+    virtual void readParamEncaps(const ::Ice::Byte*&, ::Ice::Int&);
+    virtual void throwUserException();
+
+    virtual void scheduleCallback(const CallbackPtr&);
 #endif
 
     void attachRemoteObserver(const Ice::ConnectionInfoPtr& c, const Ice::EndpointPtr& endpt, Ice::Int requestId)
@@ -160,15 +165,14 @@ protected:
 #ifdef ICE_CPP11_MAPPING
     std::mutex _m;
     using Lock = std::lock_guard<std::mutex>;
-    std::exception_ptr _ex;
-    std::exception_ptr _cancellationException;
 #else
     IceUtil::Monitor<IceUtil::Mutex> _m;
     typedef IceUtil::Monitor<IceUtil::Mutex>::Lock Lock;
-    IceUtil::UniquePtr<Ice::Exception> _ex;
-    IceUtil::UniquePtr<Ice::LocalException> _cancellationException;
     Ice::LocalObjectPtr _cookie;
 #endif
+
+    IceInternal::UniquePtr<Ice::Exception> _ex;
+    IceInternal::UniquePtr<Ice::LocalException> _cancellationException;
 
     InvocationObserver _observer;
     ObserverHelperT<Ice::Instrumentation::ChildInvocationObserver> _childObserver;
@@ -193,8 +197,7 @@ protected:
 // correctly canceled when the invocation completes.
 //
 class ICE_API ProxyOutgoingAsyncBase : public OutgoingAsyncBase,
-                                       public IceUtil::TimerTask,
-                                       public Ice::EnableSharedFromThis<ProxyOutgoingAsyncBase>
+                                       public IceUtil::TimerTask
 {
 public:
 
@@ -208,9 +211,12 @@ public:
     void retry();
     void abort(const Ice::Exception&);
 
-    using Ice::EnableSharedFromThis<ProxyOutgoingAsyncBase>::shared_from_this;
-
-#ifndef ICE_CPP11_MAPPING
+#ifdef ICE_CPP11_MAPPING
+    std::shared_ptr<ProxyOutgoingAsyncBase> shared_from_this()
+    {
+        return std::static_pointer_cast<ProxyOutgoingAsyncBase>(OutgoingAsyncBase::shared_from_this());
+    }
+#else
     virtual Ice::ObjectPrx getProxy() const;
     virtual Ice::CommunicatorPtr getCommunicator() const;
 #endif
@@ -244,7 +250,7 @@ class ICE_API OutgoingAsync : public ProxyOutgoingAsyncBase
 {
 public:
 
-    OutgoingAsync(const Ice::ObjectPrxPtr&);
+    OutgoingAsync(const Ice::ObjectPrxPtr&, bool);
 
     void prepare(const std::string&, Ice::OperationMode, const Ice::Context&);
 
@@ -258,7 +264,7 @@ public:
     void invoke(const std::string&);
 #ifdef ICE_CPP11_MAPPING
     void invoke(const std::string&, Ice::OperationMode, Ice::FormatType, const Ice::Context&,
-                const std::function<void (Ice::OutputStream*)>&);
+                std::function<void(Ice::OutputStream*)>);
     void throwUserException();
 #endif
 
@@ -292,88 +298,10 @@ protected:
     const Ice::EncodingVersion _encoding;
 
 #ifdef ICE_CPP11_MAPPING
-    std::function<void (const ::Ice::UserException&)> _userException;
+    std::function<void(const ::Ice::UserException&)> _userException;
 #endif
 
     bool _synchronous;
-};
-
-//
-// Class for handling the proxy's begin_ice_flushBatchRequest request.
-//
-class ICE_API ProxyFlushBatchAsync : public ProxyOutgoingAsyncBase
-{
-public:
-
-    ProxyFlushBatchAsync(const Ice::ObjectPrxPtr&);
-
-    virtual AsyncStatus invokeRemote(const Ice::ConnectionIPtr&, bool, bool);
-    virtual AsyncStatus invokeCollocated(CollocatedRequestHandler*);
-
-    void invoke(const std::string&);
-
-private:
-
-    int _batchRequestNum;
-};
-typedef IceUtil::Handle<ProxyFlushBatchAsync> ProxyFlushBatchAsyncPtr;
-
-//
-// Class for handling the proxy's begin_ice_getConnection request.
-//
-class ICE_API ProxyGetConnection :  public ProxyOutgoingAsyncBase
-{
-public:
-
-    ProxyGetConnection(const Ice::ObjectPrxPtr&);
-
-    virtual AsyncStatus invokeRemote(const Ice::ConnectionIPtr&, bool, bool);
-    virtual AsyncStatus invokeCollocated(CollocatedRequestHandler*);
-
-    void invoke(const std::string&);
-};
-typedef IceUtil::Handle<ProxyGetConnection> ProxyGetConnectionPtr;
-
-//
-// Class for handling Ice::Connection::begin_flushBatchRequests
-//
-class ICE_API ConnectionFlushBatchAsync : public OutgoingAsyncBase
-{
-public:
-
-    ConnectionFlushBatchAsync(const Ice::ConnectionIPtr&, const InstancePtr&);
-
-    virtual Ice::ConnectionPtr getConnection() const;
-
-    void invoke(const std::string&);
-
-private:
-
-    const Ice::ConnectionIPtr _connection;
-};
-typedef IceUtil::Handle<ConnectionFlushBatchAsync> ConnectionFlushBatchAsyncPtr;
-
-//
-// Class for handling Ice::Communicator::begin_flushBatchRequests
-//
-class ICE_API CommunicatorFlushBatchAsync : public OutgoingAsyncBase,
-                                            public Ice::EnableSharedFromThis<CommunicatorFlushBatchAsync>
-{
-public:
-
-    CommunicatorFlushBatchAsync(const InstancePtr&);
-
-    void flushConnection(const Ice::ConnectionIPtr&);
-    void invoke(const std::string&);
-
-    using Ice::EnableSharedFromThis<CommunicatorFlushBatchAsync>::shared_from_this;
-
-private:
-
-    void check(bool);
-
-    int _useCount;
-    InvocationObserver _observer;
 };
 
 }
@@ -387,7 +315,7 @@ class ICE_API LambdaInvoke : virtual public OutgoingAsyncCompletionCallback
 {
 public:
 
-    LambdaInvoke(std::function<void (::std::exception_ptr)>&& exception, std::function<void (bool)>&& sent) :
+    LambdaInvoke(std::function<void(::std::exception_ptr)> exception, std::function<void(bool)> sent) :
         _exception(std::move(exception)), _sent(std::move(sent))
     {
     }
@@ -402,9 +330,9 @@ protected:
     virtual void handleInvokeException(const Ice::Exception&, OutgoingAsyncBase*) const override;
     virtual void handleInvokeResponse(bool, OutgoingAsyncBase*) const override;
 
-    std::function<void (::std::exception_ptr)> _exception;
-    std::function<void (bool)> _sent;
-    std::function<void (bool)> _response;
+    std::function<void(::std::exception_ptr)> _exception;
+    std::function<void(bool)> _sent;
+    std::function<void(bool)> _response;
 };
 
 template<typename Promise>
@@ -421,7 +349,7 @@ public:
 protected:
 
     Promise _promise;
-    std::function<void (bool)> _response;
+    std::function<void(bool)> _response;
 
 private:
 
@@ -477,8 +405,8 @@ public:
            Ice::OperationMode mode,
            Ice::FormatType format,
            const Ice::Context& ctx,
-           std::function<void (Ice::OutputStream*)>&& write,
-           std::function<void (const Ice::UserException&)>&& userException)
+           std::function<void(Ice::OutputStream*)> write,
+           std::function<void(const Ice::UserException&)> userException)
     {
         _read = [](Ice::InputStream* stream)
         {
@@ -487,7 +415,7 @@ public:
             return v;
         };
         _userException = std::move(userException);
-        OutgoingAsync::invoke(operation, mode, format, ctx, write);
+        OutgoingAsync::invoke(operation, mode, format, ctx, std::move(write));
     }
 
     void
@@ -495,22 +423,22 @@ public:
            Ice::OperationMode mode,
            Ice::FormatType format,
            const Ice::Context& ctx,
-           std::function<void (Ice::OutputStream*)>&& write,
-           std::function<void (const Ice::UserException&)>&& userException,
-           std::function<T (Ice::InputStream*)>&& read)
+           std::function<void(Ice::OutputStream*)> write,
+           std::function<void(const Ice::UserException&)> userException,
+           std::function<T(Ice::InputStream*)> read)
     {
         _read = std::move(read);
         _userException = std::move(userException);
-        OutgoingAsync::invoke(operation, mode, format, ctx, write);
+        OutgoingAsync::invoke(operation, mode, format, ctx, std::move(write));
     }
 
 protected:
 
-    std::function<T (Ice::InputStream*)> _read;
+    std::function<T(Ice::InputStream*)> _read;
 };
 
 template<>
-class ICE_API OutgoingAsyncT<void> : public OutgoingAsync
+class OutgoingAsyncT<void> : public OutgoingAsync
 {
 public:
 
@@ -521,11 +449,11 @@ public:
            Ice::OperationMode mode,
            Ice::FormatType format,
            const Ice::Context& ctx,
-           std::function<void (Ice::OutputStream*)>&& write,
-           std::function<void (const Ice::UserException&)>&& userException)
+           std::function<void(Ice::OutputStream*)> write,
+           std::function<void(const Ice::UserException&)> userException)
     {
         _userException = std::move(userException);
-        OutgoingAsync::invoke(operation, mode, format, ctx, write);
+        OutgoingAsync::invoke(operation, mode, format, ctx, std::move(write));
     }
 };
 
@@ -535,91 +463,109 @@ class LambdaOutgoing : public OutgoingAsyncT<R>, public LambdaInvoke
 public:
 
     LambdaOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy,
-                   std::function<void (R)> response,
-                   std::function<void (::std::exception_ptr)>& ex,
-                   std::function<void (bool)>& sent) :
-        OutgoingAsyncT<R>(proxy), LambdaInvoke(std::move(ex), std::move(sent))
+                   std::function<void(R)> response,
+                   std::function<void(::std::exception_ptr)> ex,
+                   std::function<void(bool)> sent) :
+        OutgoingAsyncT<R>(proxy, false), LambdaInvoke(std::move(ex), std::move(sent))
     {
         _response = [this, response](bool ok)
         {
-            if(ok)
+            if(!ok)
+            {
+                this->throwUserException();
+            }
+            else if(response)
             {
                 assert(this->_read);
                 this->_is.startEncapsulation();
                 R v = this->_read(&this->_is);
                 this->_is.endEncapsulation();
-                if(response)
+                try
                 {
-                    try
-                    {
-                        response(std::move(v));
-                    }
-                    catch(...)
-                    {
-                        throw std::current_exception();
-                    }
+                    response(std::move(v));
                 }
-            }
-            else
-            {
-                this->throwUserException();
+                catch(...)
+                {
+                    throw std::current_exception();
+                }
             }
         };
     }
 };
 
 template<>
-class ICE_API LambdaOutgoing<void> : public OutgoingAsyncT<void>, public LambdaInvoke
+class LambdaOutgoing<void> : public OutgoingAsyncT<void>, public LambdaInvoke
 {
 public:
 
     LambdaOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy,
                    std::function<void()> response,
-                   std::function<void (::std::exception_ptr)>& ex,
-                   std::function<void (bool)>& sent) :
-        OutgoingAsyncT<void>(proxy), LambdaInvoke(std::move(ex), std::move(sent))
+                   std::function<void(::std::exception_ptr)> ex,
+                   std::function<void(bool)> sent) :
+        OutgoingAsyncT<void>(proxy, false), LambdaInvoke(std::move(ex), std::move(sent))
     {
         _response = [this, response](bool ok)
         {
-            if(this->_is.b.empty())
-            {
-                //
-                // If there's no response (oneway, batch-oneway proxies), we just set the promise
-                // on completion without reading anything from the input stream. This is required for
-                // batch invocations.
-                //
-                if(response)
-                {
-                    try
-                    {
-                        response();
-                    }
-                    catch(...)
-                    {
-                        throw std::current_exception();
-                    }
-                }
-            }
-            else if(ok)
-            {
-                this->_is.skipEmptyEncapsulation();
-                if(response)
-                {
-                    try
-                    {
-                        response();
-                    }
-                    catch(...)
-                    {
-                        throw std::current_exception();
-                    }
-                }
-            }
-            else
+            if(!ok)
             {
                 this->throwUserException();
             }
+            else if(response)
+            {
+                if(!this->_is.b.empty())
+                {
+                    this->_is.skipEmptyEncapsulation();
+                }
+
+                try
+                {
+                    response();
+                }
+                catch(...)
+                {
+                    throw std::current_exception();
+                }
+            }
         };
+    }
+};
+
+class CustomLambdaOutgoing : public OutgoingAsync, public LambdaInvoke
+{
+public:
+
+    CustomLambdaOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy,
+                         std::function<void(Ice::InputStream*)> read,
+                         std::function<void(::std::exception_ptr)> ex,
+                         std::function<void(bool)> sent) :
+        OutgoingAsync(proxy, false), LambdaInvoke(std::move(ex), std::move(sent))
+    {
+        _response = [this, read](bool ok)
+        {
+            if(!ok)
+            {
+                this->throwUserException();
+            }
+            else if(read)
+            {
+                //
+                // Read and respond
+                //
+                read(&this->_is);
+            }
+        };
+    }
+
+    void
+    invoke(const std::string& operation,
+           Ice::OperationMode mode,
+           Ice::FormatType format,
+           const Ice::Context& ctx,
+           std::function<void(Ice::OutputStream*)> write,
+           std::function<void(const Ice::UserException&)> userException)
+    {
+        _userException = std::move(userException);
+        OutgoingAsync::invoke(operation, mode, format, ctx, std::move(write));
     }
 };
 
@@ -628,10 +574,9 @@ class PromiseOutgoing : public OutgoingAsyncT<R>, public PromiseInvoke<P>
 {
 public:
 
-    PromiseOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy, bool synchronous) :
-        OutgoingAsyncT<R>(proxy)
+    PromiseOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy, bool sync) :
+        OutgoingAsyncT<R>(proxy, sync)
     {
-        this->_synchronous = synchronous;
         this->_response = [this](bool ok)
         {
             if(ok)
@@ -655,10 +600,9 @@ class PromiseOutgoing<P, void> : public OutgoingAsyncT<void>, public PromiseInvo
 {
 public:
 
-    PromiseOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy, bool synchronous) :
-        OutgoingAsyncT<void>(proxy)
+    PromiseOutgoing(const std::shared_ptr<Ice::ObjectPrx>& proxy, bool sync) :
+        OutgoingAsyncT<void>(proxy, sync)
     {
-        this->_synchronous = synchronous;
         this->_response = [&](bool ok)
         {
             if(this->_is.b.empty())
@@ -701,6 +645,8 @@ class ICE_API CallbackBase : public IceUtil::Shared
 {
 public:
 
+    virtual ~CallbackBase();
+
     void checkCallback(bool, bool);
 
     virtual void completed(const ::Ice::AsyncResultPtr&) const = 0;
@@ -715,12 +661,15 @@ typedef IceUtil::Handle<CallbackBase> CallbackBasePtr;
 //
 class ICE_API GenericCallbackBase : public virtual CallbackBase
 {
+public:
+
+    virtual ~GenericCallbackBase();
 };
 
 //
 // See comments in OutgoingAsync.cpp
 //
-extern ICE_API CallbackBasePtr __dummyCallback;
+extern ICE_API CallbackBasePtr dummyCallback;
 
 //
 // Generic callback template that requires the caller to down-cast the
@@ -820,15 +769,16 @@ private:
     const CallbackBasePtr _callback;
 };
 
-class ICE_API CallbackOutgoing : public OutgoingAsync, public CallbackCompletion
+class CallbackOutgoing : public OutgoingAsync, public CallbackCompletion
 {
 public:
 
     CallbackOutgoing(const Ice::ObjectPrx& proxy,
                      const std::string& operation,
                      const CallbackBasePtr& cb,
-                     const Ice::LocalObjectPtr& cookie) :
-        OutgoingAsync(proxy), CallbackCompletion(cb, cookie), _operation(operation)
+                     const Ice::LocalObjectPtr& cookie,
+                     bool sync) :
+        OutgoingAsync(proxy, sync), CallbackCompletion(cb, cookie), _operation(operation)
     {
         _cookie = cookie;
     }

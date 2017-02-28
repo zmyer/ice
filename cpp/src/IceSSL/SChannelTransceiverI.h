@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -43,18 +43,14 @@ namespace IceSSL
 class ConnectorI;
 class AcceptorI;
 
-class TransceiverI : public IceInternal::Transceiver, public IceInternal::WSTransceiverDelegate
+class TransceiverI : public IceInternal::Transceiver
 {
 public:
 
     virtual IceInternal::NativeInfoPtr getNativeInfo();
 
     virtual IceInternal::SocketOperation initialize(IceInternal::Buffer&, IceInternal::Buffer&);
-#ifdef ICE_CPP11_MAPPING
-    virtual IceInternal::SocketOperation closing(bool, std::exception_ptr);
-#else
     virtual IceInternal::SocketOperation closing(bool, const Ice::LocalException&);
-#endif
     virtual void close();
     virtual IceInternal::SocketOperation write(IceInternal::Buffer&);
     virtual IceInternal::SocketOperation read(IceInternal::Buffer&);
@@ -68,16 +64,13 @@ public:
     virtual std::string toString() const;
     virtual std::string toDetailedString() const;
     virtual Ice::ConnectionInfoPtr getInfo() const;
-    virtual Ice::ConnectionInfoPtr getWSInfo(const Ice::HeaderDict&) const;
     virtual void checkSendSize(const IceInternal::Buffer&);
     virtual void setBufferSize(int rcvSize, int sndSize);
 
 private:
 
-    TransceiverI(const InstancePtr&, const IceInternal::StreamSocketPtr&, const std::string&, bool);
+    TransceiverI(const InstancePtr&, const IceInternal::TransceiverPtr&, const std::string&, bool);
     virtual ~TransceiverI();
-
-    void fillConnectionInfo(const ConnectionInfoPtr&, std::vector<CertificatePtr>&) const;
 
     IceInternal::SocketOperation sslHandshake();
 
@@ -92,6 +85,7 @@ private:
 
     enum State
     {
+        StateNotInitialized,
         StateHandshakeNotStarted,
         StateHandshakeReadContinue,
         StateHandshakeWriteContinue,
@@ -103,7 +97,7 @@ private:
     const std::string _host;
     const std::string _adapterName;
     const bool _incoming;
-    const IceInternal::StreamSocketPtr _stream;
+    const IceInternal::TransceiverPtr _delegate;
     State _state;
 
     //
@@ -127,7 +121,10 @@ private:
     CredHandle _credentials;
     bool _credentialsInitialized;
     SecPkgContext_StreamSizes _sizes;
+    std::string _cipher;
+    std::vector<std::string> _certs;
     bool _verified;
+    std::vector<CertificatePtr> _nativeCerts;
 };
 typedef IceUtil::Handle<TransceiverI> TransceiverIPtr;
 

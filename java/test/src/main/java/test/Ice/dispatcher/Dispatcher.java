@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,10 +9,11 @@
 
 package test.Ice.dispatcher;
 
-public class Dispatcher implements Runnable, Ice.Dispatcher
+public class Dispatcher implements Runnable,
+                        java.util.function.BiConsumer<Runnable, com.zeroc.Ice.Connection>,
+                        java.util.concurrent.Executor
 {
-    private static void
-    test(boolean b)
+    private static void test(boolean b)
     {
         if(!b)
         {
@@ -27,8 +28,7 @@ public class Dispatcher implements Runnable, Ice.Dispatcher
     }
 
     @Override
-    public void 
-    run()
+    public void run()
     {
         while(true)
         {
@@ -45,7 +45,7 @@ public class Dispatcher implements Runnable, Ice.Dispatcher
                     {
                     }
                 }
-                
+
                 if(!_calls.isEmpty())
                 {
                     call = _calls.poll();
@@ -56,7 +56,7 @@ public class Dispatcher implements Runnable, Ice.Dispatcher
                     return;
                 }
             }
-            
+
             if(call != null)
             {
                 try
@@ -71,10 +71,9 @@ public class Dispatcher implements Runnable, Ice.Dispatcher
             }
         }
     }
-    
+
     @Override
-    synchronized public void
-    dispatch(Runnable call, Ice.Connection con)
+    synchronized public void accept(Runnable call, com.zeroc.Ice.Connection con)
     {
         boolean added = _calls.offer(call);
         assert(added);
@@ -84,8 +83,13 @@ public class Dispatcher implements Runnable, Ice.Dispatcher
         }
     }
 
-    public void
-    terminate()
+    @Override
+    public void execute(Runnable call)
+    {
+        accept(call, null);
+    }
+
+    public void terminate()
     {
         synchronized(this)
         {
@@ -104,14 +108,13 @@ public class Dispatcher implements Runnable, Ice.Dispatcher
             }
         }
     }
-    
-    public boolean
-    isDispatcherThread()
+
+    public boolean isDispatcherThread()
     {
         return Thread.currentThread() == _thread;
     }
 
-    private java.util.Queue<Runnable> _calls = new java.util.LinkedList<Runnable>();
+    private java.util.Queue<Runnable> _calls = new java.util.LinkedList<>();
     private Thread _thread;
     private boolean _terminated = false;
 }

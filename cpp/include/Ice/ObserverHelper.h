@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,7 +22,7 @@ template<typename T = Ice::Instrumentation::Observer> class ObserverHelperT
 public:
 
 #ifdef ICE_CPP11_MAPPING
-    typedef ::std::shared_ptr<T> TPtr;
+    using TPtr = ::std::shared_ptr<T>;
 #else
     typedef IceInternal::Handle<T> TPtr;
 #endif

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,6 +14,7 @@
 #include <Ice/Initialize.h>
 
 #include <IceDiscovery/LookupI.h>
+#include <iterator>
 
 using namespace std;
 using namespace Ice;
@@ -116,7 +117,7 @@ AdapterRequest::finished(const Ice::ObjectPrxPtr& proxy)
 void
 AdapterRequest::runTimerTask()
 {
-    _lookup->adapterRequestTimedOut(shared_from_this());
+    _lookup->adapterRequestTimedOut(ICE_SHARED_FROM_THIS);
 }
 
 void
@@ -128,7 +129,7 @@ ObjectRequest::response(const Ice::ObjectPrxPtr& proxy)
 void
 ObjectRequest::runTimerTask()
 {
-    _lookup->objectRequestTimedOut(shared_from_this());
+    _lookup->objectRequestTimedOut(ICE_SHARED_FROM_THIS);
 }
 
 LookupI::LookupI(const LocatorRegistryIPtr& registry, const LookupPrxPtr& lookup, const Ice::PropertiesPtr& properties) :
@@ -193,7 +194,7 @@ LookupI::findObjectById(const string& domainId, const Ice::Identity& id, const I
         try
         {
 #ifdef ICE_CPP11_MAPPING
-            reply->foundObjectById_async(id, proxy);
+            reply->foundObjectByIdAsync(id, proxy);
 #else
             reply->begin_foundObjectById(id, proxy);
 #endif
@@ -229,7 +230,7 @@ LookupI::findAdapterById(const string& domainId, const string& adapterId, const 
         try
         {
 #ifdef ICE_CPP11_MAPPING
-            reply->foundAdapterById_async(adapterId, proxy, isReplicaGroup);
+            reply->foundAdapterByIdAsync(adapterId, proxy, isReplicaGroup);
 #else
             reply->begin_foundAdapterById(adapterId, proxy, isReplicaGroup);
 #endif
@@ -243,7 +244,7 @@ LookupI::findAdapterById(const string& domainId, const string& adapterId, const 
 
 #ifdef ICE_CPP11_MAPPING
 void
-LookupI::findObject(function<void (const shared_ptr<Ice::ObjectPrx>&)> response, const Ice::Identity& id)
+LookupI::findObject(function<void(const shared_ptr<Ice::ObjectPrx>&)> response, const Ice::Identity& id)
 {
     Lock sync(*this);
     map<Ice::Identity, ObjectRequestPtr>::iterator p = _objectRequests.find(id);
@@ -256,7 +257,7 @@ LookupI::findObject(function<void (const shared_ptr<Ice::ObjectPrx>&)> response,
     {
         try
         {
-            _lookup->findObjectById_async(_domainId, id, _lookupReply);
+            _lookup->findObjectByIdAsync(_domainId, id, _lookupReply);
             _timer->schedule(p->second, _timeout);
         }
         catch(const Ice::LocalException&)
@@ -268,7 +269,7 @@ LookupI::findObject(function<void (const shared_ptr<Ice::ObjectPrx>&)> response,
 }
 
 void
-LookupI::findAdapter(function<void (const shared_ptr<Ice::ObjectPrx>&)> response, const std::string& adapterId)
+LookupI::findAdapter(function<void(const shared_ptr<Ice::ObjectPrx>&)> response, const std::string& adapterId)
 {
     Lock sync(*this);
     map<string, AdapterRequestPtr>::iterator p = _adapterRequests.find(adapterId);
@@ -281,7 +282,7 @@ LookupI::findAdapter(function<void (const shared_ptr<Ice::ObjectPrx>&)> response
     {
         try
         {
-            _lookup->findAdapterById_async(_domainId, adapterId, _lookupReply);
+            _lookup->findAdapterByIdAsync(_domainId, adapterId, _lookupReply);
             _timer->schedule(p->second, _timeout);
         }
         catch(const Ice::LocalException&)
@@ -390,7 +391,7 @@ LookupI::objectRequestTimedOut(const ObjectRequestPtr& request)
         try
         {
 #ifdef ICE_CPP11_MAPPING
-            _lookup->findObjectById_async(_domainId, request->getId(), _lookupReply);
+            _lookup->findObjectByIdAsync(_domainId, request->getId(), _lookupReply);
 #else
             _lookup->begin_findObjectById(_domainId, request->getId(), _lookupReply);
 #endif
@@ -422,7 +423,7 @@ LookupI::adapterRequestTimedOut(const AdapterRequestPtr& request)
         try
         {
 #ifdef ICE_CPP11_MAPPING
-            _lookup->findAdapterById_async(_domainId, request->getId(), _lookupReply);            
+            _lookup->findAdapterByIdAsync(_domainId, request->getId(), _lookupReply);
 #else
             _lookup->begin_findAdapterById(_domainId, request->getId(), _lookupReply);
 #endif

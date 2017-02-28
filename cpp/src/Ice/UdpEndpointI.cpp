@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -76,11 +76,25 @@ IceInternal::UdpEndpointI::UdpEndpointI(const ProtocolInstancePtr& instance, Inp
     s->read(const_cast<bool&>(_compress));
 }
 
+void
+IceInternal::UdpEndpointI::streamWriteImpl(OutputStream* s) const
+{
+    IPEndpointI::streamWriteImpl(s);
+    if(s->getEncoding() == Ice::Encoding_1_0)
+    {
+        s->write(Ice::Protocol_1_0);
+        s->write(Ice::Encoding_1_0);
+    }
+    // Not transmitted.
+    //s->write(_connect);
+    s->write(_compress);
+}
+
 EndpointInfoPtr
 IceInternal::UdpEndpointI::getInfo() const
 {
-    Ice::UDPEndpointInfoPtr info = ICE_MAKE_SHARED(InfoI<Ice::UDPEndpointInfo>, 
-                                                   ICE_DYNAMIC_CAST(UdpEndpointI, shared_from_this()));
+    Ice::UDPEndpointInfoPtr info = ICE_MAKE_SHARED(InfoI<Ice::UDPEndpointInfo>,
+                                                   ICE_DYNAMIC_CAST(UdpEndpointI, ICE_SHARED_FROM_CONST_THIS(UdpEndpointI)));
     fillEndpointInfo(info.get());
     return info;
 }
@@ -94,7 +108,7 @@ IceInternal::UdpEndpointI::timeout() const
 EndpointIPtr
 IceInternal::UdpEndpointI::timeout(Int) const
 {
-    return shared_from_this();
+    return ICE_SHARED_FROM_CONST_THIS(UdpEndpointI);
 }
 
 bool
@@ -108,7 +122,7 @@ IceInternal::UdpEndpointI::compress(bool compress) const
 {
     if(compress == _compress)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(UdpEndpointI);
     }
     else
     {
@@ -126,7 +140,7 @@ IceInternal::UdpEndpointI::datagram() const
 TransceiverPtr
 IceInternal::UdpEndpointI::transceiver() const
 {
-    return new UdpTransceiver(ICE_DYNAMIC_CAST(UdpEndpointI, shared_from_this()), _instance, _host, _port, _mcastInterface, _connect);
+    return new UdpTransceiver(ICE_DYNAMIC_CAST(UdpEndpointI, ICE_SHARED_FROM_CONST_THIS(UdpEndpointI)), _instance, _host, _port, _mcastInterface, _connect);
 }
 
 AcceptorPtr
@@ -140,6 +154,26 @@ IceInternal::UdpEndpointI::endpoint(const UdpTransceiverPtr& transceiver) const
 {
     return ICE_MAKE_SHARED(UdpEndpointI, _instance, _host, transceiver->effectivePort(), _sourceAddr, _mcastInterface,
                            _mcastTtl, _connect, _connectionId, _compress);
+}
+
+void
+IceInternal::UdpEndpointI::initWithOptions(vector<string>& args, bool oaEndpoint)
+{
+    IPEndpointI::initWithOptions(args, oaEndpoint);
+
+    if(_mcastInterface == "*")
+    {
+        if(oaEndpoint)
+        {
+            const_cast<string&>(_mcastInterface) = string();
+        }
+        else
+        {
+            Ice::EndpointParseException ex(__FILE__, __LINE__);
+            ex.str = "`--interface *' not valid for proxy endpoint `" + toString() + "'";
+            throw ex;
+        }
+    }
 }
 
 string
@@ -284,20 +318,6 @@ IceInternal::UdpEndpointI::operator<(const LocalObject& r) const
     }
 
     return IPEndpointI::operator<(r);
-}
-
-void
-IceInternal::UdpEndpointI::streamWriteImpl(OutputStream* s) const
-{
-    IPEndpointI::streamWriteImpl(s);
-    if(s->getEncoding() == Ice::Encoding_1_0)
-    {
-        s->write(Ice::Protocol_1_0);
-        s->write(Ice::Encoding_1_0);
-    }
-    // Not transmitted.
-    //s->write(_connect);
-    s->write(_compress);
 }
 
 void
@@ -463,7 +483,7 @@ IceInternal::UdpEndpointFactory::destroy()
 }
 
 EndpointFactoryPtr
-IceInternal::UdpEndpointFactory::clone(const ProtocolInstancePtr& instance) const
+IceInternal::UdpEndpointFactory::clone(const ProtocolInstancePtr& instance, const EndpointFactoryPtr&) const
 {
     return new UdpEndpointFactory(instance);
 }

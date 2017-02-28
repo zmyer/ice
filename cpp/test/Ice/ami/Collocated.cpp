@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -27,10 +27,10 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 
     TestIntfControllerIPtr testController = ICE_MAKE_SHARED(TestIntfControllerI, adapter);
 
-    adapter->add(ICE_MAKE_SHARED(TestIntfI), communicator->stringToIdentity("test"));
+    adapter->add(ICE_MAKE_SHARED(TestIntfI), Ice::stringToIdentity("test"));
     //adapter->activate(); // Collocated test doesn't need to activate the OA
 
-    adapter2->add(testController, communicator->stringToIdentity("testController"));
+    adapter2->add(testController, Ice::stringToIdentity("testController"));
     //adapter2->activate(); // Collocated test doesn't need to activate the OA
 
     void allTests(const Ice::CommunicatorPtr&, bool);
@@ -48,8 +48,7 @@ main(int argc, char* argv[])
 
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
         initData.properties->setProperty("Ice.Warn.AMICallback", "0");
 
         Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);

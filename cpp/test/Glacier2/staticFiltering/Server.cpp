@@ -1,14 +1,13 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
 
-#include <Ice/Application.h>
-#include <Ice/Locator.h>
+#include <Ice/Ice.h>
 #include <BackendI.h>
 
 using namespace std;
@@ -54,7 +53,7 @@ public:
         _adapter(adapter),
         _registryPrx(
             LocatorRegistryPrx::uncheckedCast(
-                adapter->add(new ServerLocatorRegistry, _adapter->getCommunicator()->stringToIdentity("registry"))))
+                adapter->add(new ServerLocatorRegistry, Ice::stringToIdentity("registry"))))
     {
     }
 
@@ -67,7 +66,7 @@ public:
     virtual void
     findAdapterById_async(const AMD_Locator_findAdapterByIdPtr& cb, const string&, const Current&) const
     {
-       cb->ice_response(_adapter->createDirectProxy(_adapter->getCommunicator()->stringToIdentity("dummy")));
+       cb->ice_response(_adapter->createDirectProxy(stringToIdentity("dummy")));
     }
 
     virtual LocatorRegistryPrx
@@ -137,7 +136,7 @@ BackendServer::run(int, char**)
     ObjectAdapterPtr adapter = communicator()->createObjectAdapter("BackendAdapter");
     BackendPtr backend = new BackendI;
     Ice::LocatorPtr locator = new ServerLocatorI(backend, adapter);
-    adapter->add(locator, communicator()->stringToIdentity("locator"));
+    adapter->add(locator, Ice::stringToIdentity("locator"));
     adapter->addServantLocator(new ServantLocatorI(backend), "");
     adapter->activate();
     communicator()->waitForShutdown();

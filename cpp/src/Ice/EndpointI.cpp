@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,6 +8,7 @@
 // **********************************************************************
 
 #include <Ice/EndpointI.h>
+#include <Ice/OutputStream.h>
 
 using namespace std;
 
@@ -15,6 +16,20 @@ using namespace std;
 IceUtil::Shared* IceInternal::upCast(EndpointI* p) { return p; }
 IceUtil::Shared* IceInternal::upCast(EndpointI_connectors* p) { return p; }
 #endif
+
+
+IceInternal::EndpointI_connectors::~EndpointI_connectors()
+{
+    // Out of line to avoid weak vtable
+}
+
+void
+IceInternal::EndpointI::streamWrite(Ice::OutputStream* s) const
+{
+    s->startEncapsulation();
+    streamWriteImpl(s);
+    s->endEncapsulation();
+}
 
 string
 IceInternal::EndpointI::toString() const

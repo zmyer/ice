@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,6 +8,7 @@
 // **********************************************************************
 
 #include <Glacier2/Application.h>
+#include <Ice/Ice.h>
 #include <IceUtil/IceUtil.h>
 #include <IceUtil/ArgVector.h>
 
@@ -58,12 +59,6 @@ Glacier2::RestartSessionException::ice_clone() const
 }
 #endif
 
-void
-Glacier2::RestartSessionException::ice_throw() const
-{
-    throw *this;
-}
-
 Ice::ObjectAdapterPtr
 Glacier2::Application::objectAdapter()
 {
@@ -73,7 +68,7 @@ Glacier2::Application::objectAdapter()
         throw ex;
     }
 
-    IceUtil::Mutex::Lock lock(*IceInternal::Application::mutex);
+    IceUtil::Mutex::Lock lock(_mutex);
     if(!_adapter)
     {
         _adapter = communicator()->createObjectAdapterWithRouter("", _router);
@@ -85,7 +80,7 @@ Glacier2::Application::objectAdapter()
 Ice::ObjectPrxPtr
 Glacier2::Application::addWithUUID(const Ice::ObjectPtr& servant)
 {
-    return objectAdapter()->add(servant, createCallbackIdentity(IceUtil::generateUUID()));
+    return objectAdapter()->add(servant, createCallbackIdentity(Ice::generateUUID()));
 }
 
 Ice::Identity
@@ -140,22 +135,22 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
     // Reset internal state variables from Ice.Application. The
     // remainder are reset at the end of this method.
     //
-    IceInternal::Application::_callbackInProgress = false;
-    IceInternal::Application::_destroyed = false;
-    IceInternal::Application::_interrupted = false;
+    _callbackInProgress = false;
+    _destroyed = false;
+    _interrupted = false;
 
     bool restart = false;
     status = 0;
 
     try
     {
-        IceInternal::Application::_communicator = Ice::initialize(args, initData);
+        _communicator = Ice::initialize(args, initData);
         _router = ICE_UNCHECKED_CAST(Glacier2::RouterPrx, communicator()->getDefaultRouter());
 
         if(!_router)
         {
             Error out(getProcessLogger());
-            out << IceInternal::Application::_appName << ": no glacier2 router configured";
+            out << _appName << ": no glacier2 router configured";
             status = 1;
         }
         else
@@ -163,7 +158,7 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
             //
             // The default is to destroy when a signal is received.
             //
-            if(IceInternal::Application::_signalPolicy == Ice::HandleSignals)
+            if(_signalPolicy == ICE_ENUM(SignalPolicy, HandleSignals))
             {
                 destroyOnInterrupt();
             }
@@ -177,7 +172,7 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
             catch(const Ice::LocalException& ex)
             {
                 Error out(getProcessLogger());
-                out << IceInternal::Application::_appName << ": " << ex;
+                out << _appName << ": " << ex;
                 status = 1;
             }
 
@@ -200,17 +195,13 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
                 {
                     Ice::ConnectionPtr connection = _router->ice_getCachedConnection();
                     assert(connection);
-                    connection->setACM(acmTimeout, IceUtil::None, Ice::HeartbeatAlways);
+                    connection->setACM(acmTimeout, IceUtil::None, ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
 #ifdef ICE_CPP11_MAPPING
-                    auto self = weak_from_this();
+                    auto app = this;
                     connection->setCloseCallback(
-                        [self](Ice::ConnectionPtr)
+                        [app](Ice::ConnectionPtr)
                         {
-                            auto s = self.lock();
-                            if(s)
-                            {
-                                s->sessionDestroyed();
-                            }
+                            app->sessionDestroyed();
                         });
 #else
                     connection->setCloseCallback(ICE_MAKE_SHARED(CloseCallbackI, this));
@@ -234,61 +225,61 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
     catch(const Ice::ConnectionRefusedException& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": " << ex;
+        out << _appName << ": " << ex;
         restart = true;
     }
     catch(const Ice::ConnectionLostException& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": " << ex;
+        out << _appName << ": " << ex;
         restart = true;
     }
     catch(const Ice::UnknownLocalException& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": " << ex;
+        out << _appName << ": " << ex;
         restart = true;
     }
     catch(const Ice::RequestFailedException& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": " << ex;
+        out << _appName << ": " << ex;
         restart = true;
     }
     catch(const Ice::TimeoutException& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": " << ex;
+        out << _appName << ": " << ex;
         restart = true;
     }
     catch(const Ice::LocalException& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": " << ex;
+        out << _appName << ": " << ex;
         status = 1;
     }
     catch(const std::exception& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": std::exception " << ex;
+        out << _appName << ": std::exception " << ex;
         status = 1;
     }
     catch(const std::string& ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": c++ exception " << ex;
+        out << _appName << ": c++ exception " << ex;
         status = 1;
     }
     catch(const char* ex)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": char* exception " << ex;
+        out << _appName << ": char* exception " << ex;
         status = 1;
     }
     catch(...)
     {
         Error out(getProcessLogger());
-        out << IceInternal::Application::_appName << ": unknown exception";
+        out << _appName << ": unknown exception";
         status = 1;
     }
 
@@ -297,31 +288,31 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
     // it would not make sense to release a held signal to run
     // shutdown or destroy.
     //
-    if(IceInternal::Application::_signalPolicy == HandleSignals)
+    if(_signalPolicy == ICE_ENUM(SignalPolicy, HandleSignals))
     {
         ignoreInterrupt();
     }
 
     {
-        IceUtil::Mutex::Lock lock(*IceInternal::Application::mutex);
-        while(IceInternal::Application::_callbackInProgress)
+        IceUtil::Mutex::Lock lock(_mutex);
+        while(_callbackInProgress)
         {
-            IceInternal::Application::_condVar->wait(lock);
+            _condVar.wait(lock);
         }
-        if(IceInternal::Application::_destroyed)
+        if(_destroyed)
         {
-            IceInternal::Application::_communicator = 0;
+            _communicator = 0;
         }
         else
         {
-            IceInternal::Application::_destroyed = true;
+            _destroyed = true;
             //
             // And _communicator != 0, meaning will be destroyed
             // next, _destroyed = true also ensures that any
             // remaining callback won't do anything
             //
         }
-        IceInternal::Application::_application = 0;
+        _application = 0;
     }
 
     if(_createdSession && _router)
@@ -347,25 +338,10 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
         _router = 0;
     }
 
-    if(IceInternal::Application::_communicator)
+    if(_communicator)
     {
-        try
-        {
-            IceInternal::Application::_communicator->destroy();
-        }
-        catch(const Ice::LocalException& ex)
-        {
-            Error out(getProcessLogger());
-            out << IceInternal::Application::_appName << ": " << ex;
-            status = 1;
-        }
-        catch(const exception& ex)
-        {
-            Error out(getProcessLogger());
-            out << "unknown exception:\n" << ex;
-            status = 1;
-        }
-        IceInternal::Application::_communicator = 0;
+        _communicator->destroy();
+        _communicator = 0;
     }
 
     //

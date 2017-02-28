@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -34,7 +34,7 @@ IceBT::BluetoothException::ice_print(ostream& out) const
 extern "C"
 {
 
-ICE_BT_API Ice::Plugin*
+ICEBT_API Ice::Plugin*
 createIceBT(const CommunicatorPtr& communicator, const string& /*name*/, const StringSeq& /*args*/)
 {
     return new PluginI(communicator);
@@ -45,7 +45,7 @@ createIceBT(const CommunicatorPtr& communicator, const string& /*name*/, const S
 namespace Ice
 {
 
-ICE_BT_API void
+ICEBT_API void
 registerIceBT(bool loadOnInitialize)
 {
     Ice::registerPluginFactory("IceBT", createIceBT, loadOnInitialize);
@@ -59,13 +59,21 @@ registerIceBT(bool loadOnInitialize)
 IceBT::PluginI::PluginI(const Ice::CommunicatorPtr& com) :
     _engine(new Engine(com))
 {
+    IceInternal::ProtocolPluginFacadePtr pluginFacade = IceInternal::getProtocolPluginFacade(com);
+
     //
     // Register the endpoint factory. We have to do this now, rather
     // than in initialize, because the communicator may need to
     // interpret proxies before the plug-in is fully initialized.
     //
-    IceInternal::EndpointFactoryPtr btFactory = new EndpointFactoryI(new Instance(_engine, EndpointType, "bt"));
-    IceInternal::getProtocolPluginFacade(com)->addEndpointFactory(btFactory);
+    pluginFacade->addEndpointFactory(new EndpointFactoryI(new Instance(_engine, BTEndpointType, "bt")));
+
+    IceInternal::EndpointFactoryPtr sslFactory = pluginFacade->getEndpointFactory(SSLEndpointType);
+    if(sslFactory)
+    {
+        InstancePtr instance = new Instance(_engine, BTSEndpointType, "bts");
+        pluginFacade->addEndpointFactory(sslFactory->clone(instance, new EndpointFactoryI(instance)));
+    }
 }
 
 void
@@ -82,7 +90,7 @@ IceBT::PluginI::destroy()
 
 void
 #ifdef ICE_CPP11_MAPPING
-IceBT::PluginI::startDiscovery(const string& address, function<void (const string&, const PropertyMap&)> cb)
+IceBT::PluginI::startDiscovery(const string& address, function<void(const string&, const PropertyMap&)> cb)
 #else
 IceBT::PluginI::startDiscovery(const string& address, const DiscoveryCallbackPtr& cb)
 #endif
@@ -94,4 +102,10 @@ void
 IceBT::PluginI::stopDiscovery(const string& address)
 {
     _engine->stopDiscovery(address);
+}
+
+IceBT::DeviceMap
+IceBT::PluginI::getDevices() const
+{
+    return _engine->getDevices();
 }

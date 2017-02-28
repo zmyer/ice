@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -306,7 +306,7 @@ public:
         }
         catch(const Ice::ObjectNotExistException& ex)
         {
-            Ice::Identity id = _communicator->stringToIdentity("does not exist");
+            Ice::Identity id = Ice::stringToIdentity("does not exist");
             test(ex.id == id);
         }
         catch(...)
@@ -501,147 +501,156 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
         localOAEndpoint = ostr.str();
     }
+#ifdef ICE_OS_UWP
+    bool uwp = true;
+#else
+    bool uwp = false;
+#endif
 
-    cout << "testing object adapter registration exceptions... " << flush;
+    if(!uwp || (communicator->getProperties()->getProperty("Ice.Default.Protocol") != "ssl" &&
+                  communicator->getProperties()->getProperty("Ice.Default.Protocol") != "wss"))
     {
-        Ice::ObjectAdapterPtr first;
-        try
+        cout << "testing object adapter registration exceptions... " << flush;
         {
+            Ice::ObjectAdapterPtr first;
+            try
+            {
+                first = communicator->createObjectAdapter("TestAdapter0");
+                test(false);
+            }
+            catch(const Ice::InitializationException& ex)
+            {
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
+                // Expected
+            }
+
+            communicator->getProperties()->setProperty("TestAdapter0.Endpoints", localOAEndpoint);
             first = communicator->createObjectAdapter("TestAdapter0");
-            test(false);
-        }
-        catch(const Ice::InitializationException& ex)
-        {
-            if(printException)
+            try
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                Ice::ObjectAdapterPtr second = communicator->createObjectAdapter("TestAdapter0");
+                test(false);
             }
-            // Expected
-        }
-
-        communicator->getProperties()->setProperty("TestAdapter0.Endpoints", localOAEndpoint);
-        first = communicator->createObjectAdapter("TestAdapter0");
-        try
-        {
-            Ice::ObjectAdapterPtr second = communicator->createObjectAdapter("TestAdapter0");
-            test(false);
-        }
-        catch(const Ice::AlreadyRegisteredException& ex)
-        {
-            if(printException)
+            catch(const Ice::AlreadyRegisteredException& ex)
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
+
+                // Expected
             }
 
-            // Expected
-        }
-
-        try
-        {
-            Ice::ObjectAdapterPtr second =
-                communicator->createObjectAdapterWithEndpoints("TestAdapter0", "ssl -h foo -p 12011");
-            test(false);
-        }
-        catch(const Ice::AlreadyRegisteredException& ex)
-        {
-            if(printException)
+            try
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                Ice::ObjectAdapterPtr second =
+                    communicator->createObjectAdapterWithEndpoints("TestAdapter0", "ssl -h foo -p 12011");
+                test(false);
+            }
+            catch(const Ice::AlreadyRegisteredException& ex)
+            {
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
+
+                // Expected.
+            }
+            first->deactivate();
+        }
+        cout << "ok" << endl;
+
+        cout << "testing servant registration exceptions... " << flush;
+        {
+            communicator->getProperties()->setProperty("TestAdapter1.Endpoints", localOAEndpoint);
+            Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter1");
+            Ice::ObjectPtr obj = ICE_MAKE_SHARED(EmptyI);
+            adapter->add(obj, Ice::stringToIdentity("x"));
+            try
+            {
+                adapter->add(obj, Ice::stringToIdentity("x"));
+                test(false);
+            }
+            catch(const Ice::AlreadyRegisteredException& ex)
+            {
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
             }
 
-            // Expected.
-        }
-        first->deactivate();
-    }
-    cout << "ok" << endl;
-
-    cout << "testing servant registration exceptions... " << flush;
-    {
-        communicator->getProperties()->setProperty("TestAdapter1.Endpoints", localOAEndpoint);
-        Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter1");
-        Ice::ObjectPtr obj = ICE_MAKE_SHARED(EmptyI);
-        adapter->add(obj, communicator->stringToIdentity("x"));
-        try
-        {
-            adapter->add(obj, communicator->stringToIdentity("x"));
-            test(false);
-        }
-        catch(const Ice::AlreadyRegisteredException& ex)
-        {
-            if(printException)
+            try
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                adapter->add(obj, Ice::stringToIdentity(""));
             }
-        }
-
-        try
-        {
-            adapter->add(obj, communicator->stringToIdentity(""));
-        }
-        catch(const Ice::IllegalIdentityException& ex)
-        {
-            test(ex.id.name == "");
-            if(printException)
+            catch(const Ice::IllegalIdentityException& ex)
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                test(ex.id.name == "");
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
             }
-        }
 
-        try
-        {
-            adapter->add(0, communicator->stringToIdentity("x"));
-        }
-        catch(const Ice::IllegalServantException& ex)
-        {
-            if(printException)
+            try
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                adapter->add(0, Ice::stringToIdentity("x"));
             }
-        }
-
-        adapter->remove(communicator->stringToIdentity("x"));
-        try
-        {
-            adapter->remove(communicator->stringToIdentity("x"));
-            test(false);
-        }
-        catch(const Ice::NotRegisteredException& ex)
-        {
-            if(printException)
+            catch(const Ice::IllegalServantException& ex)
             {
-                Ice::Print printer(communicator->getLogger());
-                printer << ex;
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
             }
+
+            adapter->remove(Ice::stringToIdentity("x"));
+            try
+            {
+                adapter->remove(Ice::stringToIdentity("x"));
+                test(false);
+            }
+            catch(const Ice::NotRegisteredException& ex)
+            {
+                if(printException)
+                {
+                    Ice::Print printer(communicator->getLogger());
+                    printer << ex;
+                }
+            }
+
+            adapter->deactivate();
         }
+        cout << "ok" << endl;
 
-        adapter->deactivate();
-    }
-    cout << "ok" << endl;
-
-    cout << "testing servant locator registrations exceptions... " << flush;
-    {
-        communicator->getProperties()->setProperty("TestAdapter2.Endpoints", localOAEndpoint);
-        Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter2");
-        Ice::ServantLocatorPtr loc = ICE_MAKE_SHARED(ServantLocatorI);
-        adapter->addServantLocator(loc, "x");
-        try
+        cout << "testing servant locator registrations exceptions... " << flush;
         {
+            communicator->getProperties()->setProperty("TestAdapter2.Endpoints", localOAEndpoint);
+            Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter2");
+            Ice::ServantLocatorPtr loc = ICE_MAKE_SHARED(ServantLocatorI);
             adapter->addServantLocator(loc, "x");
-            test(false);
-        }
-        catch(const Ice::AlreadyRegisteredException&)
-        {
-        }
+            try
+            {
+                adapter->addServantLocator(loc, "x");
+                test(false);
+            }
+            catch(const Ice::AlreadyRegisteredException&)
+            {
+            }
 
-        adapter->deactivate();
+            adapter->deactivate();
+        }
+        cout << "ok" << endl;
     }
-    cout << "ok" << endl;
 
     cout << "testing value factory registration exception... " << flush;
     {
@@ -690,7 +699,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     ThrowerPrxPtr thrower = ICE_CHECKED_CAST(ThrowerPrx, base);
     test(thrower);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(thrower, base));
+    test(Ice::targetEqualTo(thrower, base));
 #else
     test(thrower == base);
 #endif
@@ -1010,7 +1019,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     cout << "catching object not exist exception... " << flush;
 
-    Ice::Identity id = communicator->stringToIdentity("does not exist");
+    Ice::Identity id = Ice::stringToIdentity("does not exist");
     try
     {
         ThrowerPrxPtr thrower2 = ICE_UNCHECKED_CAST(ThrowerPrx, thrower->ice_identity(id));
@@ -1137,6 +1146,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     try
     {
         thrower->throwAfterException();
+        test(false);
     }
     catch(const A&)
     {
@@ -1151,7 +1161,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "catching exact types with new AMI mapping... " << flush;
 #ifdef ICE_CPP11_MAPPING
     {
-        auto f = thrower->throwAasA_async(1);
+        auto f = thrower->throwAasAAsync(1);
         try
         {
             f.get();
@@ -1170,9 +1180,9 @@ allTests(const Ice::CommunicatorPtr& communicator)
             test(false);
         }
     }
-    
+
     {
-        auto f = thrower->throwAorDasAorD_async(1);
+        auto f = thrower->throwAorDasAorDAsync(1);
         try
         {
             f.get();
@@ -1187,9 +1197,9 @@ allTests(const Ice::CommunicatorPtr& communicator)
             test(false);
         }
     }
-    
+
     {
-        auto f = thrower->throwAorDasAorD_async(-1);
+        auto f = thrower->throwAorDasAorDAsync(-1);
         try
         {
             f.get();
@@ -1205,7 +1215,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
     }
     {
-        auto f = thrower->throwBasB_async(1, 2);
+        auto f = thrower->throwBasBAsync(1, 2);
         try
         {
             f.get();
@@ -1222,7 +1232,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
     }
     {
-        auto f = thrower->throwCasC_async(1, 2, 3);
+        auto f = thrower->throwCasCAsync(1, 2, 3);
         try
         {
             f.get();
@@ -1240,7 +1250,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
     }
     {
-        auto f = thrower->throwModA_async(1, 2);
+        auto f = thrower->throwModAAsync(1, 2);
         try
         {
             f.get();
@@ -1260,43 +1270,13 @@ allTests(const Ice::CommunicatorPtr& communicator)
             test(false);
         }
     }
-    
+
     //
     // repeat with callback API and no exception callback
     //
     {
         promise<bool> sent;
-        thrower->throwAasA_async(1,
-            []()
-            {
-                test(false);
-            },
-            nullptr,
-            [&](bool value)
-            {
-                sent.set_value(value);
-            });
-        sent.get_future().get(); // Wait for sent
-    }
-    
-    {
-        promise<bool> sent;
-        thrower->throwAorDasAorD_async(1,
-            []()
-            {
-                test(false);
-            },
-            nullptr,
-            [&](bool value)
-            {
-                sent.set_value(value);
-            });
-        sent.get_future().get(); // Wait for sent
-    }
-    
-    {
-        promise<bool> sent;
-        thrower->throwAorDasAorD_async(-1,
+        thrower->throwAasAAsync(1,
             []()
             {
                 test(false);
@@ -1311,7 +1291,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     {
         promise<bool> sent;
-        thrower->throwBasB_async(1, 2,
+        thrower->throwAorDasAorDAsync(1,
             []()
             {
                 test(false);
@@ -1326,7 +1306,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     {
         promise<bool> sent;
-        thrower->throwCasC_async(1, 2, 3,
+        thrower->throwAorDasAorDAsync(-1,
             []()
             {
                 test(false);
@@ -1341,7 +1321,37 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     {
         promise<bool> sent;
-        thrower->throwModA_async(1, 2,
+        thrower->throwBasBAsync(1, 2,
+            []()
+            {
+                test(false);
+            },
+            nullptr,
+            [&](bool value)
+            {
+                sent.set_value(value);
+            });
+        sent.get_future().get(); // Wait for sent
+    }
+
+    {
+        promise<bool> sent;
+        thrower->throwCasCAsync(1, 2, 3,
+            []()
+            {
+                test(false);
+            },
+            nullptr,
+            [&](bool value)
+            {
+                sent.set_value(value);
+            });
+        sent.get_future().get(); // Wait for sent
+    }
+
+    {
+        promise<bool> sent;
+        thrower->throwModAAsync(1, 2,
             []()
             {
                 test(false);
@@ -1402,7 +1412,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "catching derived types with new AMI mapping... " << flush;
 #ifdef ICE_CPP11_MAPPING
     {
-        auto f = thrower->throwBasA_async(1, 2);
+        auto f = thrower->throwBasAAsync(1, 2);
         try
         {
             f.get();
@@ -1419,7 +1429,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     }
 
     {
-        auto f = thrower->throwCasA_async(1, 2, 3);
+        auto f = thrower->throwCasAAsync(1, 2, 3);
         try
         {
             f.get();
@@ -1437,7 +1447,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     }
 
     {
-        auto f = thrower->throwCasB_async(1, 2, 3);
+        auto f = thrower->throwCasBAsync(1, 2, 3);
         try
         {
             f.get();
@@ -1485,7 +1495,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         cout << "catching unknown user exception with new AMI mapping... " << flush;
 #ifdef ICE_CPP11_MAPPING
         {
-            auto f = thrower->throwUndeclaredA_async(1);
+            auto f = thrower->throwUndeclaredAAsync(1);
             try
             {
                 f.get();
@@ -1507,7 +1517,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
 
         {
-            auto f = thrower->throwUndeclaredB_async(1, 2);
+            auto f = thrower->throwUndeclaredBAsync(1, 2);
             try
             {
                 f.get();
@@ -1523,7 +1533,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
 
         {
-            auto f = thrower->throwUndeclaredC_async(1, 2, 3);
+            auto f = thrower->throwUndeclaredCAsync(1, 2, 3);
             try
             {
                 f.get();
@@ -1568,9 +1578,9 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     {
 #ifdef ICE_CPP11_MAPPING
-        id = communicator->stringToIdentity("does not exist");
+        id = Ice::stringToIdentity("does not exist");
         shared_ptr<ThrowerPrx> thrower2 = Ice::uncheckedCast<ThrowerPrx>(thrower->ice_identity(id));
-        auto f = thrower2->throwAasA_async(1);
+        auto f = thrower2->throwAasAAsync(1);
         try
         {
             f.get();
@@ -1584,7 +1594,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             test(false);
         }
 #else
-        id = communicator->stringToIdentity("does not exist");
+        id = Ice::stringToIdentity("does not exist");
         ThrowerPrx thrower2 = ThrowerPrx::uncheckedCast(thrower->ice_identity(id));
         CallbackPtr cb = new Callback(communicator);
         Callback_Thrower_throwAasAPtr callback =
@@ -1601,7 +1611,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     {
 #ifdef ICE_CPP11_MAPPING
         shared_ptr<ThrowerPrx> thrower2 = Ice::uncheckedCast<ThrowerPrx>(thrower, "no such facet");
-        auto f = thrower2->throwAasA_async(1);
+        auto f = thrower2->throwAasAAsync(1);
         try
         {
             f.get();
@@ -1627,7 +1637,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     {
 #ifdef ICE_CPP11_MAPPING
         shared_ptr<WrongOperationPrx> thrower4 = Ice::uncheckedCast<WrongOperationPrx>(thrower);
-        auto f = thrower4->noSuchOperation_async();
+        auto f = thrower4->noSuchOperationAsync();
         try
         {
             f.get();
@@ -1656,7 +1666,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "catching unknown local exception with new AMI mapping... " << flush;
 #ifdef ICE_CPP11_MAPPING
     {
-        auto f = thrower->throwLocalException_async();
+        auto f = thrower->throwLocalExceptionAsync();
         try
         {
             f.get();
@@ -1672,7 +1682,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     }
 
     {
-        auto f = thrower->throwLocalExceptionIdempotent_async();
+        auto f = thrower->throwLocalExceptionIdempotentAsync();
         try
         {
             f.get();
@@ -1713,7 +1723,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = thrower->throwNonIceException_async();
+        auto f = thrower->throwNonIceExceptionAsync();
         try
         {
             f.get();

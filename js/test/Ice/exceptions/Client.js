@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,33 +12,27 @@
     var Ice = require("ice").Ice;
     var Test = require("Test").Test;
 
-    var Promise = Ice.Promise;
-
     var allTests = function(out, communicator, Test, bidir)
     {
-        var EmptyI = function()
+        class EmptyI extends Test._EmptyDisp
         {
-        };
+        }
 
-        EmptyI.prototype = new Test.Empty();
-        EmptyI.prototype.constructor = EmptyI;
-
-        var ServantLocatorI = function()
+        class ServantLocatorI 
         {
-        };
+            locate(curr, cookie)
+            {
+                return null;
+            }
 
-        ServantLocatorI.prototype.locate = function(curr, cookie)
-        {
-            return null;
-        };
+            finished(curr, servant, cookie)
+            {
+            }
 
-        ServantLocatorI.prototype.finished = function(curr, servant, cookie)
-        {
-        };
-
-        ServantLocatorI.prototype.deactivate = function(category)
-        {
-        };
+            deactivate(category)
+            {
+            }
+        }
 
         function ValueFactoryI()
         {
@@ -56,7 +50,7 @@
                 }
                 catch(err)
                 {
-                    p.fail(err);
+                    p.reject(err);
                     throw err;
                 }
             }
@@ -66,7 +60,7 @@
 
         var supportsUndeclaredExceptions = function(thrower)
         {
-            return Promise.try(
+            return Ice.Promise.try(
                 function()
                 {
                     return thrower.supportsUndeclaredExceptions().then(
@@ -104,7 +98,7 @@
 
         var supportsAssertException = function(thrower)
         {
-            return Promise.try(
+            return Ice.Promise.try(
                 function()
                 {
                     return thrower.supportsAssertException().then(
@@ -128,7 +122,7 @@
         };
 
         var base, ref, thrower;
-        Promise.try(
+        Ice.Promise.try(
             function()
             {
                 out.write("testing object adapter registration exceptions... ");
@@ -158,10 +152,10 @@
                     function(adapter)
                     {
                         var obj = new EmptyI();
-                        adapter.add(obj, communicator.stringToIdentity("x"));
+                        adapter.add(obj, Ice.stringToIdentity("x"));
                         try
                         {
-                            adapter.add(obj, communicator.stringToIdentity("x"));
+                            adapter.add(obj, Ice.stringToIdentity("x"));
                             test(false);
                         }
                         catch(ex)
@@ -170,7 +164,7 @@
                         }
                         try
                         {
-                            adapter.add(obj, communicator.stringToIdentity(""));
+                            adapter.add(obj, Ice.stringToIdentity(""));
                             test(false);
                         }
                         catch(ex)
@@ -180,7 +174,7 @@
                         }
                         try
                         {
-                            adapter.add(null, communicator.stringToIdentity("x"));
+                            adapter.add(null, Ice.stringToIdentity("x"));
                             test(false);
                         }
                         catch(ex)
@@ -188,10 +182,10 @@
                             test(ex instanceof Ice.IllegalServantException);
                         }
 
-                        adapter.remove(communicator.stringToIdentity("x"));
+                        adapter.remove(Ice.stringToIdentity("x"));
                         try
                         {
-                            adapter.remove(communicator.stringToIdentity("x"));
+                            adapter.remove(Ice.stringToIdentity("x"));
                             test(false);
                         }
                         catch(ex)
@@ -249,7 +243,7 @@
                 out.write("testing checked cast... ");
                 return Test.ThrowerPrx.checkedCast(base);
             }
-            ).then(
+        ).then(
             function(obj)
             {
                 thrower = obj;
@@ -385,7 +379,7 @@
             function()
             {
                 out.write("catching object not exist exception... ");
-                var id = communicator.stringToIdentity("does not exist");
+                var id = Ice.stringToIdentity("does not exist");
                 var thrower2 = Test.ThrowerPrx.uncheckedCast(thrower.ice_identity(id));
                 return thrower2.ice_ping();
             }
@@ -394,7 +388,7 @@
             function(ex)
             {
                 test(ex instanceof Ice.ObjectNotExistException);
-                test(ex.id.equals(communicator.stringToIdentity("does not exist")));
+                test(ex.id.equals(Ice.stringToIdentity("does not exist")));
                 out.writeLine("ok");
                 out.write("catching facet not exist exception... ");
                 var thrower2 = Test.ThrowerPrx.uncheckedCast(thrower, "no such facet");
@@ -460,16 +454,7 @@
                 out.writeLine("ok");
                 return thrower.shutdown();
             }
-        ).then(
-            function()
-            {
-                p.succeed();
-            },
-            function(ex)
-            {
-                p.fail(ex);
-            }
-        );
+        ).then(p.resolve, p.reject);
         return p;
     };
 
@@ -478,22 +463,17 @@
         id.properties.setProperty("Ice.MessageSizeMax", "10");
         id.properties.setProperty("Ice.Warn.Connections", "0");
         var c = Ice.initialize(id);
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 return allTests(out, c, Test);
             }
-        ).finally(
-            function()
-            {
-                return c.destroy();
-            }
-        );
+        ).finally(() => c.destroy);
     };
-    exports.__test__ = run;
-    exports.__clientAllTests__ = allTests;
-    exports.__runServer__ = true;
+    exports._test = run;
+    exports._clientAllTests = allTests;
+    exports._runServer = true;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

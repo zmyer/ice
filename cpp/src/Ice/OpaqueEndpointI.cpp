@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -92,7 +92,7 @@ private:
 //
 OpaqueEndpointInfoI::OpaqueEndpointInfoI(Ice::Short type, const Ice::EncodingVersion& rawEncoding,
                                          const Ice::ByteSeq& rawBytes) :
-    Ice::OpaqueEndpointInfo(-1, false, rawEncoding, rawBytes),
+    Ice::OpaqueEndpointInfo(ICE_NULLPTR, -1, false, rawEncoding, rawBytes),
     _type(type)
 {
 }
@@ -100,7 +100,7 @@ OpaqueEndpointInfoI::OpaqueEndpointInfoI(Ice::Short type, const Ice::EncodingVer
 void
 IceInternal::OpaqueEndpointI::streamWrite(OutputStream* s) const
 {
-    s->startEncapsulation(_rawEncoding, DefaultFormat);
+    s->startEncapsulation(_rawEncoding, ICE_ENUM(FormatType, DefaultFormat));
     s->writeBlob(_rawBytes);
     s->endEncapsulation();
 }
@@ -132,7 +132,7 @@ IceInternal::OpaqueEndpointI::timeout() const
 EndpointIPtr
 IceInternal::OpaqueEndpointI::timeout(Int) const
 {
-    return shared_from_this();
+    return ICE_SHARED_FROM_CONST_THIS(OpaqueEndpointI);
 }
 
 const string&
@@ -144,7 +144,7 @@ IceInternal::OpaqueEndpointI::connectionId() const
 EndpointIPtr
 IceInternal::OpaqueEndpointI::connectionId(const string&) const
 {
-    return shared_from_this();
+    return ICE_SHARED_FROM_CONST_THIS(OpaqueEndpointI);
 }
 
 bool
@@ -156,7 +156,7 @@ IceInternal::OpaqueEndpointI::compress() const
 EndpointIPtr
 IceInternal::OpaqueEndpointI::compress(bool) const
 {
-    return shared_from_this();
+    return ICE_SHARED_FROM_CONST_THIS(OpaqueEndpointI);
 }
 
 bool
@@ -193,7 +193,7 @@ vector<EndpointIPtr>
 IceInternal::OpaqueEndpointI::expand() const
 {
     vector<EndpointIPtr> endps;
-    endps.push_back(shared_from_this());
+    endps.push_back(ICE_SHARED_FROM_CONST_THIS(OpaqueEndpointI));
     return endps;
 }
 
@@ -318,6 +318,12 @@ IceInternal::OpaqueEndpointI::operator<(const LocalObject& r) const
     }
 
     return false;
+}
+
+void
+IceInternal::OpaqueEndpointI::streamWriteImpl(Ice::OutputStream*) const
+{
+    assert(false);
 }
 
 bool

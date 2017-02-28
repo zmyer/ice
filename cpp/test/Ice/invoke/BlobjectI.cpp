@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -38,6 +38,10 @@ invokeInternal(Ice::InputStream& in, vector<Ice::Byte>& outEncaps, const Ice::Cu
     }
     else if(current.operation == "opException")
     {
+        if(current.ctx.find("raise") != current.ctx.end())
+        {
+            throw Test::MyException();
+        }
         Test::MyException ex;
         out.writeException(ex);
         out.endEncapsulation();
@@ -88,7 +92,7 @@ BlobjectI::ice_invoke(const vector<Ice::Byte>& inEncaps, vector<Ice::Byte>& outE
 
 bool
 BlobjectArrayI::ice_invoke(const pair<const Ice::Byte*, const Ice::Byte*>& inEncaps, vector<Ice::Byte>& outEncaps,
-                          const Ice::Current& current)
+                           const Ice::Current& current)
 {
     Ice::InputStream in(current.adapter->getCommunicator(), current.encoding, inEncaps);
     return invokeInternal(in, outEncaps, current);
@@ -96,10 +100,10 @@ BlobjectArrayI::ice_invoke(const pair<const Ice::Byte*, const Ice::Byte*>& inEnc
 
 #ifdef ICE_CPP11_MAPPING
 void
-BlobjectAsyncI::ice_invoke_async(vector<Ice::Byte> inEncaps,
-                                 function<void (bool, vector<Ice::Byte>)> response,
-                                 function<void (exception_ptr)>,
-                                 const Ice::Current& current)
+BlobjectAsyncI::ice_invokeAsync(vector<Ice::Byte> inEncaps,
+                                function<void(bool, vector<Ice::Byte>)> response,
+                                function<void(exception_ptr)>,
+                                const Ice::Current& current)
 {
     Ice::InputStream in(current.adapter->getCommunicator(), inEncaps);
     vector<Ice::Byte> outEncaps;
@@ -108,10 +112,10 @@ BlobjectAsyncI::ice_invoke_async(vector<Ice::Byte> inEncaps,
 }
 
 void
-BlobjectArrayAsyncI::ice_invoke_async(pair<const Ice::Byte*, const Ice::Byte*> inEncaps,
-                                      function<void (bool, pair<const Ice::Byte*, const Ice::Byte*>)> response,
-                                      function<void (exception_ptr)>,
-                                      const Ice::Current& current)
+BlobjectArrayAsyncI::ice_invokeAsync(pair<const Ice::Byte*, const Ice::Byte*> inEncaps,
+                                     function<void(bool, pair<const Ice::Byte*, const Ice::Byte*>)> response,
+                                     function<void(exception_ptr)>,
+                                     const Ice::Current& current)
 {
     Ice::InputStream in(current.adapter->getCommunicator(), inEncaps);
     vector<Ice::Byte> outEncaps;
@@ -130,7 +134,7 @@ BlobjectArrayAsyncI::ice_invoke_async(pair<const Ice::Byte*, const Ice::Byte*> i
 }
 #else
 void
-BlobjectAsyncI::ice_invoke_async(const Ice::AMD_Object_ice_invokePtr& cb, const vector<Ice::Byte>& inEncaps, 
+BlobjectAsyncI::ice_invoke_async(const Ice::AMD_Object_ice_invokePtr& cb, const vector<Ice::Byte>& inEncaps,
                                 const Ice::Current& current)
 {
     Ice::InputStream in(current.adapter->getCommunicator(), current.encoding, inEncaps);

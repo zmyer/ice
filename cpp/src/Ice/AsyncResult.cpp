@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,10 +18,15 @@ using namespace Ice;
 
 IceUtil::Shared* Ice::upCast(AsyncResult* p) { return p; }
 
-void
-AsyncResult::__check(const AsyncResultPtr& r, const IceProxy::Ice::Object* prx, const string& operation)
+AsyncResult::~AsyncResult()
 {
-    __check(r, operation);
+    // Out of line to avoid weak vtable
+}
+
+void
+AsyncResult::check(const AsyncResultPtr& r, const IceProxy::Ice::Object* prx, const string& operation)
+{
+    check(r, operation);
     if(r->getProxy().get() != prx)
     {
         throw IceUtil::IllegalArgumentException(__FILE__, __LINE__, "Proxy for call to end_" + operation +
@@ -31,9 +36,9 @@ AsyncResult::__check(const AsyncResultPtr& r, const IceProxy::Ice::Object* prx, 
 }
 
 void
-AsyncResult::__check(const AsyncResultPtr& r, const Ice::Communicator* com, const string& operation)
+AsyncResult::check(const AsyncResultPtr& r, const Ice::Communicator* com, const string& operation)
 {
-    __check(r, operation);
+    check(r, operation);
     if(r->getCommunicator().get() != com)
     {
         throw IceUtil::IllegalArgumentException(__FILE__, __LINE__, "Communicator for call to end_" + operation +
@@ -43,9 +48,9 @@ AsyncResult::__check(const AsyncResultPtr& r, const Ice::Communicator* com, cons
 }
 
 void
-AsyncResult::__check(const AsyncResultPtr& r, const Ice::Connection* con, const string& operation)
+AsyncResult::check(const AsyncResultPtr& r, const Ice::Connection* con, const string& operation)
 {
-    __check(r, operation);
+    check(r, operation);
     if(r->getConnection().get() != con)
     {
         throw IceUtil::IllegalArgumentException(__FILE__, __LINE__, "Connection for call to end_" + operation +
@@ -55,7 +60,7 @@ AsyncResult::__check(const AsyncResultPtr& r, const Ice::Connection* con, const 
 }
 
 void
-AsyncResult::__check(const AsyncResultPtr& r, const string& operation)
+AsyncResult::check(const AsyncResultPtr& r, const string& operation)
 {
     if(!r)
     {
@@ -69,4 +74,3 @@ AsyncResult::__check(const AsyncResultPtr& r, const string& operation)
 }
 
 #endif
-

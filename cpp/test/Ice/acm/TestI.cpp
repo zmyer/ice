@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -26,41 +26,6 @@ toString(int value)
     return os.str();
 }
 
-class HeartbeatCallbackI :
-#ifdef ICE_CPP11_MAPPING
-                            public enable_shared_from_this<HeartbeatCallbackI>,
-#else
-                            public Ice::HeartbeatCallback,
-#endif
-                            private IceUtil::Monitor<IceUtil::Mutex>
-{
-public:
-
-    void
-    waitForCount(int count)
-    {
-        Lock sync(*this);
-        _count = count;
-        while(_count > 0)
-        {
-            wait();
-        }
-    }
-
-    virtual void
-    heartbeat(const Ice::ConnectionPtr&)
-    {
-        Lock sync(*this);
-        --_count;
-        notifyAll();
-    }
-
-private:
-
-    int _count;
-};
-ICE_DEFINE_PTR(HeartbeatCallbackIPtr, HeartbeatCallbackI);
-
 }
 
 RemoteObjectAdapterPrxPtr
@@ -75,7 +40,7 @@ RemoteCommunicatorI::createObjectAdapter(int timeout, int close, int heartbeat, 
         opts = " -h \"" + properties->getPropertyWithDefault("Ice.Default.Host", "127.0.0.1") + "\"";
     }
 
-    string name = IceUtil::generateUUID();
+    string name = generateUUID();
     if(timeout >= 0)
     {
         properties->setProperty(name + ".ACM.Timeout", toString(timeout));
@@ -104,7 +69,7 @@ RemoteCommunicatorI::shutdown(const Ice::Current& current)
 RemoteObjectAdapterI::RemoteObjectAdapterI(const Ice::ObjectAdapterPtr& adapter) :
     _adapter(adapter),
     _testIntf(ICE_UNCHECKED_CAST(TestIntfPrx, _adapter->add(ICE_MAKE_SHARED(TestI),
-                                         adapter->getCommunicator()->stringToIdentity("test"))))
+                                         stringToIdentity("test"))))
 {
     _adapter->activate();
 }
@@ -162,16 +127,23 @@ TestI::interruptSleep(const Ice::Current& current)
 }
 
 void
-TestI::waitForHeartbeat(int count, const Ice::Current& current)
+TestI::startHeartbeatCount(const Ice::Current& current)
 {
-    HeartbeatCallbackIPtr callback = ICE_MAKE_SHARED(HeartbeatCallbackI);
+    _callback = ICE_MAKE_SHARED(HeartbeatCallbackI);
 #ifdef ICE_CPP11_MAPPING
+    HeartbeatCallbackIPtr callback = _callback;
     current.con->setHeartbeatCallback([callback](Ice::ConnectionPtr connection)
     {
         callback->heartbeat(move(connection));
     });
 #else
-    current.con->setHeartbeatCallback(callback);
+    current.con->setHeartbeatCallback(_callback);
 #endif
-    callback->waitForCount(count);
+}
+
+void
+TestI::waitForHeartbeatCount(int count, const Ice::Current&)
+{
+    assert(_callback);
+    _callback->waitForCount(count);
 }

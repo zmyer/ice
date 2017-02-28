@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -35,8 +35,8 @@
 
 #include <Block.h>
 
-#define OBJECTPRX ((IceProxy::Ice::Object*)objectPrx__)
-#define ASYNCRESULT ((Ice::AsyncResult*)asyncResult__)
+#define OBJECTPRX ((IceProxy::Ice::Object*)objectPrx_)
+#define ASYNCRESULT ((Ice::AsyncResult*)asyncResult_)
 
 namespace
 {
@@ -67,71 +67,37 @@ virtual ~BeginInvokeAsyncCallback()
 
 void response(bool ok, const std::pair<const Ice::Byte*, const Ice::Byte*>& outParams)
 {
-    id<ICEInputStream> is = nil;
-    NSException* nsex = nil;
-    try
-    {
-        if(_returnsData)
-        {
-            is = [[ICEInputStream alloc] initWithCxxCommunicator:_communicator.get() data:outParams];
-        }
-        else if(outParams.first != outParams.second)
-        {
-            if(ok)
-            {
-                if((outParams.second - outParams.first) != 6)
-                {
-                    throw Ice::EncapsulationException(__FILE__, __LINE__);
-                }
-            }
-            else
-            {
-                Ice::InputStream s(_communicator.get(), outParams);
-                try
-                {
-                    s.startEncapsulation();
-                    s.throwException();
-                }
-                catch(const Ice::UserException& ex)
-                {
-                    s.endEncapsulation();
-                    throw Ice::UnknownUserException(__FILE__, __LINE__, ex.ice_id());
-                }
-            }
-        }
-    }
-    catch(const std::exception& ex)
-    {
-        if(is != nil)
-        {
-            [is release];
-            is = nil;
-        }
-        nsex = toObjCException(ex);
-    }
-
+    id<ICEInputStream> is = [[ICEInputStream alloc] initWithCxxCommunicator:_communicator.get() data:outParams];
     NSException* exception = nil;
     @autoreleasepool
     {
         @try
         {
-            if(nsex != nil)
+            if(_returnsData)
             {
-                @try
-                {
-                    @throw nsex;
-                }
-                @catch(ICEException* ex)
-                {
-                    if(_exception)
-                    {
-                        _exception(ex);
-                    }
-                    return;
-                }
+                _completed(is, ok);
             }
-
-            _completed(is, ok);
+            else if(outParams.first != outParams.second)
+            {
+                if(ok)
+                {
+                    [is skipEmptyEncapsulation];
+                }
+                else
+                {
+                    @try
+                    {
+                        [is startEncapsulation];
+                        [is throwException];
+                    }
+                    @catch(ICEUserException *ex)
+                    {
+                        [is endEncapsulation];
+                        @throw [ICEUnknownUserException unknownUserException:__FILE__ line:__LINE__ unknown:[ex ice_id]];
+                    }
+                }
+                _completed(nil, ok);
+            }
         }
         @catch(id e)
         {
@@ -219,7 +185,7 @@ BOOL _returnsData;
 };
 
 @implementation ICEAsyncResult
--(ICEAsyncResult*) initWithAsyncResult__:(const Ice::AsyncResultPtr&)arg
+-(ICEAsyncResult*) initWithAsyncResult:(const Ice::AsyncResultPtr&)arg
                                operation:(NSString*)op
                                    proxy:(id<ICEObjectPrx>)p;
 {
@@ -229,14 +195,14 @@ BOOL _returnsData;
         return nil;
     }
 
-    asyncResult__ = arg.get();
+    asyncResult_ = arg.get();
     ASYNCRESULT->__incRef();
     operation_ = [op retain];
     proxy_ = [p retain];
     return self;
 }
 
--(Ice::AsyncResult*) asyncResult__
+-(Ice::AsyncResult*) asyncResult
 {
     return ASYNCRESULT;
 }
@@ -244,17 +210,17 @@ BOOL _returnsData;
 -(void) dealloc
 {
     ASYNCRESULT->__decRef();
-    asyncResult__ = 0;
+    asyncResult_ = 0;
     [operation_ release];
     [proxy_ release];
     [super dealloc];
 }
 
-+(ICEAsyncResult*) asyncResultWithAsyncResult__:(const Ice::AsyncResultPtr&)arg
++(ICEAsyncResult*) asyncResultWithAsyncResult:(const Ice::AsyncResultPtr&)arg
 {
-    return [self asyncResultWithAsyncResult__:arg operation:nil proxy:nil];
+    return [self asyncResultWithAsyncResult:arg operation:nil proxy:nil];
 }
-+(ICEAsyncResult*) asyncResultWithAsyncResult__:(const Ice::AsyncResultPtr&)arg
++(ICEAsyncResult*) asyncResultWithAsyncResult:(const Ice::AsyncResultPtr&)arg
                                       operation:(NSString*)op
                                           proxy:(id<ICEObjectPrx>)p
 {
@@ -264,7 +230,7 @@ BOOL _returnsData;
     }
     else
     {
-        return [[[self alloc] initWithAsyncResult__:arg operation:op proxy:p] autorelease];
+        return [[[self alloc] initWithAsyncResult:arg operation:op proxy:p] autorelease];
     }
 }
 -(NSString*) operation
@@ -347,33 +313,33 @@ BOOL _returnsData;
 
 @implementation ICEObjectPrx
 
--(ICEObjectPrx*) initWithObjectPrx__:(const Ice::ObjectPrx&)arg
+-(ICEObjectPrx*) iceInitWithObjectPrx:(const Ice::ObjectPrx&)arg
 {
     self = [super init];
     if(!self)
     {
         return nil;
     }
-    communicator__ = [ICECommunicator localObjectWithCxxObjectNoAutoRelease:arg->ice_getCommunicator().get()];
-    objectPrx__ = arg.get();
+    communicator_ = [ICECommunicator localObjectWithCxxObjectNoAutoRelease:arg->ice_getCommunicator().get()];
+    objectPrx_ = arg.get();
     OBJECTPRX->__incRef();
     return self;
 }
 
--(IceProxy::Ice::Object*) objectPrx__
+-(IceProxy::Ice::Object*) iceObjectPrx
 {
-    return (IceProxy::Ice::Object*)objectPrx__;
+    return (IceProxy::Ice::Object*)objectPrx_;
 }
 
 -(void) dealloc
 {
     OBJECTPRX->__decRef();
-    objectPrx__ = 0;
-    [communicator__ release];
+    objectPrx_ = 0;
+    [communicator_ release];
     [super dealloc];
 }
 
-+(ICEObjectPrx*) objectPrxWithObjectPrx__:(const Ice::ObjectPrx&)arg
++(ICEObjectPrx*) iceObjectPrxWithObjectPrx:(const Ice::ObjectPrx&)arg
 {
     if(!arg)
     {
@@ -381,7 +347,7 @@ BOOL _returnsData;
     }
     else
     {
-        return [[[self alloc] initWithObjectPrx__:arg] autorelease];
+        return [[[self alloc] iceInitWithObjectPrx:arg] autorelease];
     }
 }
 
@@ -395,7 +361,7 @@ BOOL _returnsData;
         }
         else
         {
-            return [[[self alloc] initWithObjectPrx__:[(ICEObjectPrx*)proxy objectPrx__]] autorelease];
+            return [[[self alloc] iceInitWithObjectPrx:[(ICEObjectPrx*)proxy iceObjectPrx]] autorelease];
         }
     }
     return nil;
@@ -412,10 +378,10 @@ BOOL _returnsData;
         {
             return [[proxy retain] autorelease];
         }
-        else if([(ICEObjectPrx*)proxy conformsToProtocol:[self protocol__]] ||
+        else if([(ICEObjectPrx*)proxy conformsToProtocol:[self iceProtocol]] ||
                 [proxy ice_isA:[self ice_staticId]])
         {
-            return [[[self alloc] initWithObjectPrx__:[(ICEObjectPrx*)proxy objectPrx__]] autorelease];
+            return [[[self alloc] iceInitWithObjectPrx:[(ICEObjectPrx*)proxy iceObjectPrx]] autorelease];
         }
     }
     return nil;
@@ -439,10 +405,10 @@ BOOL _returnsData;
         {
             return [[proxy retain] autorelease];
         }
-        else if([(ICEObjectPrx*)proxy conformsToProtocol:[self protocol__]] ||
+        else if([(ICEObjectPrx*)proxy conformsToProtocol:[self iceProtocol]] ||
                 [proxy ice_isA:[self ice_staticId] context:context])
         {
-            return [[[self alloc] initWithObjectPrx__:[(ICEObjectPrx*)proxy objectPrx__]] autorelease];
+            return [[[self alloc] iceInitWithObjectPrx:[(ICEObjectPrx*)proxy iceObjectPrx]] autorelease];
         }
     }
     return nil;
@@ -463,12 +429,12 @@ BOOL _returnsData;
     return @"::Ice::Object";
 }
 
-+(Protocol*) protocol__
++(Protocol*) iceProtocol
 {
     return objc_getProtocol(class_getName([self class]));
 }
 
--(id<ICEOutputStream>) createOutputStream__
+-(id<ICEOutputStream>) iceCreateOutputStream
 {
     NSException* nsex = nil;
     try
@@ -482,7 +448,7 @@ BOOL _returnsData;
     @throw nsex;
     return nil; // Keep the compiler happy.
 }
--(void) checkAsyncTwowayOnly__:(NSString*)operation
+-(void) iceCheckAsyncTwowayOnly:(NSString*)operation
 {
     //
     // No mutex lock necessary, there is nothing mutable in this
@@ -497,7 +463,7 @@ BOOL _returnsData;
     }
 }
 
--(void) invoke__:(NSString*)operation
+-(void) iceInvoke:(NSString*)operation
             mode:(ICEOperationMode)mode
           format:(ICEFormatType)format
          marshal:(ICEMarshalCB)marshal
@@ -512,7 +478,7 @@ BOOL _returnsData;
     ICEOutputStream<ICEOutputStream>* os = nil;
     if(marshal)
     {
-        os = [self createOutputStream__];
+        os = [self iceCreateOutputStream];
         try
         {
             [os os]->startEncapsulation(IceInternal::getCompatibleEncoding(OBJECTPRX->ice_getEncodingVersion()),
@@ -560,49 +526,41 @@ BOOL _returnsData;
             ok = OBJECTPRX->ice_invoke(fromNSString(operation), (Ice::OperationMode)mode, inParams, outParams);
         }
 
-        if(unmarshal)
+        std::pair<const Ice::Byte*, const Ice::Byte*> p(&outParams[0], &outParams[0] + outParams.size());
+        ICEInputStream<ICEInputStream>* is;
+        is = [[ICEInputStream alloc] initWithCxxCommunicator:OBJECTPRX->ice_getCommunicator().get() data:p];
+        @try
         {
-            if(outParams.empty())
-            {
-                throw Ice::EncapsulationException(__FILE__, __LINE__);
-            }
-            std::pair<const Ice::Byte*, const Ice::Byte*> p(&outParams[0], &outParams[0] + outParams.size());
-            ICEInputStream<ICEInputStream>* is;
-            is = [[ICEInputStream alloc] initWithCxxCommunicator:OBJECTPRX->ice_getCommunicator().get() data:p];
-            @try
+            if(unmarshal)
             {
                 unmarshal(is, ok);
             }
-            @catch(id e)
+            else if(!outParams.empty())
             {
-                nsex = [e retain];
+                if(ok)
+                {
+                    [is skipEmptyEncapsulation];
+                }
+                else
+                {
+                    @try
+                    {
+                        [is startEncapsulation];
+                        [is throwException];
+                    }
+                    @catch(ICEUserException* ex)
+                    {
+                        [is endEncapsulation];
+                        @throw [ICEUnknownUserException unknownUserException:__FILE__ line:__LINE__ unknown:[ex ice_id]];
+                    }
+                }
             }
-            [is release];
         }
-        else if(!outParams.empty())
+        @catch(id e)
         {
-            if(ok)
-            {
-                if(outParams.size() != 6)
-                {
-                    throw Ice::EncapsulationException(__FILE__, __LINE__);
-                }
-            }
-            else
-            {
-                Ice::InputStream s(OBJECTPRX->ice_getCommunicator(), outParams);
-                try
-                {
-                    s.startEncapsulation();
-                    s.throwException();
-                }
-                catch(const Ice::UserException& ex)
-                {
-                    s.endEncapsulation();
-                    throw Ice::UnknownUserException(__FILE__, __LINE__, ex.ice_id());
-                }
-            }
+            nsex = [e retain];
         }
+        [is release];
     }
     catch(const std::exception& ex)
     {
@@ -621,7 +579,7 @@ BOOL _returnsData;
     NSAssert(os == nil, @"output stream not cleared");
 }
 
--(id<ICEAsyncResult>) begin_invoke__:(NSString*)operation
+-(id<ICEAsyncResult>) iceI_begin_invoke:(NSString*)operation
                                 mode:(ICEOperationMode)mode
                               format:(ICEFormatType)format
                              marshal:(void(^)(id<ICEOutputStream>))marshal
@@ -630,13 +588,13 @@ BOOL _returnsData;
 {
     if(returnsData)
     {
-        [self checkAsyncTwowayOnly__:operation];
+        [self iceCheckAsyncTwowayOnly:operation];
     }
 
     ICEOutputStream<ICEOutputStream>* os = nil;
     if(marshal)
     {
-        os = [self createOutputStream__];
+        os = [self iceCreateOutputStream];
         try
         {
             [os os]->startEncapsulation(IceInternal::getCompatibleEncoding(OBJECTPRX->ice_getEncodingVersion()),
@@ -682,7 +640,7 @@ BOOL _returnsData;
         {
             r = OBJECTPRX->begin_ice_invoke(fromNSString(operation), (Ice::OperationMode)mode, inParams);
         }
-        return [ICEAsyncResult asyncResultWithAsyncResult__:r operation:operation proxy:self];
+        return [ICEAsyncResult asyncResultWithAsyncResult:r operation:operation proxy:self];
     }
     catch(const std::exception& ex)
     {
@@ -700,7 +658,7 @@ BOOL _returnsData;
     return nil; // Keep the compiler happy.
 }
 
--(id<ICEAsyncResult>) begin_invoke__:(NSString*)operation
+-(id<ICEAsyncResult>) iceI_begin_invoke:(NSString*)operation
                                 mode:(ICEOperationMode)mode
                               format:(ICEFormatType)format
                              marshal:(void(^)(id<ICEOutputStream>))marshal
@@ -713,7 +671,7 @@ BOOL _returnsData;
 {
     if(returnsData)
     {
-        [self checkAsyncTwowayOnly__:operation];
+        [self iceCheckAsyncTwowayOnly:operation];
         if(!response)
         {
             @throw [NSException exceptionWithName:NSInvalidArgumentException
@@ -732,7 +690,7 @@ BOOL _returnsData;
     ICEOutputStream<ICEOutputStream>* os = nil;
     if(marshal)
     {
-        os = [self createOutputStream__];
+        os = [self iceCreateOutputStream];
         try
         {
             [os os]->startEncapsulation(IceInternal::getCompatibleEncoding(OBJECTPRX->ice_getEncodingVersion()),
@@ -784,7 +742,7 @@ BOOL _returnsData;
         {
             r = OBJECTPRX->begin_ice_invoke(fromNSString(operation), (Ice::OperationMode)mode, inParams, cb);
         }
-        return [ICEAsyncResult asyncResultWithAsyncResult__:r operation:operation proxy:self];
+        return [ICEAsyncResult asyncResultWithAsyncResult:r operation:operation proxy:self];
     }
     catch(const std::exception& ex)
     {
@@ -801,7 +759,7 @@ BOOL _returnsData;
     }
     return nil; // Keep the compiler happy.
 }
--(id<ICEAsyncResult>) begin_invoke__:(NSString*)op
+-(id<ICEAsyncResult>) iceI_begin_invoke:(NSString*)op
                                 mode:(ICEOperationMode)mode
                               format:(ICEFormatType)format
                              marshal:(void(^)(id<ICEOutputStream>))marshal
@@ -816,19 +774,19 @@ BOOL _returnsData;
             response();
         }
     };
-    return [self begin_invoke__:op
+    return [self iceI_begin_invoke:op
                  mode:mode
                  format:format
                  marshal:marshal
                  returnsData:NO
                  completed:completed
-                 response:TRUE
+                 response:YES
                  exception:exception
                  sent:sent
                  context:ctx];
 }
 
--(id<ICEAsyncResult>) begin_invoke__:(NSString*)op
+-(id<ICEAsyncResult>) iceI_begin_invoke:(NSString*)op
                                 mode:(ICEOperationMode)mode
                               format:(ICEFormatType)format
                              marshal:(void(^)(id<ICEOutputStream>))marshal
@@ -838,18 +796,18 @@ BOOL _returnsData;
                                 sent:(void(^)(BOOL))sent
                              context:(ICEContext*)ctx
 {
-    return [self begin_invoke__:op
+    return [self iceI_begin_invoke:op
                  mode:mode
                  format:format
                  marshal:marshal
-                 returnsData:TRUE
+                 returnsData:YES
                  completed:completed
                  response:response
                  exception:exception
                  sent:sent context:ctx];
 }
 
--(void)end_invoke__:(NSString*)operation unmarshal:(ICEUnmarshalCB)unmarshal result:(id<ICEAsyncResult>)r
+-(void)iceI_end_invoke:(NSString*)operation unmarshal:(ICEUnmarshalCB)unmarshal result:(id<ICEAsyncResult>)r
 {
     ICEAsyncResult* result = (ICEAsyncResult*)r;
     if(operation != [result operation])
@@ -866,67 +824,55 @@ BOOL _returnsData;
                             userInfo:nil];
     }
 
-    BOOL ok = YES; // Keep the compiler happy.
     NSException* nsex = nil;
-    ICEInputStream* is = nil;
     try
     {
         std::pair<const Ice::Byte*, const Ice::Byte*> outParams;
-        ok = OBJECTPRX->___end_ice_invoke(outParams, [result asyncResult__]);
+        BOOL ok = OBJECTPRX->_iceI_end_ice_invoke(outParams, [result asyncResult]);
 
-        if(unmarshal)
+        ICEInputStream* is;
+        is = [[ICEInputStream alloc] initWithCxxCommunicator:OBJECTPRX->ice_getCommunicator().get() data:outParams];
+        @try
         {
-            is = [[ICEInputStream alloc] initWithCxxCommunicator:OBJECTPRX->ice_getCommunicator().get() data:outParams];
-        }
-        else if(outParams.first != outParams.second)
-        {
-            if(ok)
+            if(unmarshal)
             {
-                if((outParams.second - outParams.first) != 6)
+                unmarshal(is, ok);
+            }
+            else if(outParams.first != outParams.second)
+            {
+                if(ok)
                 {
-                    throw Ice::EncapsulationException(__FILE__, __LINE__);
+                    [is skipEmptyEncapsulation];
+                }
+                else
+                {
+                    @try
+                    {
+                        [is startEncapsulation];
+                        [is throwException];
+                    }
+                    @catch(ICEUserException* ex)
+                    {
+                        [is endEncapsulation];
+                        @throw [ICEUnknownUserException unknownUserException:__FILE__ line:__LINE__ unknown:[ex ice_id]];
+                    }
                 }
             }
-            else
-            {
-                Ice::InputStream s(OBJECTPRX->ice_getCommunicator(), outParams);
-                try
-                {
-                    s.startEncapsulation();
-                    s.throwException();
-                }
-                catch(const Ice::UserException& ex)
-                {
-                    s.endEncapsulation();
-                    throw Ice::UnknownUserException(__FILE__, __LINE__, ex.ice_id());
-                }
-            }
         }
+        @catch(id e)
+        {
+            nsex = [e retain];
+        }
+        [is release];
     }
     catch(const std::exception& ex)
     {
-        if(is != nil)
-        {
-            [is release];
-            is = nil;
-        }
         nsex = toObjCException(ex);
     }
+
     if(nsex != nil)
     {
         @throw nsex;
-    }
-
-    if(is != nil)
-    {
-        @try
-        {
-            unmarshal(is, ok);
-        }
-        @finally
-        {
-            [is release];
-        }
     }
 }
 
@@ -937,7 +883,7 @@ BOOL _returnsData;
 
 -(NSUInteger) hash
 {
-    return (NSUInteger)OBJECTPRX->__hash();
+    return (NSUInteger)OBJECTPRX->_hash();
 }
 -(NSString*) description
 {
@@ -953,13 +899,13 @@ BOOL _returnsData;
     {
         return NO;
     }
-    return *OBJECTPRX == *[o_ objectPrx__];
+    return *OBJECTPRX == *[o_ iceObjectPrx];
 }
 
 -(NSComparisonResult) compareIdentity:(id<ICEObjectPrx>)aProxy
 {
     IceProxy::Ice::Object* lhs = OBJECTPRX;
-    IceProxy::Ice::Object* rhs = [(ICEObjectPrx*)aProxy objectPrx__];
+    IceProxy::Ice::Object* rhs = [(ICEObjectPrx*)aProxy iceObjectPrx];
     if(Ice::proxyIdentityEqual(lhs, rhs))
     {
         return NSOrderedSame;
@@ -977,7 +923,7 @@ BOOL _returnsData;
 -(NSComparisonResult) compareIdentityAndFacet:(id<ICEObjectPrx>)aProxy
 {
     IceProxy::Ice::Object* lhs = OBJECTPRX;
-    IceProxy::Ice::Object* rhs = [(ICEObjectPrx*)aProxy objectPrx__];
+    IceProxy::Ice::Object* rhs = [(ICEObjectPrx*)aProxy iceObjectPrx];
     if(Ice::proxyIdentityAndFacetEqual(lhs, rhs))
     {
         return NSOrderedSame;
@@ -994,7 +940,7 @@ BOOL _returnsData;
 
 -(id<ICECommunicator>) ice_getCommunicator
 {
-    return [[communicator__ retain] autorelease];
+    return [[communicator_ retain] autorelease];
 }
 
 -(NSMutableString*) ice_toString
@@ -1004,15 +950,15 @@ BOOL _returnsData;
 
 -(BOOL) ice_isA:(NSString*)typeId
 {
-    __block BOOL ret__;
-    cppCall(^ { ret__ = OBJECTPRX->ice_isA(fromNSString(typeId)); });
-    return ret__;
+    __block BOOL ret;
+    cppCall(^ { ret = OBJECTPRX->ice_isA(fromNSString(typeId)); });
+    return ret;
 }
 -(BOOL) ice_isA:(NSString*)typeId context:(ICEContext*)context
 {
-    __block BOOL ret__;
-    cppCall(^(const Ice::Context& ctx) { ret__ = OBJECTPRX->ice_isA(fromNSString(typeId), ctx); }, context);
-    return ret__;
+    __block BOOL ret;
+    cppCall(^(const Ice::Context& ctx) { ret = OBJECTPRX->ice_isA(fromNSString(typeId), ctx); }, context);
+    return ret;
 }
 -(id<ICEAsyncResult>) begin_ice_isA:(NSString*)typeId
 {
@@ -1052,10 +998,10 @@ BOOL _returnsData;
                             result = OBJECTPRX->begin_ice_isA(fromNSString(typeId), cb);
                         },
                         ^(const Ice::AsyncResultPtr& result) {
-                            BOOL ret__ = OBJECTPRX->end_ice_isA(result);
+                            BOOL ret = OBJECTPRX->end_ice_isA(result);
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, sent, self);
@@ -1073,19 +1019,19 @@ BOOL _returnsData;
                         },
                         context,
                         ^(const Ice::AsyncResultPtr& result) {
-                            BOOL ret__ = OBJECTPRX->end_ice_isA(result);
+                            BOOL ret = OBJECTPRX->end_ice_isA(result);
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, sent, self);
 }
 -(BOOL) end_ice_isA:(id<ICEAsyncResult>)result
 {
-    __block BOOL ret__;
-    endCppCall(^(const Ice::AsyncResultPtr& r) { ret__ = OBJECTPRX->end_ice_isA(r); }, result);
-    return ret__;
+    __block BOOL ret;
+    endCppCall(^(const Ice::AsyncResultPtr& r) { ret = OBJECTPRX->end_ice_isA(r); }, result);
+    return ret;
 }
 
 -(void) ice_ping
@@ -1163,15 +1109,15 @@ BOOL _returnsData;
 
 -(NSMutableArray*) ice_ids
 {
-    __block NSMutableArray* ret__;
-    cppCall(^ { ret__ = [toNSArray(OBJECTPRX->ice_ids()) autorelease]; });
-    return ret__;
+    __block NSMutableArray* ret;
+    cppCall(^ { ret = [toNSArray(OBJECTPRX->ice_ids()) autorelease]; });
+    return ret;
 }
 -(NSMutableArray*) ice_ids:(ICEContext*)context
 {
-    __block NSMutableArray* ret__;
-    cppCall(^(const Ice::Context& ctx) { ret__ = [toNSArray(OBJECTPRX->ice_ids(ctx)) autorelease]; }, context);
-    return ret__;
+    __block NSMutableArray* ret;
+    cppCall(^(const Ice::Context& ctx) { ret = [toNSArray(OBJECTPRX->ice_ids(ctx)) autorelease]; }, context);
+    return ret;
 }
 -(id<ICEAsyncResult>) begin_ice_ids
 {
@@ -1204,10 +1150,10 @@ BOOL _returnsData;
                             result = OBJECTPRX->begin_ice_ids(cb);
                         },
                         ^(const Ice::AsyncResultPtr& result) {
-                            NSMutableArray* ret__ = [toNSArray(OBJECTPRX->end_ice_ids(result)) autorelease];
+                            NSMutableArray* ret = [toNSArray(OBJECTPRX->end_ice_ids(result)) autorelease];
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, sent, self);
@@ -1223,32 +1169,32 @@ BOOL _returnsData;
                         },
                         context,
                         ^(const Ice::AsyncResultPtr& result) {
-                            NSMutableArray* ret__ = [toNSArray(OBJECTPRX->end_ice_ids(result)) autorelease];
+                            NSMutableArray* ret = [toNSArray(OBJECTPRX->end_ice_ids(result)) autorelease];
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, sent, self);
 }
 -(NSMutableArray*) end_ice_ids:(id<ICEAsyncResult>)result
 {
-    __block NSMutableArray* ret__;
-    endCppCall(^(const Ice::AsyncResultPtr& r) { ret__ = [toNSArray(OBJECTPRX->end_ice_ids(r)) autorelease]; }, result);
-    return ret__;
+    __block NSMutableArray* ret;
+    endCppCall(^(const Ice::AsyncResultPtr& r) { ret = [toNSArray(OBJECTPRX->end_ice_ids(r)) autorelease]; }, result);
+    return ret;
 }
 
 -(NSMutableString*) ice_id
 {
-    __block NSMutableString* ret__;
-    cppCall(^ { ret__ = [toNSMutableString(OBJECTPRX->ice_id()) autorelease]; });
-    return ret__;
+    __block NSMutableString* ret;
+    cppCall(^ { ret = [toNSMutableString(OBJECTPRX->ice_id()) autorelease]; });
+    return ret;
 }
 -(NSMutableString*) ice_id:(ICEContext*)context
 {
-    __block NSMutableString* ret__;
-    cppCall(^(const Ice::Context& ctx) { ret__ = [toNSMutableString(OBJECTPRX->ice_id(ctx)) autorelease]; }, context);
-    return ret__;
+    __block NSMutableString* ret;
+    cppCall(^(const Ice::Context& ctx) { ret = [toNSMutableString(OBJECTPRX->ice_id(ctx)) autorelease]; }, context);
+    return ret;
 }
 -(id<ICEAsyncResult>) begin_ice_id
 {
@@ -1281,10 +1227,10 @@ BOOL _returnsData;
                             result = OBJECTPRX->begin_ice_id(cb);
                         },
                         ^(const Ice::AsyncResultPtr& result) {
-                            NSString* ret__ = [toNSString(OBJECTPRX->end_ice_id(result)) autorelease];
+                            NSString* ret = [toNSString(OBJECTPRX->end_ice_id(result)) autorelease];
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, sent, self);
@@ -1300,20 +1246,20 @@ BOOL _returnsData;
                         },
                         context,
                         ^(const Ice::AsyncResultPtr& result) {
-                            NSString* ret__ = [toNSString(OBJECTPRX->end_ice_id(result)) autorelease];
+                            NSString* ret = [toNSString(OBJECTPRX->end_ice_id(result)) autorelease];
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, sent, self);
 }
 -(NSMutableString*) end_ice_id:(id<ICEAsyncResult>)result
 {
-    __block NSMutableString* ret__;
-    endCppCall(^(const Ice::AsyncResultPtr& r) { ret__ = [toNSMutableString(OBJECTPRX->end_ice_id(r)) autorelease]; },
+    __block NSMutableString* ret;
+    endCppCall(^(const Ice::AsyncResultPtr& r) { ret = [toNSMutableString(OBJECTPRX->end_ice_id(r)) autorelease]; },
                result);
-    return ret__;
+    return ret;
 }
 
 -(BOOL) ice_invoke:(NSString*)operation
@@ -1396,12 +1342,12 @@ BOOL _returnsData;
                         },
                         ^(const Ice::AsyncResultPtr& result) {
                             std::pair<const ::Ice::Byte*, const ::Ice::Byte*> outP;
-                            BOOL ret__ = OBJECTPRX->___end_ice_invoke(outP, result);
+                            BOOL ret = OBJECTPRX->_iceI_end_ice_invoke(outP, result);
                             if(response)
                             {
                                 NSMutableData* outEncaps =
                                     [NSMutableData dataWithBytes:outP.first length:(outP.second - outP.first)];
-                                response(ret__, outEncaps);
+                                response(ret, outEncaps);
                             }
                         },
                         exception, sent, self);
@@ -1427,12 +1373,12 @@ BOOL _returnsData;
                         context,
                         ^(const Ice::AsyncResultPtr& result) {
                             std::pair<const ::Ice::Byte*, const ::Ice::Byte*> outP;
-                            BOOL ret__ = OBJECTPRX->___end_ice_invoke(outP, result);
+                            BOOL ret = OBJECTPRX->_iceI_end_ice_invoke(outP, result);
                             if(response)
                             {
                                 NSMutableData* outEncaps =
                                     [NSMutableData dataWithBytes:outP.first length:(outP.second - outP.first)];
-                                response(ret__, outEncaps);
+                                response(ret, outEncaps);
                             }
                         },
                         exception, sent, self);
@@ -1440,14 +1386,14 @@ BOOL _returnsData;
 -(BOOL) end_ice_invoke:(NSMutableData**)outEncaps result:(id<ICEAsyncResult>)result
 
 {
-    __block BOOL ret__;
+    __block BOOL ret;
     endCppCall(^(const Ice::AsyncResultPtr& r)
                {
                    std::pair<const ::Ice::Byte*, const ::Ice::Byte*> outP;
-                   ret__ = OBJECTPRX->___end_ice_invoke(outP, r);
+                   ret = OBJECTPRX->_iceI_end_ice_invoke(outP, r);
                    *outEncaps = [NSMutableData dataWithBytes:outP.first length:(outP.second - outP.first)];
                }, result);
-    return ret__;
+    return ret;
 }
 
 -(ICEIdentity*) ice_getIdentity
@@ -1456,7 +1402,7 @@ BOOL _returnsData;
 }
 -(id) ice_identity:(ICEIdentity*)identity
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_identity([identity identity])];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_identity([identity identity])];
 }
 -(ICEMutableContext*) ice_getContext
 {
@@ -1465,7 +1411,7 @@ BOOL _returnsData;
 -(id) ice_context:(ICEContext*)context
 {
     Ice::Context ctx;
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_context(fromNSDictionary(context, ctx))];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_context(fromNSDictionary(context, ctx))];
 }
 -(NSMutableString*) ice_getFacet
 {
@@ -1473,7 +1419,7 @@ BOOL _returnsData;
 }
 -(id) ice_facet:(NSString*)facet
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_facet(fromNSString(facet))];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_facet(fromNSString(facet))];
 }
 -(NSMutableString*) ice_getAdapterId
 {
@@ -1489,12 +1435,12 @@ BOOL _returnsData;
 {
     Ice::EndpointSeq cxxEndpoints;
     fromNSArray(endpoints, cxxEndpoints);
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_endpoints(cxxEndpoints)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_endpoints(cxxEndpoints)];
 }
 
 -(id) ice_adapterId:(NSString*)adapterId
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_adapterId(fromNSString(adapterId))];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_adapterId(fromNSString(adapterId))];
 }
 
 -(ICEInt) ice_getLocatorCacheTimeout
@@ -1506,7 +1452,7 @@ BOOL _returnsData;
     NSException* nsex;
     try
     {
-        return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_locatorCacheTimeout(timeout)];
+        return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_locatorCacheTimeout(timeout)];
     }
     catch(const std::exception& ex)
     {
@@ -1520,7 +1466,7 @@ BOOL _returnsData;
 }
 -(id) ice_connectionCached:(BOOL)cached
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_connectionCached(cached)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_connectionCached(cached)];
 }
 -(ICEEndpointSelectionType) ice_getEndpointSelection
 {
@@ -1528,7 +1474,7 @@ BOOL _returnsData;
 }
 -(id) ice_endpointSelection:(ICEEndpointSelectionType)type
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_endpointSelection((Ice::EndpointSelectionType)type)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_endpointSelection((Ice::EndpointSelectionType)type)];
 }
 -(BOOL) ice_isSecure
 {
@@ -1536,7 +1482,7 @@ BOOL _returnsData;
 }
 -(id) ice_secure:(BOOL)secure
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_secure(secure)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_secure(secure)];
 }
 
 -(ICEEncodingVersion*) ice_getEncodingVersion
@@ -1546,7 +1492,7 @@ BOOL _returnsData;
 
 -(id) ice_encodingVersion:(ICEEncodingVersion*)encoding;
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_encodingVersion([encoding encodingVersion])];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_encodingVersion([encoding encodingVersion])];
 }
 
 -(BOOL) ice_isPreferSecure
@@ -1555,25 +1501,25 @@ BOOL _returnsData;
 }
 -(id) ice_preferSecure:(BOOL)preferSecure
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_preferSecure(preferSecure)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_preferSecure(preferSecure)];
 }
 -(id<ICERouterPrx>) ice_getRouter
 {
-    return (id<ICERouterPrx>)[ICERouterPrx objectPrxWithObjectPrx__:OBJECTPRX->ice_getRouter()];
+    return (id<ICERouterPrx>)[ICERouterPrx iceObjectPrxWithObjectPrx:OBJECTPRX->ice_getRouter()];
 }
 -(id) ice_router:(id<ICERouterPrx>)router
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_router(
-            Ice::RouterPrx::uncheckedCast(Ice::ObjectPrx([(ICEObjectPrx*)router objectPrx__])))];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_router(
+            Ice::RouterPrx::uncheckedCast(Ice::ObjectPrx([(ICEObjectPrx*)router iceObjectPrx])))];
 }
 -(id<ICELocatorPrx>) ice_getLocator
 {
-    return (id<ICELocatorPrx>)[ICELocatorPrx objectPrxWithObjectPrx__:OBJECTPRX->ice_getLocator()];
+    return (id<ICELocatorPrx>)[ICELocatorPrx iceObjectPrxWithObjectPrx:OBJECTPRX->ice_getLocator()];
 }
 -(id) ice_locator:(id<ICELocatorPrx>)locator
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_locator(
-            Ice::LocatorPrx::uncheckedCast(Ice::ObjectPrx([(ICEObjectPrx*)locator objectPrx__])))];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_locator(
+            Ice::LocatorPrx::uncheckedCast(Ice::ObjectPrx([(ICEObjectPrx*)locator iceObjectPrx])))];
 }
 -(BOOL) ice_isCollocationOptimized
 {
@@ -1581,7 +1527,7 @@ BOOL _returnsData;
 }
 -(id) ice_collocationOptimized:(BOOL)collocOptimized
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_collocationOptimized(collocOptimized)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_collocationOptimized(collocOptimized)];
 }
 -(ICEInt) ice_getInvocationTimeout
 {
@@ -1592,7 +1538,7 @@ BOOL _returnsData;
     NSException* nsex;
     try
     {
-        return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_invocationTimeout(timeout)];
+        return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_invocationTimeout(timeout)];
     }
     catch(const std::exception& ex)
     {
@@ -1602,7 +1548,7 @@ BOOL _returnsData;
 }
 -(id) ice_twoway
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_twoway()];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_twoway()];
 }
 -(BOOL) ice_isTwoway
 {
@@ -1610,7 +1556,7 @@ BOOL _returnsData;
 }
 -(id) ice_oneway
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_oneway()];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_oneway()];
 }
 -(BOOL) ice_isOneway
 {
@@ -1618,7 +1564,7 @@ BOOL _returnsData;
 }
 -(id) ice_batchOneway
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_batchOneway()];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_batchOneway()];
 }
 -(BOOL) ice_isBatchOneway
 {
@@ -1626,7 +1572,7 @@ BOOL _returnsData;
 }
 -(id) ice_datagram
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_datagram()];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_datagram()];
 }
 -(BOOL) ice_isDatagram
 {
@@ -1634,7 +1580,7 @@ BOOL _returnsData;
 }
 -(id) ice_batchDatagram
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_batchDatagram()];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_batchDatagram()];
 }
 -(BOOL) ice_isBatchDatagram
 {
@@ -1642,14 +1588,14 @@ BOOL _returnsData;
 }
 -(id) ice_compress:(BOOL)compress
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_compress(compress)];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_compress(compress)];
 }
 -(id) ice_timeout:(int)timeout
 {
     NSException* nsex;
     try
     {
-        return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_timeout(timeout)];
+        return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_timeout(timeout)];
     }
     catch(const std::exception& ex)
     {
@@ -1659,7 +1605,7 @@ BOOL _returnsData;
 }
 -(id) ice_connectionId:(NSString*)connectionId
 {
-    return [[self class] objectPrxWithObjectPrx__:OBJECTPRX->ice_connectionId(fromNSString(connectionId))];
+    return [[self class] iceObjectPrxWithObjectPrx:OBJECTPRX->ice_connectionId(fromNSString(connectionId))];
 }
 -(id<ICEConnection>) ice_getConnection
 {
@@ -1691,23 +1637,23 @@ BOOL _returnsData;
                             result = OBJECTPRX->begin_ice_getConnection(cb);
                         },
                         ^(const Ice::AsyncResultPtr& result) {
-                            id<ICEConnection> ret__ =
+                            id<ICEConnection> ret =
                                 [ICEConnection localObjectWithCxxObject:OBJECTPRX->end_ice_getConnection(result).get()];
                             if(response)
                             {
-                                response(ret__);
+                                response(ret);
                             }
                         },
                         exception, nil, self);
 }
 -(id<ICEConnection>) end_ice_getConnection:(id<ICEAsyncResult>)result
 {
-    __block id<ICEConnection> ret__;
+    __block id<ICEConnection> ret;
     endCppCall(^(const Ice::AsyncResultPtr& r)
                {
-                   ret__ = [ICEConnection localObjectWithCxxObject:OBJECTPRX->end_ice_getConnection(r).get()];
+                   ret = [ICEConnection localObjectWithCxxObject:OBJECTPRX->end_ice_getConnection(r).get()];
                }, result);
-    return ret__;
+    return ret;
 }
 
 -(id<ICEConnection>) ice_getCachedConnection

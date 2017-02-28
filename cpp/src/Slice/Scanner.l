@@ -2,7 +2,7 @@
 
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -36,6 +36,10 @@
 // '<' : signed/unsigned mismatch
 //
 #   pragma warning( 4 : 4018 )
+#endif
+
+#if defined(__GNUC__)
+#   pragma GCC diagnostic ignored "-Wsign-compare"
 #endif
 
 #ifdef _MSC_VER
@@ -80,7 +84,6 @@ int checkKeyword(string&);
 %option noyywrap
 %option never-interactive
 %option prefix="slice_"
-%option outfile="lex.yy.c"
 
 identifier      \\?[[:alpha:]_][[:alnum:]_]*
 integer_constant    (\+|-)?((0[0-7]+)|(0x[[:xdigit:]]+)|([[:digit:]]+))
@@ -163,7 +166,7 @@ floating_literal    (({fractional_constant}{exponent_part}?)|((\+|-)?[[:digit:]]
         }
         else if(c == EOF)
         {
-            unit->warning("EOF in comment");
+            unit->warning(All, "EOF in comment");
             break;
         }
         else
@@ -239,7 +242,7 @@ floating_literal    (({fractional_constant}{exponent_part}?)|((\+|-)?[[:digit:]]
     BEGIN(MAINSCAN);
     StringTokPtr str = new StringTok;
     str->literal = "\"";
-    while(true)
+     while(true)
     {
         char c = static_cast<char>(yyinput());
         str->literal += c;
@@ -252,9 +255,10 @@ floating_literal    (({fractional_constant}{exponent_part}?)|((\+|-)?[[:digit:]]
             unit->error("EOF in string");
             break;
         }
-        else if(c == '\n')
+        else if(static_cast<unsigned char>(c) < 32 || c == 127)
         {
-            unit->error("newline in string");
+            unit->error("a string literal can only contain printable ASCII characters and non-ASCII characters");
+            break;
         }
         else if(c == '\\')
         {
@@ -264,67 +268,58 @@ floating_literal    (({fractional_constant}{exponent_part}?)|((\+|-)?[[:digit:]]
             {
                 case '\\':
                 {
+                    //
+                    // add extra escape to our internal string
+                    //
                     str->v += '\\';
                     str->v += '\\';
                     break;
                 }
                 case '"':
                 case '\'':
+                case '?':
                 {
                     str->v += next;
                     break;
                 }
-            
-                case 'n':
-                {
-                    str->v += '\n';
-                    break;
-                }
-            
-                case 'r':
-                {
-                    str->v += '\r';
-                    break;
-                }
-
-                case 't':
-                {
-                    str->v += '\t';
-                    break;
-                }
-            
-                case 'v':
-                {
-                    str->v += '\v';
-                    break;
-                }
-            
-                case 'f':
-                {
-                    str->v += '\f';
-                    break;
-                }
-
                 case 'a':
                 {
                     str->v += '\a';
                     break;
                 }
-
                 case 'b':
                 {
                     str->v += '\b';
                     break;
                 }
-
-                case '?':
+                case 'f':
                 {
-                    str->v += '\?';
+                    str->v += '\f';
+                    break;
+                }
+                case 'n':
+                {
+                    str->v += '\n';
+                    break;
+                }
+                case 'r':
+                {
+                    str->v += '\r';
+                    break;
+                }
+                case 't':
+                {
+                    str->v += '\t';
+                    break;
+                }
+                case 'v':
+                {
+                    str->v += '\v';
                     break;
                 }
 
                 //
-                // Octal value \nnn limited to three octal digits but terminate at the first character 
+                // Octal value \nnn limited to three octal digits but terminate at the first character
                 // that is not a valid octal digit if encountered sooner.
                 //
                 case '0':
@@ -333,10 +328,10 @@ floating_literal    (({fractional_constant}{exponent_part}?)|((\+|-)?[[:digit:]]
                 case '3':
                 case '4':
                 case '5':
+                case '6':
                 case '7':
                 {
                     static string octalDigits = "01234567";
-                    IceUtil::Int64 value = 0;
                     string escape;
                     escape += next;
                     for(int i = 0; i < 2; ++i)
@@ -347,158 +342,92 @@ floating_literal    (({fractional_constant}{exponent_part}?)|((\+|-)?[[:digit:]]
                             unput(next);
                             break;
                         }
-                        escape += next;                        
+                        escape += next;
                     }
                     str->literal += escape;
-                    value = IceUtilInternal::strToInt64(escape.c_str(), 0, 8);
-                    
-                    if(value == 0)
+                    IceUtil::Int64 value = IceUtilInternal::strToInt64(escape.c_str(), 0, 8);
+                    if(value > 255)
                     {
-                        unit->error("illegal NUL character in string constant");
-                    }
-                    else if(value > 255)
-                    {
-                        ostringstream os;
-                        os << "octal escape sequence out of range: '\\" << oct << value << "'";
-                        unit->warning(os.str());
+                        unit->error(string("octal escape sequence out of range: `\\") + escape + "'");
                     }
                     str->v += static_cast<char>(value);
                     break;
                 }
+
                 case 'x':
                 {
-                    IceUtil::Int64 value = 0;
                     string escape = "";
-                    while(isxdigit(static_cast<unsigned char>(next = static_cast<char>(yyinput()))))
+                    next = static_cast<char>(yyinput());
+
+                    //
+                    // Unlike C++, we limit hex escape sequences to 2 hex digits
+                    //
+                    while(isxdigit(next) && escape.length() < 2)
                     {
                         escape += next;
+                        next = static_cast<char>(yyinput());
                     }
                     unput(next);
-                    
-                    str->literal += escape;
-                    value = IceUtilInternal::strToInt64(escape.c_str(), 0, 16);
 
-                    if(value == 0)
+                    if(escape.length() == 0)
                     {
-                        unit->error("illegal NUL character in string constant");
+                        unit->error("no hex digit in hex escape sequence");
                     }
-                    else if(value > 255)
-                    {
-                        ostringstream os;
-                        os << "hex escape sequence out of range: '\\x" << hex << value << "'";
-                        unit->warning(os.str());
-                    }
+
+                    str->literal += escape;
+                    IceUtil::Int64 value = IceUtilInternal::strToInt64(escape.c_str(), 0, 16);
+
+                    assert(value >= 0 && value <= 255);
                     str->v += static_cast<char>(value);
                     break;
                 }
-        
+
                 //
-                // Universal character name \unnnn code point U+nnnn
+                // Universal character name
                 //
                 case 'u':
-                {
-                    IceUtil::Int64 value = 0;
-                    string escape = "";
-
-                    for(int i = 0; i < 4; ++i)
-                    {
-                        next = static_cast<char>(yyinput());
-                        str->literal += next;
-                        if(!isxdigit(static_cast<unsigned char>(next)))
-                        {
-                            unit->error("unknown escape sequence in string constant: " + str->literal);
-                            break;
-                        }
-                        escape += next;
-                    }
-                    
-                    value = escape.size() == 4 ? IceUtilInternal::strToInt64(escape.c_str(), 0, 16) : -1;
-
-                    ostringstream os;
-                    os << '\\' << 'u';
-                    os.fill('0');
-                    os.width(4);
-                    os << hex << value;
-                    
-                    if(value == 0)
-                    {
-                        unit->error("illegal NUL character in string constant");
-                    }
-                    
-                    
-                    //
-                    // Determine if a character is a surrogate:
-                    // 
-                    // * High surrogate code point, ranging from 0xd800 to 0xdbff, inclusive
-                    // * Low surrogate code point, ranging from 0xdc00 to 0xdfff, inclusive.
-                    //
-                    else if((value >= 0xd800 && value <= 0xdbff) || (value >= 0xdc00 && value <= 0xdfff))
-                    {
-                        unit->error("unknown escape sequence in string constant: '" + os.str() + "'");
-                    }
-
-                    str->v += os.str();
-                    
-                    break;
-                }
-                
                 case 'U':
                 {
-                    IceUtil::Int64 value = 0;
                     string escape = "";
-                    
-                    for(int i = 0; i < 8; ++i)
+                    char c = next;
+                    int size = (c == 'u') ? 4 : 8;
+                    while(size > 0)
                     {
                         next = static_cast<char>(yyinput());
-                        str->literal += next;
                         if(!isxdigit(static_cast<unsigned char>(next)))
                         {
-
-                            unit->error("unknown escape sequence in string constant: " + str->literal);
+                            unit->error(string("unknown escape sequence in string literal: `\\") + c + escape + next + "'");
+                            unput(next);
                             break;
                         }
                         escape += next;
-                    }
-                    
-                    value = escape.size() == 8 ? IceUtilInternal::strToInt64(escape.c_str(), 0, 16) : -1;
-
-                    ostringstream os;
-                    os << '\\' << 'U';
-                    os.fill('0');
-                    os.width(8);
-                    os << hex << value;
-                    
-                    if(value == 0)
-                    {
-                        unit->error("illegal NUL character in string constant");
-                    }
-                    
-                    //
-                    // Determine if a character is a surrogate:
-                    // 
-                    // * High surrogate code point, ranging from 0xd800 to 0xdbff, inclusive
-                    // * Low surrogate code point, ranging from 0xdc00 to 0xdfff, inclusive.
-                    //
-                    else if((value >= 0xd800 && value <= 0xdbff) || (value >= 0xdc00 && value <= 0xdfff))
-                    {
-                        unit->error("unknown escape sequence in string constant: '" + os.str() + "'");
+                        --size;
                     }
 
-                    str->v += os.str();
+                    if(size == 0)
+                    {
+                        // All digits read, check value
+                        IceUtil::Int64 codePoint = IceUtilInternal::strToInt64(escape.c_str(), 0, 16);
+                        if(codePoint >= 0xd800 && codePoint <= 0xdfff)
+                        {
+                            unit->error(string("a universal character name cannot designate a surrogate: `\\") + c + escape + "'");
+                        }
+                    }
+
+                    str->literal += escape;
+                    str->v += string("\\") + c + escape;
                     break;
                 }
 
                 default:
                 {
                     ostringstream os;
-                    os << "unknown escape sequence '\\" << next << "'";
-                    unit->warning(os.str());
-                    //
-                    // We escape the backslack in a unknown escape sequence 
-                    // to keep compativility with 3.6"
-                    //
+                    os << "unknown escape sequence `\\" << next << "'";
+                    unit->warning(All, os.str());
+
+                    // Escape the \ in this unknown escape sequence
                     str->v += '\\';
-                    str->v += c;
+                    str->v += '\\';
                     unput(next);
                 }
             }

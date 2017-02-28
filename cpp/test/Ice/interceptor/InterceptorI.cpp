@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,12 +15,11 @@ using namespace std;
 
 InterceptorI::InterceptorI(const Ice::ObjectPtr& servant) :
     _servant(servant),
-    _lastStatus(Ice::DispatchAsync)
+    _lastStatus(false)
 {
 }
 
-
-Ice::DispatchStatus
+bool
 InterceptorI::dispatch(Ice::Request& request)
 {
     Ice::Current& current = const_cast<Ice::Current&>(request.getCurrent());
@@ -49,7 +48,7 @@ InterceptorI::dispatch(Ice::Request& request)
     return _lastStatus;
 }
 
-Ice::DispatchStatus
+bool
 InterceptorI::getLastStatus() const
 {
     return _lastStatus;
@@ -64,6 +63,6 @@ InterceptorI::getLastOperation() const
 void
 InterceptorI::clear()
 {
-    _lastStatus = Ice::DispatchAsync;
+    _lastStatus = false;
     _lastOperation = "";
 }

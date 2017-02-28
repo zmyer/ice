@@ -1,14 +1,14 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
 
-var Ice = require("../Ice/ModuleRegistry").Ice;
-Ice.__M.require(module,
+const Ice = require("../Ice/ModuleRegistry").Ice;
+Ice._ModuleRegistry.require(module,
     [
         "../Ice/Protocol",
         "../Ice/LocalException",
@@ -16,7 +16,7 @@ Ice.__M.require(module,
         "../Ice/Properties"
     ]);
 
-var Protocol = Ice.Protocol;
+const Protocol = Ice.Protocol;
 
 //
 // Ice.InitializationData
@@ -30,7 +30,7 @@ Ice.InitializationData = function()
 
 Ice.InitializationData.prototype.clone = function()
 {
-    var r = new Ice.InitializationData();
+    const r = new Ice.InitializationData();
     r.properties = this.properties;
     r.logger = this.logger;
     r.valueFactoryManager = this.valueFactoryManager;
@@ -42,8 +42,8 @@ Ice.InitializationData.prototype.clone = function()
 //
 Ice.initialize = function(arg1, arg2)
 {
-    var args = null;
-    var initData = null;
+    let args = null;
+    let initData = null;
 
     if(arg1 instanceof Array)
     {
@@ -80,7 +80,7 @@ Ice.initialize = function(arg1, arg2)
     }
     initData.properties = Ice.createProperties(args, initData.properties);
 
-    var result = new Ice.Communicator(initData);
+    const result = new Ice.Communicator(initData);
     result.finishSetup(null);
     return result;
 };
@@ -101,6 +101,16 @@ Ice.currentProtocol = function()
 Ice.currentEncoding = function()
 {
     return Protocol.currentEncoding.clone();
+};
+
+Ice.stringVersion = function()
+{
+    return "3.7a4"; // "A.B.C", with A=major, B=minor, C=patch
+};
+
+Ice.intVersion = function()
+{
+    return 30754; // AABBCC, with AA=major, BB=minor, CC=patch
 };
 
 module.exports.Ice = Ice;

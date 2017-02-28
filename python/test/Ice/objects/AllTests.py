@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -106,14 +106,14 @@ def allTests(communicator):
     i = initial.getI()
     test(i)
     j = initial.getJ()
-    test(isinstance(j, Test.J))
+    test(isinstance(j, TestI.JI))
     h = initial.getH()
     test(isinstance(h, Test.H))
     print("ok")
 
     sys.stdout.write("getting D1... ")
     sys.stdout.flush()
-    d1 = initial.getD1(Test.D1(Test.A1("a1"), Test.A1("a2"), Test.A1("a3"), Test.A1("a4")));
+    d1 = initial.getD1(Test.D1(Test.A1("a1"), Test.A1("a2"), Test.A1("a3"), Test.A1("a4")))
     test(d1.a1.name == "a1")
     test(d1.a2.name == "a2")
     test(d1.a3.name == "a3")
@@ -155,11 +155,11 @@ def allTests(communicator):
     test(b1.theA.theC)
     test(b1.theA.theC.theB == b1.theA)
     test(b1.preMarshalInvoked)
-    test(b1.postUnmarshalInvoked())
+    test(b1.postUnmarshalInvoked)
     test(b1.theA.preMarshalInvoked)
-    test(b1.theA.postUnmarshalInvoked())
+    test(b1.theA.postUnmarshalInvoked)
     test(b1.theA.theC.preMarshalInvoked)
-    test(b1.theA.theC.postUnmarshalInvoked())
+    test(b1.theA.theC.postUnmarshalInvoked)
     # More tests possible for b2 and d, but I think this is already sufficient.
     test(b2.theA == b2)
     test(d.theC == None)
@@ -193,13 +193,13 @@ def allTests(communicator):
     test(d.theB == b2)
     test(d.theC == None)
     test(d.preMarshalInvoked)
-    test(d.postUnmarshalInvoked())
+    test(d.postUnmarshalInvoked)
     test(d.theA.preMarshalInvoked)
-    test(d.theA.postUnmarshalInvoked())
+    test(d.theA.postUnmarshalInvoked)
     test(d.theB.preMarshalInvoked)
-    test(d.theB.postUnmarshalInvoked())
+    test(d.theB.postUnmarshalInvoked)
     test(d.theB.theC.preMarshalInvoked)
-    test(d.theB.theC.postUnmarshalInvoked())
+    test(d.theB.theC.postUnmarshalInvoked)
     print("ok")
 
     sys.stdout.write("testing sequences... ")
@@ -220,6 +220,14 @@ def allTests(communicator):
         test(r)
     except Ice.OperationNotExistException:
         pass
+    print("ok")
+
+    sys.stdout.write("testing marshaled results...")
+    sys.stdout.flush()
+    b1 = initial.getMB()
+    test(b1 != None and b1.theB == b1)
+    b1 = initial.getAMDMBAsync().result()
+    test(b1 != None and b1.theB == b1)
     print("ok")
 
     # Don't run this test with collocation, this should work with collocation

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -52,7 +52,10 @@ private:
     bool _called;
 };
 
-class Callback : public CallbackBase, public Ice::EnableSharedFromThis<Callback>
+class Callback : public CallbackBase
+#ifndef ICE_CPP11_MAPPING
+               , public virtual IceUtil::Shared
+#endif
 {
 public:
 
@@ -627,7 +630,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "base as Object (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->SBaseAsObject_async();
+        auto f = test->SBaseAsObjectAsync();
         try
         {
             auto o = f.get();
@@ -670,7 +673,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            auto sb = test->SBaseAsSBase_async().get();
+            auto sb = test->SBaseAsSBaseAsync().get();
             test(sb->sb == "SBase.sb");
         }
         catch(...)
@@ -707,7 +710,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "base with known derived as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->SBSKnownDerivedAsSBase_async();
+        auto f = test->SBSKnownDerivedAsSBaseAsync();
         try
         {
             shared_ptr<SBase> sb = f.get();
@@ -749,7 +752,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "base with known derived as known derived (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->SBSKnownDerivedAsSBSKnownDerived_async();
+        auto f = test->SBSKnownDerivedAsSBSKnownDerivedAsync();
         try
         {
             SBSKnownDerivedPtr sbskd = test->SBSKnownDerivedAsSBSKnownDerived();
@@ -828,7 +831,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "base with unknown derived as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->SBSUnknownDerivedAsSBase_async();
+        auto f = test->SBSUnknownDerivedAsSBaseAsync();
         try
         {
             SBasePtr sb = f.get();
@@ -852,7 +855,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         // This test succeeds for the 1.0 encoding.
         //
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->SBSUnknownDerivedAsSBaseCompact_async();
+        auto f = test->SBSUnknownDerivedAsSBaseCompactAsync();
         try
         {
             SBasePtr sb = f.get();
@@ -877,7 +880,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         // be sliced to a known type.
         //
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->SBSUnknownDerivedAsSBaseCompact_async();
+        auto f = test->SBSUnknownDerivedAsSBaseCompactAsync();
         try
         {
             f.get();
@@ -914,7 +917,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
             if(test->ice_getEncodingVersion() == Ice::Encoding_1_0)
             {
-                auto f = test->SUnknownAsObject_async();
+                auto f = test->SUnknownAsObjectAsync();
                 try
                 {
                     f.get();
@@ -930,7 +933,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             }
             else
             {
-                auto f = test->SUnknownAsObject_async();
+                auto f = test->SUnknownAsObjectAsync();
                 try
                 {
                     shared_ptr<Ice::Value> v = f.get();
@@ -987,7 +990,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "one-element cycle (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->oneElementCycle_async();
+        auto f = test->oneElementCycleAsync();
         try
         {
             auto b = f.get();
@@ -1035,7 +1038,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "two-element cycle (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->twoElementCycle_async();
+        auto f = test->twoElementCycleAsync();
         try
         {
             auto b1 = f.get();
@@ -1097,7 +1100,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "known derived pointer slicing as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->D1AsB_async();
+        auto f = test->D1AsBAsync();
         try
         {
             auto b1 = f.get();
@@ -1159,7 +1162,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "known derived pointer slicing as derived (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->D1AsD1_async();
+        auto f = test->D1AsD1Async();
         try
         {
             auto d1 = f.get();
@@ -1219,7 +1222,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "unknown derived pointer slicing as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->D2AsB_async();
+        auto f = test->D2AsBAsync();
         try
         {
             auto b2 = test->D2AsB();
@@ -1283,7 +1286,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "param ptr slicing with known first (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->paramTest1_async();
+        auto f = test->paramTest1Async();
         try
         {
             auto result = f.get();
@@ -1365,7 +1368,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "return value identity with known first (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->returnTest1_async();
+        auto f = test->returnTest1Async();
         try
         {
             auto result = f.get();
@@ -1403,7 +1406,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "return value identity with unknown first (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->returnTest2_async();
+        auto f = test->returnTest2Async();
         try
         {
             auto result = f.get();
@@ -1489,7 +1492,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #endif
 
 #ifdef ICE_CPP11_MAPPING
-            auto f = test->returnTest3_async(d1, d3);
+            auto f = test->returnTest3Async(d1, d3);
             auto b1 = f.get();
 #else
             CallbackPtr cb = new Callback;
@@ -1595,7 +1598,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #endif
 
 #ifdef ICE_CPP11_MAPPING
-            auto f = test->returnTest3_async(d3, d1);
+            auto f = test->returnTest3Async(d3, d1);
             auto b1 = f.get();
 #else
             CallbackPtr cb = new Callback;
@@ -1666,7 +1669,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "remainder unmarshaling (3 instances) (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->paramTest3_async();
+        auto f = test->paramTest3Async();
         try
         {
             auto result = f.get();
@@ -1729,7 +1732,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "remainder unmarshaling (4 instances) (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto f = test->paramTest4_async();
+        auto f = test->paramTest4Async();
         try
         {
             auto result = f.get();
@@ -1816,7 +1819,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             b2->pb = b1;
 
 #ifdef ICE_CPP11_MAPPING
-            auto r = test->returnTest3_async(d3, b2).get();
+            auto r = test->returnTest3Async(d3, b2).get();
 #else
             CallbackPtr cb = new Callback;
             test->begin_returnTest3(d3, b2,
@@ -1903,7 +1906,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #endif
 
 #ifdef ICE_CPP11_MAPPING
-            auto r = test->returnTest3_async(d3, d12).get();
+            auto r = test->returnTest3Async(d3, d12).get();
 #else
             CallbackPtr cb = new Callback;
             test->begin_returnTest3(d3, d12,
@@ -2074,7 +2077,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #endif
 
 #ifdef ICE_CPP11_MAPPING
-                ss = test->sequenceTest_async(ss1, ss2).get();
+                ss = test->sequenceTestAsync(ss1, ss2).get();
 #else
                 CallbackPtr cb = new Callback;
                 test->begin_sequenceTest(ss1, ss2,
@@ -2201,7 +2204,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             }
 
 #ifdef ICE_CPP11_MAPPING
-            auto result = test->dictionaryTest_async(bin).get();
+            auto result = test->dictionaryTestAsync(bin).get();
             r = result.returnValue;
             bout = result.bout;
 #else
@@ -2276,7 +2279,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            test->throwBaseAsBase_async().get();
+            test->throwBaseAsBaseAsync().get();
             test(false);
         }
         catch(const BaseException& ex)
@@ -2333,7 +2336,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            test->throwDerivedAsBase_async().get();
+            test->throwDerivedAsBaseAsync().get();
             test(false);
         }
         catch(const DerivedException& ex)
@@ -2396,7 +2399,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            test->throwDerivedAsDerived_async().get();
+            test->throwDerivedAsDerivedAsync().get();
             test(false);
         }
         catch(const DerivedException& e)
@@ -2454,7 +2457,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            test->throwUnknownDerivedAsBase_async().get();
+            test->throwUnknownDerivedAsBaseAsync().get();
             test(false);
         }
         catch(const BaseException& e)
@@ -2671,7 +2674,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            pd = dynamic_pointer_cast<PDerived>(test->exchangePBase_async(pd).get());
+            pd = dynamic_pointer_cast<PDerived>(test->exchangePBaseAsync(pd).get());
             test(pd);
             test(pd->pi == 3);
             test(pd->ps == "preserved");
@@ -2699,7 +2702,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         try
         {
-            auto r = test->exchangePBase_async(pu).get();
+            auto r = test->exchangePBaseAsync(pu).get();
             auto p2 = dynamic_pointer_cast<PCUnknown>(r);
             test(!p2);
             test(r->pi == 3);
@@ -2727,14 +2730,14 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         if(test->ice_getEncodingVersion() == Ice::Encoding_1_0)
         {
-            auto r = test->exchangePBase_async(pcd).get();
+            auto r = test->exchangePBaseAsync(pcd).get();
             auto p2 = dynamic_pointer_cast<PCDerived>(r);
             test(!p2);
             test(r->pi == 3);
         }
         else
         {
-            auto r = test->exchangePBase_async(pcd).get();
+            auto r = test->exchangePBaseAsync(pcd).get();
             auto p2 = dynamic_pointer_cast<PCDerived>(r);
             test(p2);
             test(p2->pi == 3);
@@ -2770,14 +2773,14 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         if(test->ice_getEncodingVersion() == Ice::Encoding_1_0)
         {
-            auto r = test->exchangePBase_async(pcd).get();
+            auto r = test->exchangePBaseAsync(pcd).get();
             auto p2 = dynamic_pointer_cast<CompactPCDerived>(r);
             test(!p2);
             test(r->pi == 3);
         }
         else
         {
-            auto r = test->exchangePBase_async(pcd).get();
+            auto r = test->exchangePBaseAsync(pcd).get();
             auto p2 = dynamic_pointer_cast<CompactPCDerived>(r);
             test(p2);
             test(p2->pi == 3);
@@ -2828,14 +2831,14 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #ifdef ICE_CPP11_MAPPING
         if(test->ice_getEncodingVersion() == Ice::Encoding_1_0)
         {
-            auto r = test->exchangePBase_async(pcd).get();
+            auto r = test->exchangePBaseAsync(pcd).get();
             auto p2 = dynamic_pointer_cast<PCDerived>(r);
             test(!p2);
             test(r->pi == 3);
         }
         else
         {
-            auto r = test->exchangePBase_async(pcd).get();
+            auto r = test->exchangePBaseAsync(pcd).get();
             auto p3 = dynamic_pointer_cast<PCDerived3>(r);
             test(p3);
             test(p3->pi == 3);

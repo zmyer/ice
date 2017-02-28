@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,7 @@ using System.Diagnostics;
 using System.Threading;
 using Test;
 
-public class AllTests : TestCommon.TestApp
+public class AllTests : TestCommon.AllTests
 {
     private class Callback
     {
@@ -48,8 +48,9 @@ public class AllTests : TestCommon.TestApp
     }
 
 
-    public static ThrowerPrx allTests(Ice.Communicator communicator)
+    public static ThrowerPrx allTests(TestCommon.Application app)
     {
+        Ice.Communicator communicator = app.communicator();
         {
             Write("testing object adapter registration exceptions... ");
             Ice.ObjectAdapter first;
@@ -98,10 +99,10 @@ public class AllTests : TestCommon.TestApp
             communicator.getProperties().setProperty("TestAdapter1.Endpoints", "default");
             Ice.ObjectAdapter adapter = communicator.createObjectAdapter("TestAdapter1");
             Ice.Object obj = new EmptyI();
-            adapter.add(obj, communicator.stringToIdentity("x"));
+            adapter.add(obj, Ice.Util.stringToIdentity("x"));
             try
             {
-                adapter.add(obj, communicator.stringToIdentity("x"));
+                adapter.add(obj, Ice.Util.stringToIdentity("x"));
                 test(false);
             }
             catch(Ice.AlreadyRegisteredException)
@@ -110,7 +111,7 @@ public class AllTests : TestCommon.TestApp
 
             try
             {
-                adapter.add(obj, communicator.stringToIdentity(""));
+                adapter.add(obj, Ice.Util.stringToIdentity(""));
                 test(false);
             }
             catch(Ice.IllegalIdentityException e)
@@ -120,17 +121,17 @@ public class AllTests : TestCommon.TestApp
 
             try
             {
-                adapter.add(null, communicator.stringToIdentity("x"));
+                adapter.add(null, Ice.Util.stringToIdentity("x"));
                 test(false);
             }
             catch(Ice.IllegalServantException)
             {
             }
 
-            adapter.remove(communicator.stringToIdentity("x"));
+            adapter.remove(Ice.Util.stringToIdentity("x"));
             try
             {
-                adapter.remove(communicator.stringToIdentity("x"));
+                adapter.remove(Ice.Util.stringToIdentity("x"));
                 test(false);
             }
             catch(Ice.NotRegisteredException)
@@ -175,7 +176,7 @@ public class AllTests : TestCommon.TestApp
 
         Write("testing stringToProxy... ");
         Flush();
-        String @ref = "thrower:default -p 12010";
+        String @ref = "thrower:" + app.getTestEndpoint(0);
         Ice.ObjectPrx @base = communicator.stringToProxy(@ref);
         test(@base != null);
         WriteLine("ok");
@@ -200,8 +201,9 @@ public class AllTests : TestCommon.TestApp
         {
             test(ex.aMem == 1);
         }
-        catch(Exception)
+        catch(Exception ex)
         {
+            System.Console.WriteLine(ex);
             test(false);
         }
 
@@ -221,7 +223,7 @@ public class AllTests : TestCommon.TestApp
 
         try
         {
-            thrower.throwAorDasAorD(- 1);
+            thrower.throwAorDasAorD(-1);
             test(false);
         }
         catch(D ex)
@@ -430,7 +432,7 @@ public class AllTests : TestCommon.TestApp
             }
 
             ThrowerPrx thrower2 = ThrowerPrxHelper.uncheckedCast(
-                communicator.stringToProxy("thrower:default -p 12011"));
+                communicator.stringToProxy("thrower:" + app.getTestEndpoint(1)));
             try
             {
                 thrower2.throwMemoryLimitException(new byte[2 * 1024 * 1024]); // 2MB (no limits)
@@ -439,7 +441,7 @@ public class AllTests : TestCommon.TestApp
             {
             }
             ThrowerPrx thrower3 = ThrowerPrxHelper.uncheckedCast(
-                communicator.stringToProxy("thrower:default -p 12012"));
+                communicator.stringToProxy("thrower:" + app.getTestEndpoint(2)));
             try
             {
                 thrower3.throwMemoryLimitException(new byte[1024]); // 1KB limit
@@ -456,7 +458,7 @@ public class AllTests : TestCommon.TestApp
         Flush();
 
         {
-            Ice.Identity id = communicator.stringToIdentity("does not exist");
+            Ice.Identity id = Ice.Util.stringToIdentity("does not exist");
             try
             {
                 ThrowerPrx thrower2 = ThrowerPrxHelper.uncheckedCast(thrower.ice_identity(id));
@@ -908,7 +910,7 @@ public class AllTests : TestCommon.TestApp
         Flush();
 
         {
-            Ice.Identity id = communicator.stringToIdentity("does not exist");
+            Ice.Identity id = Ice.Util.stringToIdentity("does not exist");
             ThrowerPrx thrower2 = ThrowerPrxHelper.uncheckedCast(thrower.ice_identity(id));
             Callback cb = new Callback();
             thrower2.begin_throwAasA(1).whenCompleted(
@@ -1092,7 +1094,6 @@ public class AllTests : TestCommon.TestApp
 
         WriteLine("ok");
 
-        // ----------------------------------------
         if(thrower.supportsUndeclaredExceptions())
         {
             Write("catching unknown user exception with new AMI mapping... ");
@@ -1180,7 +1181,7 @@ public class AllTests : TestCommon.TestApp
         Flush();
 
         {
-            Ice.Identity id = communicator.stringToIdentity("does not exist");
+            Ice.Identity id = Ice.Util.stringToIdentity("does not exist");
             ThrowerPrx thrower2 = ThrowerPrxHelper.uncheckedCast(thrower.ice_identity(id));
             Callback cb = new Callback();
             thrower2.begin_throwAasA(1).whenCompleted(

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,12 +14,11 @@
 #include <Ice/IPEndpointI.h>
 #include <Ice/EndpointFactory.h>
 #include <Ice/Network.h> // for IceIternal::Address
-#include <Ice/WSEndpoint.h>
 
 namespace IceInternal
 {
 
-class TcpEndpointI : public IPEndpointI, public WSEndpointDelegate
+class TcpEndpointI : public IPEndpointI
 {
 public:
 
@@ -28,8 +27,9 @@ public:
     TcpEndpointI(const ProtocolInstancePtr&);
     TcpEndpointI(const ProtocolInstancePtr&, Ice::InputStream*);
 
+    virtual void streamWriteImpl(Ice::OutputStream*) const;
+
     virtual Ice::EndpointInfoPtr getInfo() const;
-    virtual Ice::EndpointInfoPtr getWSInfo(const std::string&) const;
 
     virtual Ice::Int timeout() const;
     virtual EndpointIPtr timeout(Ice::Int) const;
@@ -54,7 +54,6 @@ public:
 
 protected:
 
-    virtual void streamWriteImpl(Ice::OutputStream*) const;
     virtual void hashInit(Ice::Int&) const;
     virtual void fillEndpointInfo(Ice::IPEndpointInfo*) const;
     virtual bool checkOption(const std::string&, const std::string&, const std::string&);
@@ -84,7 +83,7 @@ public:
     virtual EndpointIPtr read(Ice::InputStream*) const;
     virtual void destroy();
 
-    virtual EndpointFactoryPtr clone(const ProtocolInstancePtr&) const;
+    virtual EndpointFactoryPtr clone(const ProtocolInstancePtr&, const EndpointFactoryPtr&) const;
 
 private:
 

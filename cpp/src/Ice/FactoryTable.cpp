@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,12 +12,21 @@
 
 using namespace std;
 
+#ifndef ICE_CPP11_MAPPING
+
+Ice::UserExceptionFactory::~UserExceptionFactory()
+{
+    // Out of line to avoid weak vtable
+}
+
+#endif
+
 //
 // Add a factory to the exception factory table.
 // If the factory is present already, increment its reference count.
 //
 void
-IceInternal::FactoryTable::addExceptionFactory(const string& t, const Ice::UserExceptionFactoryPtr& f)
+IceInternal::FactoryTable::addExceptionFactory(const string& t, ICE_IN(ICE_USER_EXCEPTION_FACTORY) f)
 {
     IceUtil::Mutex::Lock lock(_m);
     assert(f);
@@ -35,12 +44,12 @@ IceInternal::FactoryTable::addExceptionFactory(const string& t, const Ice::UserE
 //
 // Return the exception factory for a given type ID
 //
-Ice::UserExceptionFactoryPtr
+ICE_USER_EXCEPTION_FACTORY
 IceInternal::FactoryTable::getExceptionFactory(const string& t) const
 {
     IceUtil::Mutex::Lock lock(_m);
     EFTable::const_iterator i = _eft.find(t);
-    return i != _eft.end() ? i->second.first : Ice::UserExceptionFactoryPtr();
+    return i != _eft.end() ? i->second.first : ICE_USER_EXCEPTION_FACTORY();
 }
 
 //

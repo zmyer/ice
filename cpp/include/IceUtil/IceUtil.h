@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,7 +19,8 @@
 
 #include <IceUtil/Config.h>
 #include <IceUtil/Cond.h>
-#if !defined(__APPLE__) && !defined(ICE_OS_WINRT)
+#include <IceUtil/ConsoleUtil.h>
+#if !defined(__APPLE__) && !defined(ICE_OS_UWP)
 #   include <IceUtil/CtrlCHandler.h>
 #endif
 #include <IceUtil/Exception.h>
@@ -39,11 +40,6 @@
 #include <IceUtil/Time.h>
 #include <IceUtil/Timer.h>
 #include <IceUtil/UUID.h>
-#include <IceUtil/UniquePtr.h>
-
-#ifndef _WIN32
-#   include <IceUtil/IconvStringConverter.h>
-#endif
 
 #include <IceUtil/PopDisableWarnings.h>
 #endif

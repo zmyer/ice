@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -33,10 +33,13 @@ namespace Glacier2
 const int GLACIER2_SSL_PORT = 4064;
 const int GLACIER2_TCP_PORT = 4063;
 
-class GLACIER2_API SessionHelper : public virtual ICE_SHARED
+class GLACIER2_API SessionHelper
+#ifndef ICE_CPP11_MAPPING
+    : public virtual IceUtil::Shared
+#endif
 {
-
 public:
+    virtual ~SessionHelper();
 
     virtual void destroy() = 0;
     virtual Ice::CommunicatorPtr communicator() const = 0;
@@ -51,10 +54,13 @@ public:
 };
 ICE_DEFINE_PTR(SessionHelperPtr, SessionHelper);
 
-class GLACIER2_API SessionCallback : public virtual ICE_SHARED
+class GLACIER2_API SessionCallback
+#ifndef ICE_CPP11_MAPPING
+    : public virtual IceUtil::Shared
+#endif
 {
-
 public:
+    virtual ~SessionCallback();
 
     virtual void createdCommunicator(const SessionHelperPtr& session) = 0;
     virtual void connected(const SessionHelperPtr&) = 0;
@@ -65,7 +71,12 @@ ICE_DEFINE_PTR(SessionCallbackPtr, SessionCallback);
 
 class SessionThreadCallback;
 
-class GLACIER2_API SessionFactoryHelper : public Ice::EnableSharedFromThis<SessionFactoryHelper>
+class GLACIER2_API SessionFactoryHelper
+#ifdef ICE_CPP11_MAPPING
+    : public std::enable_shared_from_this<SessionFactoryHelper>
+#else
+    : public virtual IceUtil::Shared
+#endif
 {
     friend class SessionThreadCallback; // To access thread functions
 

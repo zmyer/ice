@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -39,7 +39,7 @@ public:
     virtual EndpointIPtr read(Ice::InputStream*) const = 0;
     virtual void destroy() = 0;
 
-    virtual EndpointFactoryPtr clone(const ProtocolInstancePtr&) const = 0;
+    virtual EndpointFactoryPtr clone(const ProtocolInstancePtr&, const EndpointFactoryPtr&) const = 0;
 
 protected:
 

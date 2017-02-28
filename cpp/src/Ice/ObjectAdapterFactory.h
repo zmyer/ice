@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,8 +19,12 @@
 namespace IceInternal
 {
 
-class ObjectAdapterFactory : public Ice::EnableSharedFromThis<ObjectAdapterFactory>,
-                             public ::IceUtil::Monitor< ::IceUtil::RecMutex>
+class ObjectAdapterFactory : public ::IceUtil::Monitor< ::IceUtil::RecMutex>,
+#ifdef ICE_CPP11_MAPPING
+                             public std::enable_shared_from_this<ObjectAdapterFactory>
+#else
+                             public virtual IceUtil::Shared
+#endif
 {
 public:
 
@@ -34,7 +38,7 @@ public:
     ::Ice::ObjectAdapterPtr createObjectAdapter(const std::string&, const Ice::RouterPrxPtr&);
     ::Ice::ObjectAdapterPtr findObjectAdapter(const ::Ice::ObjectPrxPtr&);
     void removeObjectAdapter(const ::Ice::ObjectAdapterPtr&);
-    void flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr&) const;
+    void flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr&, ::Ice::CompressBatch) const;
 
     ObjectAdapterFactory(const InstancePtr&, const ::Ice::CommunicatorPtr&);
     virtual ~ObjectAdapterFactory();

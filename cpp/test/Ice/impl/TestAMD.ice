@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -94,8 +94,6 @@ dictionary<MyEnum, MyEnumS> MyEnumMyEnumSD;
 ["amd"] class MyClass
 {
     void shutdown();
-
-    void delay(int ms);
 
     void opVoid();
 
@@ -249,7 +247,7 @@ dictionary<MyEnum, MyEnumS> MyEnumMyEnumSD;
     string opString1(string opString1);
     StringS opStringS1(StringS opStringS1);
     ByteBoolD opByteBoolD1(ByteBoolD opByteBoolD1);
-    
+
     StringS opStringS2(StringS stringS);
     ByteBoolD opByteBoolD2(ByteBoolD byteBoolD);
 };

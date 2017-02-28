@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,7 +11,7 @@
 #define ICE_INITIALIZE_H
 
 #include <IceUtil/Timer.h>
-#include <Ice/CommunicatorF.h>
+#include <Ice/Communicator.h>
 #include <Ice/PropertiesF.h>
 #include <Ice/InstanceF.h>
 #include <Ice/LoggerF.h>
@@ -42,9 +42,21 @@ ICE_API StringSeq argsToStringSeq(int, wchar_t*[]);
 //
 ICE_API void stringSeqToArgs(const StringSeq&, int&, char*[]);
 
+#ifdef _WIN32
+
+ICE_API void stringSeqToArgs(const StringSeq&, int&, wchar_t*[]);
+
+#endif
+
 ICE_API PropertiesPtr createProperties();
 ICE_API PropertiesPtr createProperties(StringSeq&, const PropertiesPtr& = 0);
 ICE_API PropertiesPtr createProperties(int&, char*[], const PropertiesPtr& = 0);
+
+#ifdef _WIN32
+
+ICE_API PropertiesPtr createProperties(int&, wchar_t*[], const PropertiesPtr& = 0);
+
+#endif
 
 //
 // This class is used to notify user of when Ice threads are started
@@ -89,8 +101,8 @@ struct InitializationData
 #ifdef ICE_CPP11_MAPPING
     std::function<void()> threadStart;
     std::function<void()> threadStop;
-    std::function<void (std::function<void ()>, const std::shared_ptr<Ice::Connection>&)> dispatcher;
-    std::function<std::string (int)> compactIdResolver;
+    std::function<void(std::function<void()>, const std::shared_ptr<Ice::Connection>&)> dispatcher;
+    std::function<std::string(int)> compactIdResolver;
     std::function<void(const Ice::BatchRequest&, int, int)> batchRequestInterceptor;
 #else
     ThreadNotificationPtr threadHook;
@@ -104,11 +116,16 @@ struct InitializationData
 ICE_API CommunicatorPtr initialize(int&, char*[], const InitializationData& = InitializationData(),
                                    Int = ICE_INT_VERSION);
 
+#ifdef _WIN32
+ICE_API CommunicatorPtr initialize(int&, wchar_t*[], const InitializationData& = InitializationData(),
+                                   Int = ICE_INT_VERSION);
+#endif
+
 ICE_API CommunicatorPtr initialize(Ice::StringSeq&, const InitializationData& = InitializationData(),
                                    Int = ICE_INT_VERSION);
 
 ICE_API CommunicatorPtr initialize(const InitializationData& = InitializationData(),
-                                           Int = ICE_INT_VERSION);
+                                   Int = ICE_INT_VERSION);
 
 ICE_API LoggerPtr getProcessLogger();
 ICE_API void setProcessLogger(const LoggerPtr&);
@@ -152,7 +169,8 @@ private:
 };
 
 ICE_API Identity stringToIdentity(const std::string&);
-ICE_API std::string identityToString(const Identity&);
+ICE_API std::string identityToString(const Identity&, ToStringMode = ICE_ENUM(ToStringMode, Unicode));
+
 }
 
 namespace IceInternal

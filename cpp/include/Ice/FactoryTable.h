@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -34,8 +34,8 @@ class ICE_API FactoryTable : private IceUtil::noncopyable
 {
 public:
 
-    void addExceptionFactory(const ::std::string&, const Ice::UserExceptionFactoryPtr&);
-    Ice::UserExceptionFactoryPtr getExceptionFactory(const ::std::string&) const;
+    void addExceptionFactory(const ::std::string&, ICE_IN(ICE_USER_EXCEPTION_FACTORY));
+    ICE_USER_EXCEPTION_FACTORY getExceptionFactory(const ::std::string&) const;
     void removeExceptionFactory(const ::std::string&);
 
     void addValueFactory(const ::std::string&, ICE_IN(ICE_VALUE_FACTORY));
@@ -50,7 +50,7 @@ private:
 
     IceUtil::Mutex _m;
 
-    typedef ::std::pair<Ice::UserExceptionFactoryPtr, int> EFPair;
+    typedef ::std::pair<ICE_USER_EXCEPTION_FACTORY, int> EFPair;
     typedef ::std::map< ::std::string, EFPair> EFTable;
     EFTable _eft;
 

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,7 +22,7 @@
 #include <vector>
 #include <map>
 
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
 #   if defined(_WIN32)
 #      include <process.h>
 #   else

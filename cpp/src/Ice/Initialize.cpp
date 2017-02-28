@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -16,10 +16,10 @@
 #include <Ice/LoggerI.h>
 #include <Ice/Instance.h>
 #include <Ice/PluginManagerI.h>
-#include <IceUtil/StringUtil.h>
+#include <Ice/StringUtil.h>
 #include <IceUtil/Mutex.h>
 #include <IceUtil/MutexPtrLock.h>
-#include <IceUtil/StringConverter.h>
+#include <Ice/StringConverter.h>
 
 using namespace std;
 using namespace Ice;
@@ -71,11 +71,11 @@ Ice::argsToStringSeq(int /*argc*/, wchar_t* argv[])
     // Don't need to use a wide string converter argv is expected to
     // come from Windows API.
     //
-    const IceUtil::StringConverterPtr converter = IceUtil::getProcessStringConverter();
+    const StringConverterPtr converter = getProcessStringConverter();
     StringSeq args;
     for(int i=0; argv[i] != 0; i++)
     {
-        args.push_back(IceUtil::wstringToString(argv[i], converter));
+        args.push_back(wstringToString(argv[i], converter));
     }
     return args;
 }
@@ -119,16 +119,61 @@ Ice::stringSeqToArgs(const StringSeq& args, int& argc, char* argv[])
     }
 }
 
+#ifdef _WIN32
+void
+Ice::stringSeqToArgs(const StringSeq& args, int& argc, wchar_t* argv[])
+{
+    //
+    // Don't need to use a wide string converter argv is expected to
+    // come from Windows API.
+    //
+    const StringConverterPtr converter = getProcessStringConverter();
+
+    //
+    // Shift all elements in argv which are present in args to the
+    // beginning of argv. We record the original value of argc so
+    // that we can know later if we've shifted the array.
+    //
+    const int argcOrig = argc;
+    int i = 0;
+    while(i < argc)
+    {
+        if(find(args.begin(), args.end(), wstringToString(argv[i], converter)) == args.end())
+        {
+            for(int j = i; j < argc - 1; j++)
+            {
+                argv[j] = argv[j + 1];
+            }
+            --argc;
+        }
+        else
+        {
+            ++i;
+        }
+    }
+
+    //
+    // Make sure that argv[argc] == 0, the ISO C++ standard requires this.
+    // We can only do this if we've shifted the array, otherwise argv[argc]
+    // may point to an invalid address.
+    //
+    if(argv && argcOrig != argc)
+    {
+        argv[argc] = 0;
+    }
+}
+#endif
+
 PropertiesPtr
 Ice::createProperties()
 {
-    return PropertiesPtr(new PropertiesI(IceUtil::getProcessStringConverter()));
+    return ICE_MAKE_SHARED(PropertiesI);
 }
 
 PropertiesPtr
 Ice::createProperties(StringSeq& args, const PropertiesPtr& defaults)
 {
-    return PropertiesPtr(new PropertiesI(args, defaults, IceUtil::getProcessStringConverter()));
+    return ICE_MAKE_SHARED(PropertiesI, args, defaults);
 }
 
 PropertiesPtr
@@ -139,6 +184,17 @@ Ice::createProperties(int& argc, char* argv[], const PropertiesPtr& defaults)
     stringSeqToArgs(args, argc, argv);
     return properties;
 }
+
+#ifdef _WIN32
+PropertiesPtr
+Ice::createProperties(int& argc, wchar_t* argv[], const PropertiesPtr& defaults)
+{
+    StringSeq args = argsToStringSeq(argc, argv);
+    PropertiesPtr properties = createProperties(args, defaults);
+    stringSeqToArgs(args, argc, argv);
+    return properties;
+}
+#endif
 
 #ifdef ICE_CPP11_MAPPING
 Ice::ThreadHookPlugin::ThreadHookPlugin(const CommunicatorPtr& communicator,
@@ -223,7 +279,6 @@ inline void checkIceVersion(Int version)
 
 }
 
-
 Ice::CommunicatorPtr
 Ice::initialize(int& argc, char* argv[], const InitializationData& initializationData, Int version)
 {
@@ -236,6 +291,17 @@ Ice::initialize(int& argc, char* argv[], const InitializationData& initializatio
     communicator->finishSetup(argc, argv);
     return communicator;
 }
+
+#ifdef _WIN32
+Ice::CommunicatorPtr
+Ice::initialize(int& argc, wchar_t* argv[], const InitializationData& initializationData, Int version)
+{
+    Ice::StringSeq args = argsToStringSeq(argc, argv);
+    CommunicatorPtr communicator = initialize(args, initializationData, version);
+    stringSeqToArgs(args, argc, argv);
+    return communicator;
+}
+#endif
 
 Ice::CommunicatorPtr
 Ice::initialize(StringSeq& args, const InitializationData& initializationData, Int version)
@@ -272,7 +338,7 @@ Ice::getProcessLogger()
        //
        // TODO: Would be nice to be able to use process name as prefix by default.
        //
-       processLogger = ICE_MAKE_SHARED(Ice::LoggerI, "", "", true, IceUtil::getProcessStringConverter());
+       processLogger = ICE_MAKE_SHARED(LoggerI, "", "", true);
     }
     return processLogger;
 }
@@ -357,15 +423,6 @@ IceInternal::getInstanceTimer(const CommunicatorPtr& communicator)
 Identity
 Ice::stringToIdentity(const string& s)
 {
-    //
-    // This method only accepts printable ascii. Since printable ascii is a subset
-    // of all narrow string encodings, it is not necessary to convert the string
-    // from the native string encoding. Any characters other than printable-ASCII
-    // will cause an IllegalArgumentException. Note that it can contain Unicode
-    // encoded in the escaped form which is the reason why we call fromUTF8 after
-    // unespcaping the printable ASCII string.
-    //
-
     Identity ident;
 
     //
@@ -376,7 +433,7 @@ Ice::stringToIdentity(const string& s)
     while((pos = s.find('/', pos)) != string::npos)
     {
         int escapes = 0;
-        while(static_cast<int>(pos)- escapes > 0 && s[pos - escapes - 1] == '\\')
+        while(static_cast<int>(pos) - escapes > 0 && s[pos - escapes - 1] == '\\')
         {
             escapes++;
         }
@@ -396,7 +453,7 @@ Ice::stringToIdentity(const string& s)
                 // Extra unescaped slash found.
                 //
                 IdentityParseException ex(__FILE__, __LINE__);
-                ex.str = "unescaped backslash in identity `" + s + "'";
+                ex.str = "unescaped '/' in identity `" + s + "'";
                 throw ex;
             }
         }
@@ -407,7 +464,7 @@ Ice::stringToIdentity(const string& s)
     {
         try
         {
-            ident.name = IceUtilInternal::unescapeString(s, 0, s.size());
+            ident.name = unescapeString(s, 0, s.size(), "/");
         }
         catch(const IceUtil::IllegalArgumentException& e)
         {
@@ -420,7 +477,7 @@ Ice::stringToIdentity(const string& s)
     {
         try
         {
-            ident.category = IceUtilInternal::unescapeString(s, 0, slash);
+            ident.category = unescapeString(s, 0, slash, "/");
         }
         catch(const IceUtil::IllegalArgumentException& e)
         {
@@ -428,11 +485,12 @@ Ice::stringToIdentity(const string& s)
             ex.str = "invalid category in identity `" + s + "': " + e.reason();
             throw ex;
         }
+
         if(slash + 1 < s.size())
         {
             try
             {
-                ident.name = IceUtilInternal::unescapeString(s, slash + 1, s.size());
+                ident.name = unescapeString(s, slash + 1, s.size(), "/");
             }
             catch(const IceUtil::IllegalArgumentException& e)
             {
@@ -443,28 +501,18 @@ Ice::stringToIdentity(const string& s)
         }
     }
 
-    ident.name = UTF8ToNative(ident.name, IceUtil::getProcessStringConverter());
-    ident.category = UTF8ToNative(ident.category, IceUtil::getProcessStringConverter());
-
     return ident;
 }
 
 string
-Ice::identityToString(const Identity& ident)
+Ice::identityToString(const Identity& ident, ToStringMode toStringMode)
 {
-    //
-    // This method returns the stringified identity. The returned string only
-    // contains printable ascii. It can contain UTF8 in the escaped form.
-    //
-    string name = nativeToUTF8(ident.name, IceUtil::getProcessStringConverter());
-    string category = nativeToUTF8(ident.category, IceUtil::getProcessStringConverter());
-
-    if(category.empty())
+    if(ident.category.empty())
     {
-        return IceUtilInternal::escapeString(name, "/");
+        return escapeString(ident.name, "/", toStringMode);
     }
     else
     {
-        return IceUtilInternal::escapeString(category, "/") + '/' + IceUtilInternal::escapeString(name, "/");
+        return escapeString(ident.category, "/", toStringMode) + '/' + escapeString(ident.name, "/", toStringMode);
     }
 }

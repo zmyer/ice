@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -749,6 +749,40 @@
 }
 @end
 
+@interface HeartbeatManualTest : TestCase
++(id) testCase:(id<TestACMRemoteCommunicatorPrx>)com;
++(NSString*) getName;
+-(void) runTestCase:(id<TestACMRemoteObjectAdapterPrx>)adapter proxy:(id<TestACMTestIntfPrx>)proxy;
+@end
+
+@implementation HeartbeatManualTest
++(id) testCase:(id<TestACMRemoteCommunicatorPrx>)com
+{
+    id tc = [super testCase:com];
+    //
+    // Disable heartbeats.
+    //
+    [tc setClientACM:10 close:-1 heartbeat:0];
+    [tc setServerACM:10 close:-1 heartbeat:0];
+    return tc;
+}
++(NSString*) getName
+{
+      return @"manual heartbeats";
+}
+-(void) runTestCase:(id<TestACMRemoteObjectAdapterPrx>)adapter proxy:(id<TestACMTestIntfPrx>)proxy
+{
+    [proxy startHeartbeatCount];
+    id<ICEConnection> con = [proxy ice_getConnection];
+    [con heartbeat];
+    [con heartbeat];
+    [con heartbeat];
+    [con heartbeat];
+    [con heartbeat];
+    [proxy waitForHeartbeatCount:5];
+}
+@end
+
 @interface SetACMTest : TestCase
 +(id) testCase:(id<TestACMRemoteCommunicatorPrx>)com;
 +(NSString*) getName;
@@ -788,7 +822,8 @@
     test(acm.close == ICECloseOnInvocationAndIdle);
     test(acm.heartbeat == ICEHeartbeatAlways);
 
-    [proxy waitForHeartbeat:2];
+    [proxy startHeartbeatCount];
+    [proxy waitForHeartbeatCount:2];
 }
 @end
 
@@ -812,6 +847,7 @@ acmAllTests(id<ICECommunicator> communicator)
 
     [tests addObject:[HeartbeatOnIdleTest testCase:com]];
     [tests addObject:[HeartbeatAlwaysTest testCase:com]];
+    [tests addObject:[HeartbeatManualTest testCase:com]];
     [tests addObject:[SetACMTest testCase:com]];
 
     for(int i = 0; i < tests.count; ++i)

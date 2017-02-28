@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -173,6 +173,17 @@ IceRuby_initialize(int argc, VALUE* argv, VALUE self)
                 communicator = Ice::initialize(data);
             }
         }
+        catch(const Ice::LocalException& ex)
+        {
+            cerr << ex << endl;
+            for(i = 0; i < ac + 1; ++i)
+            {
+                free(av[i]);
+            }
+            delete[] av;
+
+            throw;
+        }
         catch(...)
         {
             for(i = 0; i < ac + 1; ++i)
@@ -239,12 +250,27 @@ IceRuby_stringToIdentity(VALUE self, VALUE str)
 
 extern "C"
 VALUE
-IceRuby_identityToString(VALUE self, VALUE id)
+IceRuby_identityToString(int argc, VALUE* argv, VALUE self)
 {
     ICE_RUBY_TRY
     {
-        Ice::Identity ident = getIdentity(id);
-        string str = Ice::identityToString(ident);
+        if(argc < 1 || argc > 2)
+        {
+            throw RubyException(rb_eArgError, "wrong number of arguments");
+        }
+
+        Ice::Identity ident = getIdentity(argv[0]);
+
+
+        Ice::ToStringMode toStringMode = Ice::Unicode;
+        if(argc == 2)
+        {
+            volatile VALUE modeValue = callRuby(rb_funcall, argv[1], rb_intern("to_i"), 0);
+            assert(TYPE(modeValue) == T_FIXNUM);
+            toStringMode = static_cast<Ice::ToStringMode>(FIX2LONG(modeValue));
+        }
+
+        string str = Ice::identityToString(ident, toStringMode);
         return createString(str);
     }
     ICE_RUBY_CATCH
@@ -587,12 +613,22 @@ IceRuby_Communicator_setDefaultLocator(VALUE self, VALUE locator)
 
 extern "C"
 VALUE
-IceRuby_Communicator_flushBatchRequests(VALUE self)
+IceRuby_Communicator_flushBatchRequests(VALUE self, VALUE compress)
 {
     ICE_RUBY_TRY
     {
         Ice::CommunicatorPtr p = getCommunicator(self);
-        p->flushBatchRequests();
+
+        volatile VALUE type = callRuby(rb_path2class, "Ice::CompressBatch");
+        if(callRuby(rb_obj_is_instance_of, compress, type) != Qtrue)
+        {
+            throw RubyException(rb_eTypeError,
+                "value for 'compress' argument must be an enumerator of Ice::CompressBatch");
+        }
+        volatile VALUE compressValue = callRuby(rb_funcall, compress, rb_intern("to_i"), 0);
+        assert(TYPE(compressValue) == T_FIXNUM);
+        Ice::CompressBatch cb = static_cast<Ice::CompressBatch>(FIX2LONG(compressValue));
+        p->flushBatchRequests(cb);
     }
     ICE_RUBY_CATCH
     return Qnil;
@@ -602,7 +638,7 @@ void
 IceRuby::initCommunicator(VALUE iceModule)
 {
     rb_define_module_function(iceModule, "initialize", CAST_METHOD(IceRuby_initialize), -1);
-    rb_define_module_function(iceModule, "identityToString", CAST_METHOD(IceRuby_identityToString), 1);
+    rb_define_module_function(iceModule, "identityToString", CAST_METHOD(IceRuby_identityToString), -1);
     rb_define_module_function(iceModule, "stringToIdentity", CAST_METHOD(IceRuby_stringToIdentity), 1);
 
     _communicatorClass = rb_define_class_under(iceModule, "CommunicatorI", rb_cObject);
@@ -625,7 +661,7 @@ IceRuby::initCommunicator(VALUE iceModule)
     rb_define_method(_communicatorClass, "setDefaultRouter", CAST_METHOD(IceRuby_Communicator_setDefaultRouter), 1);
     rb_define_method(_communicatorClass, "getDefaultLocator", CAST_METHOD(IceRuby_Communicator_getDefaultLocator), 0);
     rb_define_method(_communicatorClass, "setDefaultLocator", CAST_METHOD(IceRuby_Communicator_setDefaultLocator), 1);
-    rb_define_method(_communicatorClass, "flushBatchRequests", CAST_METHOD(IceRuby_Communicator_flushBatchRequests), 0);
+    rb_define_method(_communicatorClass, "flushBatchRequests", CAST_METHOD(IceRuby_Communicator_flushBatchRequests), 1);
 }
 
 Ice::CommunicatorPtr

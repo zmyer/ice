@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,6 +15,48 @@ namespace IceInternal
 
     public delegate void ThreadPoolWorkItem();
     public delegate void AsyncCallback(object state);
+
+    //
+    // Thread pool threads set a custom synchronization context to ensure that
+    // continuations from awaited methods continue executing on the thread pool
+    // and not on the thread that notifies the awaited task.
+    //
+    sealed class ThreadPoolSynchronizationContext : SynchronizationContext
+    {
+        public ThreadPoolSynchronizationContext(ThreadPool threadPool)
+        {
+            _threadPool = threadPool;
+        }
+
+        public override void Post(SendOrPostCallback d, object state)
+        {
+            //
+            // Dispatch the continuation on the thread pool if this isn't called
+            // already from a thread pool thread. We don't use the dispatcher
+            // for the continuations, the dispatcher is only used when the
+            // call is initialy invoked (e.g.: a servant dispatch after being
+            // received is dispatched using the dispatcher which might dispatch
+            // the call on the UI thread which will then use its own synchronization
+            // context to execute continuations).
+            //
+            var ctx = Current as ThreadPoolSynchronizationContext;
+            if(ctx != this)
+            {
+                _threadPool.dispatch(() => { d(state); }, null, false);
+            }
+            else
+            {
+                d(state);
+            }
+        }
+
+        public override void Send(SendOrPostCallback d, object state)
+        {
+            throw new System.NotSupportedException("the thread pool doesn't support synchronous calls");
+        }
+
+        private ThreadPool _threadPool;
+    }
 
     internal struct ThreadPoolMessage
     {
@@ -194,13 +236,10 @@ namespace IceInternal
                 stackSize = 0;
             }
             _stackSize = stackSize;
-            _hasPriority = properties.getProperty(_prefix + ".ThreadPriority").Length > 0;
-            _priority = IceInternal.Util.stringToThreadPriority(properties.getProperty(_prefix + ".ThreadPriority"));
-            if(!_hasPriority)
-            {
-                _hasPriority = properties.getProperty("Ice.ThreadPriority").Length > 0;
-                _priority = IceInternal.Util.stringToThreadPriority(properties.getProperty("Ice.ThreadPriority"));
-            }
+
+            _priority = properties.getProperty(_prefix + ".ThreadPriority").Length > 0 ?
+                Util.stringToThreadPriority(properties.getProperty(_prefix + ".ThreadPriority")) :
+                Util.stringToThreadPriority(properties.getProperty("Ice.ThreadPriority"));
 
             if(_instance.traceLevels().threadPool >= 1)
             {
@@ -217,14 +256,7 @@ namespace IceInternal
                 for(int i = 0; i < _size; ++i)
                 {
                     WorkerThread thread = new WorkerThread(this, _threadPrefix + "-" + _threadIndex++);
-                    if(_hasPriority)
-                    {
-                        thread.start(_priority);
-                    }
-                    else
-                    {
-                        thread.start(ThreadPriority.Normal);
-                    }
+                    thread.start(_priority);
                     _threads.Add(thread);
                 }
             }
@@ -248,7 +280,7 @@ namespace IceInternal
                     return;
                 }
                 _destroyed = true;
-                System.Threading.Monitor.PulseAll(this);
+                Monitor.PulseAll(this);
             }
         }
 
@@ -265,7 +297,12 @@ namespace IceInternal
 
         public void initialize(EventHandler handler)
         {
-            // Nothing to do.
+            handler._ready = 0;
+            handler._pending = 0;
+            handler._started = 0;
+            handler._finish = false;
+            handler._hasMoreData = false;
+            handler._registered = 0;
         }
 
         public void register(EventHandler handler, int op)
@@ -323,12 +360,13 @@ namespace IceInternal
             {
                 Debug.Assert(!_destroyed);
 
+                handler._registered = SocketOperation.None;
+
                 //
                 // If there are no pending asynchronous operations, we can call finish on the handler now.
                 //
                 if(handler._pending == 0)
                 {
-                    handler._registered = SocketOperation.None;
                     executeNonBlocking(() =>
                        {
                            ThreadPoolCurrent current = new ThreadPoolCurrent(this, handler, SocketOperation.None);
@@ -357,7 +395,7 @@ namespace IceInternal
                     {
                         _instance.initializationData().logger.warning("dispatch exception:\n" + ex);
                     }
-                }                            
+                }
             }
             else
             {
@@ -365,7 +403,7 @@ namespace IceInternal
             }
         }
 
-        public void dispatch(System.Action call, Ice.Connection con)
+        public void dispatch(System.Action call, Ice.Connection con, bool useDispatcher = true)
         {
             lock(this)
             {
@@ -374,11 +412,15 @@ namespace IceInternal
                     throw new Ice.CommunicatorDestroyedException();
                 }
 
-                _workItems.Enqueue(() => 
-                    { 
-                        dispatchFromThisThread(call, con); 
-                    });
-                System.Threading.Monitor.Pulse(this);
+                if(useDispatcher)
+                {
+                    _workItems.Enqueue(() => { dispatchFromThisThread(call, con); });
+                }
+                else
+                {
+                    _workItems.Enqueue(() => { call(); });
+                }
+                Monitor.Pulse(this);
 
                 //
                 // If this is a dynamic thread pool which can still grow and if all threads are
@@ -398,14 +440,7 @@ namespace IceInternal
                     try
                     {
                         WorkerThread t = new WorkerThread(this, _threadPrefix + "-" + _threadIndex++);
-                        if(_hasPriority)
-                        {
-                            t.start(_priority);
-                        }
-                        else
-                        {
-                            t.start(ThreadPriority.Normal);
-                        }
+                        t.start(_priority);
                         _threads.Add(t);
                     }
                     catch(System.Exception ex)
@@ -479,7 +514,7 @@ namespace IceInternal
 
                         if(_threadIdleTime > 0)
                         {
-                            if(!System.Threading.Monitor.Wait(this, _threadIdleTime * 1000) && _workItems.Count == 0) // If timeout
+                            if(!Monitor.Wait(this, _threadIdleTime * 1000) && _workItems.Count == 0) // If timeout
                             {
                                 if(_destroyed)
                                 {
@@ -511,7 +546,7 @@ namespace IceInternal
                                 else
                                 {
                                     Debug.Assert(_serverIdleTime > 0 && _inUse == 0 && _threads.Count == 1);
-                                    if(!System.Threading.Monitor.Wait(this, _serverIdleTime * 1000)  && 
+                                    if(!Monitor.Wait(this, _serverIdleTime * 1000)  &&
                                        _workItems.Count == 0)
                                     {
                                         if(!_destroyed)
@@ -533,7 +568,7 @@ namespace IceInternal
                         }
                         else
                         {
-                            System.Threading.Monitor.Wait(this);
+                            Monitor.Wait(this);
                         }
                     }
 
@@ -775,6 +810,12 @@ namespace IceInternal
 
             public void Run()
             {
+                //
+                // Set the default synchronization context to allow async/await to run
+                // continuations on the thread pool.
+                //
+                SynchronizationContext.SetSynchronizationContext(new ThreadPoolSynchronizationContext(_threadPool));
+
                 if(_threadPool._instance.initializationData().threadHook != null)
                 {
                     try
@@ -828,7 +869,6 @@ namespace IceInternal
         private readonly int _sizeWarn; // If _inUse reaches _sizeWarn, a "low on threads" warning will be printed.
         private readonly bool _serialize; // True if requests need to be serialized over the connection.
         private readonly ThreadPriority _priority;
-        private readonly bool _hasPriority = false;
         private readonly int _serverIdleTime;
         private readonly int _threadIdleTime;
         private readonly int _stackSize;

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -196,12 +196,13 @@ class G
 class Recursive;
 sequence<Recursive> RecursiveSeq;
 
-class Recursive {
+class Recursive
+{
     optional(0) RecursiveSeq value;
 };
 
 ["amd"]
-class Initial
+interface Initial
 {
     void shutdown();
 
@@ -294,6 +295,8 @@ class Initial
 
     optional(1) StringIntDict opStringIntDict(optional(2) StringIntDict p1, out optional(3) StringIntDict p3);
 
+    optional(1) IntOneOptionalDict opIntOneOptionalDict(optional(2) IntOneOptionalDict p1, out optional(3) IntOneOptionalDict p3);
+
     ["cpp:view-type:::std::map< ::Ice::Int, ::Util::string_view>", "cpp:type:::Test::CustomMap< ::Ice::Int, std::string>"] optional(1) IntStringDict
     opCustomIntStringDict(
         ["cpp:view-type:::std::map< ::Ice::Int, ::Util::string_view>", "cpp:type:::Test::CustomMap< ::Ice::Int, std::string>"] optional(2) IntStringDict p1,
@@ -309,6 +312,21 @@ class Initial
 
     void opVoid();
 
+    ["marshaled-result"] optional(1) SmallStruct opMStruct1();
+    ["marshaled-result"] optional(1) SmallStruct opMStruct2(optional(2) SmallStruct p1,
+                                                            out optional(3)SmallStruct p2);
+
+    ["marshaled-result"] optional(1) StringSeq opMSeq1();
+    ["marshaled-result"] optional(1) StringSeq opMSeq2(optional(2) StringSeq p1,
+                                                       out optional(3) StringSeq p2);
+
+    ["marshaled-result"] optional(1) StringIntDict opMDict1();
+    ["marshaled-result"] optional(1) StringIntDict opMDict2(optional(2) StringIntDict p1,
+                                                            out optional(3) StringIntDict p2);
+
+    ["marshaled-result"] optional(1) G opMG1();
+    ["marshaled-result"] optional(1) G opMG2(optional(2) G p1, out optional(3) G p2);
+
     bool supportsRequiredParams();
 
     bool supportsJavaSerializable();
@@ -316,6 +334,8 @@ class Initial
     bool supportsCsharpSerializable();
 
     bool supportsCppStringView();
+
+    bool supportsNullOptional();
 };
 
 };

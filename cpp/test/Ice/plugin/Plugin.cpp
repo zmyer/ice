@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -59,7 +59,9 @@ class PluginInitializeFailExeption : public std::exception
 public:
 
     PluginInitializeFailExeption() ICE_NOEXCEPT {}
-    virtual ~PluginInitializeFailExeption() ICE_NOEXCEPT {}
+#ifndef ICE_CPP11_COMPILER
+    virtual ~PluginInitializeFailExeption() throw() {}
+#endif
     virtual const char* what() const ICE_NOEXCEPT { return "PluginInitializeFailExeption"; }
 };
 

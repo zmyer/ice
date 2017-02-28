@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -27,6 +27,13 @@ prefix			?= /opt/Ice-$(version)
 # the executables. If not set, defaults to to "yes"
 #
 embedded_runpath 	?= yes
+
+#
+# Define new_dtags as yes if you want the linker to enable the new style
+# dtags, this will cause the linker to add a runpath entry instead of
+# a rpath entry. This only aplly to gcc builds on Linux
+#
+new_dtags              ?= no
 
 #
 # Define OPTIMIZE as yes if you want to build with optimization.
@@ -58,7 +65,14 @@ PLATFORMS              	?= $(firstword $(supported-platforms))
 CONFIGS			?= $(firstword $(supported-configs))
 
 #
-# Third-party libraries
+# List of binary distributions to build against. Defaults to undefined,
+# i.e. build all source distributions. This is useful for building
+# a language mapping or tests against a binary distribution.
+#
+#ICE_BIN_DIST         ?=
+
+#
+# Third-party libraries (Ice for C++)
 #
 # If a third-party library is not installed in a standard location
 # where the compiler can find it, set the corresponding variable
@@ -80,7 +94,7 @@ include	$(top_srcdir)/config/Make.rules.$(os)
 include	$(top_srcdir)/config/Make.project.rules
 include	$(top_srcdir)/config/Make.tests.rules
 
-ifeq ($(USE_BIN_DIST),yes)
+ifneq ($(ICE_BIN_DIST),)
 prefix 			:= $(or $(ICE_HOME),$(if $(filter Darwin,$(os)),/usr/local,/usr))
 bindir			?= $(install_bindir)
 libdir			?= $(install_libdir)
@@ -95,18 +109,26 @@ endif
 
 srcdir 			?= $(call mappingdir,$(or $1,$(currentdir)),src)
 
-usr_dir_install		:= $(filter /usr%,$(prefix))
+usr_dir_install		:= $(or $(filter yes,$(USR_DIR_INSTALL)),$(filter /usr%,$(prefix)))
 install_bindir	  	?= $(prefix)/bin
 install_libdir	  	?= $(prefix)/lib
-install_slicedir 	?= $(prefix)$(if $(usr_dir_install),/share/Ice-$(version))/slice
+install_slicedir 	?= $(prefix)$(if $(usr_dir_install),/share/ice)/slice
 install_includedir	?= $(prefix)/include
-install_docdir 		?= $(prefix)$(if $(usr_dir_install),/share/Ice-$(version))
+install_docdir 		?= $(prefix)$(if $(usr_dir_install),/share/ice)
 install_mandir		?= $(prefix)$(if $(usr_dir_install),/share)/man
-install_configdir 	?= $(prefix)$(if $(usr_dir_install),/share/Ice-$(version),/config)
+install_configdir 	?= $(prefix)$(if $(usr_dir_install),/share/ice,/config)
 
-version     		= 3.7a0
+version     		= 3.7a4
 mmversion		= 3.7
-soversion   		= 37a0
+soversion   		= 37a4
+
+#
+# The compatversion is the lowest patch release with the same API.
+# For example, if 3.7.2 introduces no new API compared to 3.7.1, we
+# would set version to 3.7.2 and compatversion to 3.7.1.
+# Used for OS X libraries.
+#
+compatversion           = $(version)
 
 #
 # Support for 3rd party libraries
@@ -118,20 +140,11 @@ expat_home 		:= $(EXPAT_HOME)
 bz2_home 		:= $(BZ2_HOME)
 lmdb_home 		:= $(LMDB_HOME)
 
-define make-thirdparty
-ifneq ($($1_home),)
-# Check for 3rd party libraries either in home/lib<platform specific subdir> or home/lib
-$1_libdir	?= $$(strip $$(if $$(wildcard $$($1_home)/lib$$(call platform-var,installdir,$$1,$$2,$$3)),\
-			$$($1_home)/lib$$(call platform-var,installdir,$$1,$$2,$$3),$$($1_home)/lib))
-$1_includedir	?= $$($1_home)/include
-endif
-$1_ldflags	?= -l$1
-endef
-$(foreach l,$(thirdparties),$(eval $(call make-thirdparty,$l)))
+$(foreach l,$(thirdparties),$(eval $(call make-lib,$l)))
 
 #
 # Languages, platforms and configurations to build
 #
-supported-languages	?= cpp java python js ruby php
+supported-languages	?= cpp java java-compat python js ruby php
 supported-configs	?= shared
 

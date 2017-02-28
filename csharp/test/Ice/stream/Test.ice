@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,6 +8,11 @@
 // **********************************************************************
 
 #pragma once
+
+//
+// Suppress invalid metadata warnings
+//
+[["suppress-warning:invalid-metadata"]]
 
 #include <Ice/BuiltinSequences.ice>
 
@@ -22,6 +27,7 @@ enum MyEnum
 };
 
 class MyClass;
+interface MyInterface;
 
 struct SmallStruct
 {
@@ -47,6 +53,7 @@ class OptionalClass
 
 sequence<MyEnum> MyEnumS;
 sequence<MyClass> MyClassS;
+sequence<MyInterface> MyInterfaceS;
 
 sequence<Ice::BoolSeq> BoolSS;
 sequence<Ice::ByteSeq> ByteSS;
@@ -58,6 +65,7 @@ sequence<Ice::DoubleSeq> DoubleSS;
 sequence<Ice::StringSeq> StringSS;
 sequence<MyEnumS> MyEnumSS;
 sequence<MyClassS> MyClassSS;
+sequence<MyInterfaceS> MyInterfaceSS;
 
 dictionary<byte, bool> ByteBoolD;
 dictionary<short, int> ShortIntD;
@@ -77,6 +85,8 @@ sequence<SmallStruct> SmallStructList;
 sequence<MyClass> MyClassList;
 ["clr:generic:List"]
 sequence<MyClass*> MyClassProxyList;
+["clr:generic:List"]
+sequence<MyInterface*> MyInterfaceProxyList;
 
 ["clr:generic:LinkedList"]
 sequence<short> ShortLinkedList;
@@ -95,6 +105,32 @@ sequence<float> FloatStack;
 sequence<SmallStruct> SmallStructStack;
 ["clr:generic:Stack"]
 sequence<MyClass*> MyClassProxyStack;
+["clr:generic:Stack"]
+sequence<MyInterface*> MyInterfaceProxyStack;
+
+//
+// This will produce a warning and use the default 
+// sequence mapping. The generic:Stack metadata cannot be use
+// with object sequences.
+//
+["clr:generic:Stack"]
+sequence<Object> ObjectStack;
+
+//
+// This will produce a warning and use the default 
+// sequence mapping. The generic:Stack metadata cannot be use
+// with object sequences.
+//
+["clr:generic:Stack"]
+sequence<MyClass> MyClassStack;
+
+//
+// This will produce a warning and use the default 
+// sequence mapping. The generic:Stack metadata cannot be use
+// with object sequences.
+//
+["clr:generic:Stack"]
+sequence<MyInterface> MyInterfaceStack;
 
 ["clr:generic:Queue"]
 sequence<double> DoubleQueue;
@@ -134,13 +170,13 @@ class MyClass
     SerialSmall ss;
 };
 
-interface MyInterface
-{
-};
-
 exception MyException
 {
     MyClass c;
+};
+
+interface MyInterface
+{
 };
 
 };

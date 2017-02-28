@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,14 +9,18 @@
 
 #pragma once
 
-[["cpp:header-ext:h", "objc:header-dir:objc"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API"]]
 
 #include <Ice/CommunicatorF.ice>
 #include <Ice/ServantLocatorF.ice>
-#include <Ice/LocatorF.ice>
+#include <Ice/Locator.ice>
 #include <Ice/Identity.ice>
 #include <Ice/FacetMap.ice>
 #include <Ice/Endpoint.ice>
+
+#ifndef __SLICE2JAVA_COMPAT__
+[["java:package:com.zeroc"]]
+#endif
 
 ["objc:prefix:ICE"]
 module Ice
@@ -165,7 +169,7 @@ local interface ObjectAdapter
      * @see Communicator#destroy
      *
      **/
-    void destroy();
+    ["cpp:noexcept"] void destroy();
 
     /**
      *
@@ -636,17 +640,6 @@ local interface ObjectAdapter
     ["cpp:const"] Locator* getLocator();
 
     /**
-     * Refresh the set of published endpoints. The run time re-reads
-     * the PublishedEndpoints property if it is set and re-reads the
-     * list of local interfaces if the adapter is configured to listen
-     * on all endpoints. This operation is useful to refresh the endpoint
-     * information that is published in the proxies that are created by
-     * an object adapter if the network interfaces used by a host changes.
-     *
-     **/
-    void refreshPublishedEndpoints();
-
-    /**
      *
      * Get the set of endpoints configured with this object adapter.
      *
@@ -656,6 +649,17 @@ local interface ObjectAdapter
      *
      **/
     ["cpp:const"] EndpointSeq getEndpoints();
+
+    /**
+     * Refresh the set of published endpoints. The run time re-reads
+     * the PublishedEndpoints property if it is set and re-reads the
+     * list of local interfaces if the adapter is configured to listen
+     * on all endpoints. This operation is useful to refresh the endpoint
+     * information that is published in the proxies that are created by
+     * an object adapter if the network interfaces used by a host changes.
+     *
+     **/
+    void refreshPublishedEndpoints();
 
     /**
      *
@@ -669,6 +673,17 @@ local interface ObjectAdapter
      *
      **/
     ["cpp:const"] EndpointSeq getPublishedEndpoints();
+
+    /**
+     *
+     * Set of the endpoints that proxies created by this object
+     * adapter will contain.
+     *
+     * @see #refreshPublishedEndpoints
+     * @see Endpoint
+     *
+     **/
+    void setPublishedEndpoints(EndpointSeq newEndpoints);
 };
 
 };

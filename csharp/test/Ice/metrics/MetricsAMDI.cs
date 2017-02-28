@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,6 +8,7 @@
 // **********************************************************************
 
 using System;
+using System.Threading.Tasks;
 using Test;
 
 public sealed class ControllerI : ControllerDisp_
@@ -33,49 +34,54 @@ public sealed class ControllerI : ControllerDisp_
 
 public sealed class MetricsI : MetricsDisp_
 {
-    override public void op_async(Test.AMD_Metrics_op cb, Ice.Current current)
+    override public Task opAsync(Ice.Current current)
     {
-        cb.ice_response();
+        return null;
     }
 
-    override public void fail_async(Test.AMD_Metrics_fail cb, Ice.Current current)
-    { 
-        current.con.close(true);
-        cb.ice_response();
-    }
-
-    override public void opWithUserException_async(Test.AMD_Metrics_opWithUserException cb, Ice.Current current)
+    override public Task failAsync(Ice.Current current)
     {
-        cb.ice_exception(new UserEx());
+        current.con.close(Ice.ConnectionClose.Forcefully);
+        return null;
     }
 
-    override public void opWithRequestFailedException_async(Test.AMD_Metrics_opWithRequestFailedException cb,
-                                                            Ice.Current current)
+    override public Task opWithUserExceptionAsync(Ice.Current current)
     {
-        cb.ice_exception(new Ice.ObjectNotExistException());
+        throw new UserEx();
     }
 
-    override public void opWithLocalException_async(Test.AMD_Metrics_opWithLocalException cb, Ice.Current current)
+    override public Task
+    opWithRequestFailedExceptionAsync(Ice.Current current)
     {
-        cb.ice_exception(new Ice.SyscallException());
+        throw new Ice.ObjectNotExistException();
     }
 
-    override public void opWithUnknownException_async(Test.AMD_Metrics_opWithUnknownException cb, Ice.Current current)
+    override public Task
+    opWithLocalExceptionAsync(Ice.Current current)
     {
-        cb.ice_exception(new ArgumentOutOfRangeException());
+        throw new Ice.SyscallException();
     }
 
-    override public void opByteS_async(Test.AMD_Metrics_opByteS cb, byte[] bs, Ice.Current current)
+    override public Task
+    opWithUnknownExceptionAsync(Ice.Current current)
     {
-        cb.ice_response();
+        throw new ArgumentOutOfRangeException();
     }
 
-    override public Ice.ObjectPrx getAdmin(Ice.Current current)
+    override public Task
+    opByteSAsync(byte[] bs, Ice.Current current)
+    {
+        return null;
+    }
+
+    override public Ice.ObjectPrx
+    getAdmin(Ice.Current current)
     {
         return current.adapter.getCommunicator().getAdmin();
     }
 
-    override public void shutdown(Ice.Current current)
+    override public void
+    shutdown(Ice.Current current)
     {
         current.adapter.getCommunicator().shutdown();
     }

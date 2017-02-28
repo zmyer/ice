@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,8 +20,10 @@ namespace IceBox
 {
 
 class ServiceManagerI : public ServiceManager, 
-                        public IceUtil::Monitor<IceUtil::Mutex>,
-                        public Ice::EnableSharedFromThis<ServiceManagerI>
+                        public IceUtil::Monitor<IceUtil::Mutex>
+#ifdef ICE_CPP11_MAPPING
+                      , public std::enable_shared_from_this<ServiceManagerI>
+#endif
 {
 public:
 
@@ -76,7 +78,7 @@ private:
     void servicesStopped(const std::vector<std::string>&, const std::set<ServiceObserverPrxPtr>&);
 
 #ifdef ICE_CPP11_MAPPING
-    std::function<void (std::exception_ptr)> makeObserverCompletedCallback(const std::shared_ptr<ServiceObserverPrx>&);
+    std::function<void(std::exception_ptr)> makeObserverCompletedCallback(const std::shared_ptr<ServiceObserverPrx>&);
     void observerRemoved(const std::shared_ptr<ServiceObserverPrx>&, std::exception_ptr);
 #else
     void observerRemoved(const ServiceObserverPrx&, const std::exception&);

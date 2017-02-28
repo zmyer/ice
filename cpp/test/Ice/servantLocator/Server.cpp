@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -97,8 +97,8 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 
     adapter->addServantLocator(ICE_MAKE_SHARED(ServantLocatorI, ""), "");
     adapter->addServantLocator(ICE_MAKE_SHARED(ServantLocatorI, "category"), "category");
-    adapter->add(ICE_MAKE_SHARED(TestI), communicator->stringToIdentity("asm"));
-    adapter->add(ICE_MAKE_SHARED(TestActivationI), communicator->stringToIdentity("test/activation"));
+    adapter->add(ICE_MAKE_SHARED(TestI), Ice::stringToIdentity("asm"));
+    adapter->add(ICE_MAKE_SHARED(TestActivationI), Ice::stringToIdentity("test/activation"));
     adapter->activate();
     TEST_READY
     adapter->waitForDeactivate();
@@ -113,8 +113,7 @@ main(int argc, char* argv[])
 #endif
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
         Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
         return run(argc, argv, ich.communicator());
     }

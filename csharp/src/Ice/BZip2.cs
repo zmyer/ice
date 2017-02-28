@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -60,7 +60,6 @@ namespace IceInternal
             // In addition, the FileName member of the BadImageFormatException is the empty string, even though
             // it should provide the name of the library.
             //
-            string lib = AssemblyUtil.runtime_ == AssemblyUtil.Runtime.Mono ? "bzip2 library" : "bzip2.dll";
             try
             {
                 NativeMethods.BZ2_bzlibVersion();
@@ -72,11 +71,12 @@ namespace IceInternal
             }
             catch(EntryPointNotFoundException)
             {
-                Console.Error.WriteLine("warning: found " + lib + " but entry point BZ2_bzlibVersion is missing.");
+                Console.Error.WriteLine("warning: found bzip2.dll but entry point BZ2_bzlibVersion is missing.");
             }
             catch(BadImageFormatException ex)
             {
-                if(ex.FileName != null && ex.FileName.Length != 0)
+                string lib = "bzip2.dll";
+                if(!String.IsNullOrEmpty(ex.FileName))
                 {
                     lib = ex.FileName; // Future-proof: we'll do the right thing if the FileName member is non-empty.
                 }

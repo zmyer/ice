@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,6 +20,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 {
     const string endp = getTestEndpoint(communicator, 0);
     cout << "testing stringToProxy... " << flush;
+
     string ref = "test:" + endp;
     Ice::ObjectPrxPtr base = communicator->stringToProxy(ref);
     test(base);
@@ -64,6 +65,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     catch(const Ice::ProxyParseException&)
     {
     }
+
     b1 = communicator->stringToProxy("test\\040test");
     test(b1->ice_getIdentity().name == "test test" && b1->ice_getIdentity().category.empty());
     try
@@ -74,10 +76,11 @@ allTests(const Ice::CommunicatorPtr& communicator)
     catch(const Ice::IdentityParseException&)
     {
     }
+
     b1 = communicator->stringToProxy("test\\40test");
     test(b1->ice_getIdentity().name == "test test");
 
-    // Test some octal and hex corner cases.
+    // Test some octal corner cases.
     b1 = communicator->stringToProxy("test\\4test");
     test(b1->ice_getIdentity().name == "test\4test");
     b1 = communicator->stringToProxy("test\\04test");
@@ -98,6 +101,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(!b1);
     b1 = communicator->stringToProxy("\"\"");
     test(!b1);
+
     try
     {
         b1 = communicator->stringToProxy("\"\" test"); // Invalid trailing characters.
@@ -106,6 +110,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     catch(const Ice::ProxyParseException&)
     {
     }
+
     try
     {
         b1 = communicator->stringToProxy("test:"); // Missing endpoint.
@@ -142,8 +147,10 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(b1->ice_getIdentity().name == "test" && b1->ice_getIdentity().category == "category" &&
          b1->ice_getAdapterId() == "adapter 1");
     b1 = communicator->stringToProxy("\"category \\/test@foo/test\"@adapter");
-    test(b1->ice_getIdentity().name == "test" && b1->ice_getIdentity().category == "category /test@foo" &&
-         b1->ice_getAdapterId() == "adapter");
+
+    test(b1->ice_getIdentity().name == "test" && b1->ice_getIdentity().category == "category /test@foo"
+         && b1->ice_getAdapterId() == "adapter");
+
     b1 = communicator->stringToProxy("\"category \\/test@foo/test\"@\"adapter:tcp\"");
     test(b1->ice_getIdentity().name == "test" && b1->ice_getIdentity().category == "category /test@foo" &&
          b1->ice_getAdapterId() == "adapter:tcp");
@@ -229,7 +236,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     try
     {
-        b1 = communicator->stringToProxy("test:tcp@adapterId");
+        communicator->stringToProxy("test:tcp@adapterId");
         test(false);
     }
     catch(const Ice::EndpointParseException&)
@@ -247,7 +254,37 @@ allTests(const Ice::CommunicatorPtr& communicator)
     //}
     try
     {
-        b1 = communicator->stringToProxy("test::tcp");
+        communicator->stringToProxy("test: :tcp");
+        test(false);
+    }
+    catch(const Ice::EndpointParseException&)
+    {
+    }
+
+    //
+    // Test invalid endpoint syntax
+    //
+    try
+    {
+        communicator->createObjectAdapterWithEndpoints("BadAdapter", " : ");
+        test(false);
+    }
+    catch(const Ice::EndpointParseException&)
+    {
+    }
+
+    try
+    {
+        communicator->createObjectAdapterWithEndpoints("BadAdapter", "tcp: ");
+        test(false);
+    }
+    catch(const Ice::EndpointParseException&)
+    {
+    }
+
+    try
+    {
+        communicator->createObjectAdapterWithEndpoints("BadAdapter", ":tcp");
         test(false);
     }
     catch(const Ice::EndpointParseException&)
@@ -258,18 +295,108 @@ allTests(const Ice::CommunicatorPtr& communicator)
     // Test for bug ICE-5543: escaped escapes in stringToIdentity
     //
     Ice::Identity id = { "test", ",X2QNUAzSBcJ_e$AV;E\\" };
-    Ice::Identity id2 = communicator->stringToIdentity(communicator->identityToString(id));
-    test(id == id2);
-    id2 = Ice::stringToIdentity(Ice::identityToString(id));
+    Ice::Identity id2 = Ice::stringToIdentity(communicator->identityToString(id));
     test(id == id2);
 
     id.name = "test";
     id.category = ",X2QNUAz\\SB\\/cJ_e$AV;E\\\\";
-    id2 = communicator->stringToIdentity(communicator->identityToString(id));
-    test(id == id2);
-    id2 = Ice::stringToIdentity(Ice::identityToString(id));
+    id2 = Ice::stringToIdentity(communicator->identityToString(id));
     test(id == id2);
 
+    id.name = "/test";
+    id.category = "cat/";
+    string idStr = communicator->identityToString(id);
+    test(idStr == "cat\\//\\/test");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+
+    // Input string with various pitfalls
+    id = Ice::stringToIdentity("\\342\\x82\\254\\60\\x9\\60\\");
+    test(id.name == "\xE2\x82\xAC\60\t0\\" && id.category.empty());
+
+    try
+    {
+        // Illegal character < 32
+        id = Ice::stringToIdentity("xx\01FooBar");
+        test(false);
+    }
+    catch(const Ice::IdentityParseException&)
+    {
+    }
+
+    try
+    {
+        // Illegal surrogate
+        id = Ice::stringToIdentity("xx\\ud911");
+        test(false);
+    }
+    catch(const Ice::IdentityParseException&)
+    {
+    }
+
+    // Testing bytes 127 (\x7F) and €
+    id.name = "test";
+    id.category = "\x7F\xE2\x82\xAC";
+
+    idStr = identityToString(id, Ice::ICE_ENUM(ToStringMode, Unicode));
+    test(idStr == "\\u007f\xE2\x82\xAC/test");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+    test(Ice::identityToString(id) == idStr);
+
+    idStr = identityToString(id, Ice::ICE_ENUM(ToStringMode, ASCII));
+    test(idStr == "\\u007f\\u20ac/test");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+
+    idStr = identityToString(id, Ice::ICE_ENUM(ToStringMode, Compat));
+    test(idStr == "\\177\\342\\202\\254/test");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+
+    id2 = Ice::stringToIdentity(communicator->identityToString(id));
+    test(id == id2);
+
+    // More unicode characters
+#ifdef ICE_CPP11_MAPPING
+    id.name = u8"banana \016-\U0001F34C\U000020AC\u00a2\u0024";
+    id.category = u8"greek \U0001016A";
+
+    idStr = identityToString(id, Ice::ICE_ENUM(ToStringMode, Unicode));
+    test(idStr == u8"greek \U0001016A/banana \\u000e-\U0001F34C\U000020AC\u00a2$");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+
+    idStr = identityToString(id, Ice::ICE_ENUM(ToStringMode, ASCII));
+    test(idStr == "greek \\U0001016a/banana \\u000e-\\U0001f34c\\u20ac\\u00a2$");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+
+    idStr = identityToString(id, Ice::ICE_ENUM(ToStringMode, Compat));
+    test(idStr == "greek \\360\\220\\205\\252/banana \\016-\\360\\237\\215\\214\\342\\202\\254\\302\\242$");
+    id2 = Ice::stringToIdentity(idStr);
+    test(id == id2);
+#endif
+
+    cout << "ok" << endl;
+
+    cout << "testing proxyToString... " << flush;
+    b1 = communicator->stringToProxy(ref);
+    Ice::ObjectPrxPtr b2 = communicator->stringToProxy(communicator->proxyToString(b1));
+    test(Ice::targetEqualTo(b1, b2));
+
+    if(b1->ice_getConnection()) // not colloc-optimized target
+    {
+        b2 = b1->ice_getConnection()->createProxy(Ice::stringToIdentity("fixed"));
+        string str = communicator->proxyToString(b2);
+        test(b2->ice_toString() == str);
+        string str2 = b1->ice_identity(b2->ice_getIdentity())->ice_secure(b2->ice_isSecure())->ice_toString();
+
+        // Verify that the stringified fixed proxy is the same as a regular stringified proxy
+        // but without endpoints
+        test(str2.substr(0, str.size()) == str);
+        test(str2[str.size()] == ':');
+    }
     cout << "ok" << endl;
 
     cout << "testing propertyToProxy... " << flush;
@@ -350,13 +477,13 @@ allTests(const Ice::CommunicatorPtr& communicator)
     prop->setProperty(property, "");
 
     property = propertyPrefix + ".EndpointSelection";
-    test(b1->ice_getEndpointSelection() == Ice::Random);
+    test(b1->ice_getEndpointSelection() == Ice::ICE_ENUM(EndpointSelectionType, Random));
     prop->setProperty(property, "Random");
     b1 = communicator->propertyToProxy(propertyPrefix);
-    test(b1->ice_getEndpointSelection() == Ice::Random);
+    test(b1->ice_getEndpointSelection() == Ice::ICE_ENUM(EndpointSelectionType, Random));
     prop->setProperty(property, "Ordered");
     b1 = communicator->propertyToProxy(propertyPrefix);
-    test(b1->ice_getEndpointSelection() == Ice::Ordered);
+    test(b1->ice_getEndpointSelection() == Ice::ICE_ENUM(EndpointSelectionType, Ordered));
     prop->setProperty(property, "");
 
     property = propertyPrefix + ".CollocationOptimized";
@@ -389,7 +516,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     b1 = b1->ice_collocationOptimized(true);
     b1 = b1->ice_connectionCached(true);
     b1 = b1->ice_preferSecure(false);
-    b1 = b1->ice_endpointSelection(Ice::Ordered);
+    b1 = b1->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered));
     b1 = b1->ice_locatorCacheTimeout(100);
     b1 = b1->ice_invocationTimeout(1234);
     Ice::EncodingVersion v = { 1, 0 };
@@ -398,7 +525,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     router = router->ice_collocationOptimized(false);
     router = router->ice_connectionCached(true);
     router = router->ice_preferSecure(true);
-    router = router->ice_endpointSelection(Ice::Random);
+    router = router->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random));
     router = router->ice_locatorCacheTimeout(200);
     router = router->ice_invocationTimeout(1500);
 
@@ -406,7 +533,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     locator = locator->ice_collocationOptimized(true);
     locator = locator->ice_connectionCached(false);
     locator = locator->ice_preferSecure(true);
-    locator = locator->ice_endpointSelection(Ice::Random);
+    locator = locator->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random));
     locator = locator->ice_locatorCacheTimeout(300);
     locator = locator->ice_invocationTimeout(1500);
 
@@ -448,9 +575,9 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "ok" << endl;
 
     cout << "testing proxy methods... " << flush;
-    test(communicator->identityToString(base->ice_identity(communicator->stringToIdentity("other"))->ice_getIdentity())
+
+    test(communicator->identityToString(base->ice_identity(Ice::stringToIdentity("other"))->ice_getIdentity())
          == "other");
-    test(Ice::identityToString(base->ice_identity(Ice::stringToIdentity("other"))->ice_getIdentity()) == "other");
     test(base->ice_facet("facet")->ice_getFacet() == "facet");
     test(base->ice_adapterId("id")->ice_getAdapterId() == "id");
     test(base->ice_twoway()->ice_isTwoway());
@@ -555,146 +682,146 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "testing proxy comparison... " << flush;
 
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(communicator->stringToProxy("foo"), communicator->stringToProxy("foo")));
-    test(!Ice::targetEquals(communicator->stringToProxy("foo"), communicator->stringToProxy("foo2")));
+    test(Ice::targetEqualTo(communicator->stringToProxy("foo"), communicator->stringToProxy("foo")));
+    test(Ice::targetNotEqualTo(communicator->stringToProxy("foo"), communicator->stringToProxy("foo2")));
     test(Ice::targetLess(communicator->stringToProxy("foo"), communicator->stringToProxy("foo2")));
-    test(!Ice::targetLess(communicator->stringToProxy("foo2"), communicator->stringToProxy("foo")));
+    test(Ice::targetGreaterEqual(communicator->stringToProxy("foo2"), communicator->stringToProxy("foo")));
 
     Ice::ObjectPrxPtr compObj = communicator->stringToProxy("foo");
 
-    test(Ice::targetEquals(compObj->ice_facet("facet"), compObj->ice_facet("facet")));
-    test(!Ice::targetEquals(compObj->ice_facet("facet"), compObj->ice_facet("facet1")));
+    test(Ice::targetEqualTo(compObj->ice_facet("facet"), compObj->ice_facet("facet")));
+    test(Ice::targetNotEqualTo(compObj->ice_facet("facet"), compObj->ice_facet("facet1")));
     test(Ice::targetLess(compObj->ice_facet("facet"), compObj->ice_facet("facet1")));
-    test(!Ice::targetLess(compObj->ice_facet("facet"), compObj->ice_facet("facet")));
+    test(Ice::targetGreaterEqual(compObj->ice_facet("facet"), compObj->ice_facet("facet")));
 
-    test(Ice::targetEquals(compObj->ice_oneway(), compObj->ice_oneway()));
-    test(!Ice::targetEquals(compObj->ice_oneway(), compObj->ice_twoway()));
+    test(Ice::targetEqualTo(compObj->ice_oneway(), compObj->ice_oneway()));
+    test(Ice::targetNotEqualTo(compObj->ice_oneway(), compObj->ice_twoway()));
     test(Ice::targetLess(compObj->ice_twoway(), compObj->ice_oneway()));
-    test(!Ice::targetLess(compObj->ice_oneway(), compObj->ice_twoway()));
+    test(Ice::targetGreaterEqual(compObj->ice_oneway(), compObj->ice_twoway()));
 
-    test(Ice::targetEquals(compObj->ice_secure(true), compObj->ice_secure(true)));
-    test(!Ice::targetEquals(compObj->ice_secure(false), compObj->ice_secure(true)));
+    test(Ice::targetEqualTo(compObj->ice_secure(true), compObj->ice_secure(true)));
+    test(Ice::targetNotEqualTo(compObj->ice_secure(false), compObj->ice_secure(true)));
     test(Ice::targetLess(compObj->ice_secure(false), compObj->ice_secure(true)));
-    test(!Ice::targetLess(compObj->ice_secure(true), compObj->ice_secure(false)));
+    test(Ice::targetGreaterEqual(compObj->ice_secure(true), compObj->ice_secure(false)));
 
-    test(Ice::targetEquals(compObj->ice_collocationOptimized(true), compObj->ice_collocationOptimized(true)));
-    test(!Ice::targetEquals(compObj->ice_collocationOptimized(false), compObj->ice_collocationOptimized(true)));
+    test(Ice::targetEqualTo(compObj->ice_collocationOptimized(true), compObj->ice_collocationOptimized(true)));
+    test(Ice::targetNotEqualTo(compObj->ice_collocationOptimized(false), compObj->ice_collocationOptimized(true)));
     test(Ice::targetLess(compObj->ice_collocationOptimized(false), compObj->ice_collocationOptimized(true)));
-    test(!Ice::targetLess(compObj->ice_collocationOptimized(true), compObj->ice_collocationOptimized(false)));
+    test(Ice::targetGreaterEqual(compObj->ice_collocationOptimized(true), compObj->ice_collocationOptimized(false)));
 
-    test(Ice::targetEquals(compObj->ice_connectionCached(true), compObj->ice_connectionCached(true)));
-    test(!Ice::targetEquals(compObj->ice_connectionCached(false), compObj->ice_connectionCached(true)));
+    test(Ice::targetEqualTo(compObj->ice_connectionCached(true), compObj->ice_connectionCached(true)));
+    test(Ice::targetNotEqualTo(compObj->ice_connectionCached(false), compObj->ice_connectionCached(true)));
     test(Ice::targetLess(compObj->ice_connectionCached(false), compObj->ice_connectionCached(true)));
-    test(!Ice::targetLess(compObj->ice_connectionCached(true), compObj->ice_connectionCached(false)));
+    test(Ice::targetGreaterEqual(compObj->ice_connectionCached(true), compObj->ice_connectionCached(false)));
 
-    test(Ice::targetEquals(compObj->ice_endpointSelection(Ice::Random), compObj->ice_endpointSelection(Ice::Random)));
-    test(!Ice::targetEquals(compObj->ice_endpointSelection(Ice::Random), compObj->ice_endpointSelection(Ice::Ordered)));
-    test(Ice::targetLess(compObj->ice_endpointSelection(Ice::Random), compObj->ice_endpointSelection(Ice::Ordered)));
-    test(!Ice::targetLess(compObj->ice_endpointSelection(Ice::Ordered), compObj->ice_endpointSelection(Ice::Random)));
+    test(Ice::targetEqualTo(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)), compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random))));
+    test(Ice::targetNotEqualTo(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)), compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered))));
+    test(Ice::targetLess(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)), compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered))));
+    test(Ice::targetGreaterEqual(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered)), compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random))));
 
-    test(Ice::targetEquals(compObj->ice_connectionId("id2"), compObj->ice_connectionId("id2")));
-    test(!Ice::targetEquals(compObj->ice_connectionId("id1"), compObj->ice_connectionId("id2")));
+    test(Ice::targetEqualTo(compObj->ice_connectionId("id2"), compObj->ice_connectionId("id2")));
+    test(Ice::targetNotEqualTo(compObj->ice_connectionId("id1"), compObj->ice_connectionId("id2")));
     test(Ice::targetLess(compObj->ice_connectionId("id1"), compObj->ice_connectionId("id2")));
-    test(!Ice::targetLess(compObj->ice_connectionId("id2"), compObj->ice_connectionId("id1")));
+    test(Ice::targetGreaterEqual(compObj->ice_connectionId("id2"), compObj->ice_connectionId("id1")));
 
     test(compObj->ice_connectionId("id1")->ice_getConnectionId() == "id1");
     test(compObj->ice_connectionId("id2")->ice_getConnectionId() == "id2");
 
-    test(Ice::targetEquals(compObj->ice_compress(true), compObj->ice_compress(true)));
-    test(!Ice::targetEquals(compObj->ice_compress(false), compObj->ice_compress(true)));
+    test(Ice::targetEqualTo(compObj->ice_compress(true), compObj->ice_compress(true)));
+    test(Ice::targetNotEqualTo(compObj->ice_compress(false), compObj->ice_compress(true)));
     test(Ice::targetLess(compObj->ice_compress(false), compObj->ice_compress(true)));
-    test(!Ice::targetLess(compObj->ice_compress(true), compObj->ice_compress(false)));
+    test(Ice::targetGreaterEqual(compObj->ice_compress(true), compObj->ice_compress(false)));
 
-    test(Ice::targetEquals(compObj->ice_timeout(20), compObj->ice_timeout(20)));
-    test(!Ice::targetEquals(compObj->ice_timeout(10), compObj->ice_timeout(20)));
+    test(Ice::targetEqualTo(compObj->ice_timeout(20), compObj->ice_timeout(20)));
+    test(Ice::targetNotEqualTo(compObj->ice_timeout(10), compObj->ice_timeout(20)));
     test(Ice::targetLess(compObj->ice_timeout(10), compObj->ice_timeout(20)));
-    test(!Ice::targetLess(compObj->ice_timeout(20), compObj->ice_timeout(10)));
+    test(Ice::targetGreaterEqual(compObj->ice_timeout(20), compObj->ice_timeout(10)));
 
     auto loc1 = Ice::uncheckedCast<Ice::LocatorPrx>(communicator->stringToProxy("loc1:default -p 10000"));
     auto loc2 = Ice::uncheckedCast<Ice::LocatorPrx>(communicator->stringToProxy("loc2:default -p 10000"));
 
-    test(Ice::targetEquals(compObj->ice_locator(0), compObj->ice_locator(0)));
-    test(Ice::targetEquals(compObj->ice_locator(loc1), compObj->ice_locator(loc1)));
-    test(!Ice::targetEquals(compObj->ice_locator(loc1), compObj->ice_locator(0)));
-    test(!Ice::targetEquals(compObj->ice_locator(0), compObj->ice_locator(loc2)));
-    test(!Ice::targetEquals(compObj->ice_locator(loc1), compObj->ice_locator(loc2)));
+    test(Ice::targetEqualTo(compObj->ice_locator(0), compObj->ice_locator(0)));
+    test(Ice::targetEqualTo(compObj->ice_locator(loc1), compObj->ice_locator(loc1)));
+    test(Ice::targetNotEqualTo(compObj->ice_locator(loc1), compObj->ice_locator(0)));
+    test(Ice::targetNotEqualTo(compObj->ice_locator(0), compObj->ice_locator(loc2)));
+    test(Ice::targetNotEqualTo(compObj->ice_locator(loc1), compObj->ice_locator(loc2)));
     test(Ice::targetLess(compObj->ice_locator(0), compObj->ice_locator(loc1)));
-    test(!Ice::targetLess(compObj->ice_locator(loc1), compObj->ice_locator(0)));
+    test(Ice::targetGreaterEqual(compObj->ice_locator(loc1), compObj->ice_locator(0)));
     test(Ice::targetLess(compObj->ice_locator(loc1), compObj->ice_locator(loc2)));
-    test(!Ice::targetLess(compObj->ice_locator(loc2), compObj->ice_locator(loc1)));
+    test(Ice::targetGreaterEqual(compObj->ice_locator(loc2), compObj->ice_locator(loc1)));
 
     auto rtr1 = Ice::uncheckedCast<Ice::RouterPrx>(communicator->stringToProxy("rtr1:default -p 10000"));
     auto rtr2 = Ice::uncheckedCast<Ice::RouterPrx>(communicator->stringToProxy("rtr2:default -p 10000"));
 
-    test(Ice::targetEquals(compObj->ice_router(0), compObj->ice_router(0)));
-    test(Ice::targetEquals(compObj->ice_router(rtr1), compObj->ice_router(rtr1)));
-    test(!Ice::targetEquals(compObj->ice_router(rtr1), compObj->ice_router(0)));
-    test(!Ice::targetEquals(compObj->ice_router(0), compObj->ice_router(rtr2)));
-    test(!Ice::targetEquals(compObj->ice_router(rtr1), compObj->ice_router(rtr2)));
+    test(Ice::targetEqualTo(compObj->ice_router(0), compObj->ice_router(0)));
+    test(Ice::targetEqualTo(compObj->ice_router(rtr1), compObj->ice_router(rtr1)));
+    test(Ice::targetNotEqualTo(compObj->ice_router(rtr1), compObj->ice_router(0)));
+    test(Ice::targetNotEqualTo(compObj->ice_router(0), compObj->ice_router(rtr2)));
+    test(Ice::targetNotEqualTo(compObj->ice_router(rtr1), compObj->ice_router(rtr2)));
     test(Ice::targetLess(compObj->ice_router(0), compObj->ice_router(rtr1)));
-    test(!Ice::targetLess(compObj->ice_router(rtr1), compObj->ice_router(0)));
+    test(Ice::targetGreaterEqual(compObj->ice_router(rtr1), compObj->ice_router(0)));
     test(Ice::targetLess(compObj->ice_router(rtr1), compObj->ice_router(rtr2)));
-    test(!Ice::targetLess(compObj->ice_router(rtr2), compObj->ice_router(rtr1)));
+    test(Ice::targetGreaterEqual(compObj->ice_router(rtr2), compObj->ice_router(rtr1)));
 
     Ice::Context ctx1;
     ctx1["ctx1"] = "v1";
     Ice::Context ctx2;
     ctx2["ctx2"] = "v2";
-    test(Ice::targetEquals(compObj->ice_context(Ice::Context()), compObj->ice_context(Ice::Context())));
-    test(Ice::targetEquals(compObj->ice_context(ctx1), compObj->ice_context(ctx1)));
-    test(!Ice::targetEquals(compObj->ice_context(ctx1), compObj->ice_context(Ice::Context())));
-    test(!Ice::targetEquals(compObj->ice_context(Ice::Context()), compObj->ice_context(ctx2)));
-    test(!Ice::targetEquals(compObj->ice_context(ctx1), compObj->ice_context(ctx2)));
+    test(Ice::targetEqualTo(compObj->ice_context(Ice::Context()), compObj->ice_context(Ice::Context())));
+    test(Ice::targetEqualTo(compObj->ice_context(ctx1), compObj->ice_context(ctx1)));
+    test(Ice::targetNotEqualTo(compObj->ice_context(ctx1), compObj->ice_context(Ice::Context())));
+    test(Ice::targetNotEqualTo(compObj->ice_context(Ice::Context()), compObj->ice_context(ctx2)));
+    test(Ice::targetNotEqualTo(compObj->ice_context(ctx1), compObj->ice_context(ctx2)));
     test(Ice::targetLess(compObj->ice_context(ctx1), compObj->ice_context(ctx2)));
-    test(!Ice::targetLess(compObj->ice_context(ctx2), compObj->ice_context(ctx1)));
+    test(Ice::targetGreaterEqual(compObj->ice_context(ctx2), compObj->ice_context(ctx1)));
 
-    test(Ice::targetEquals(compObj->ice_preferSecure(true), compObj->ice_preferSecure(true)));
-    test(!Ice::targetEquals(compObj->ice_preferSecure(true), compObj->ice_preferSecure(false)));
+    test(Ice::targetEqualTo(compObj->ice_preferSecure(true), compObj->ice_preferSecure(true)));
+    test(Ice::targetNotEqualTo(compObj->ice_preferSecure(true), compObj->ice_preferSecure(false)));
     test(Ice::targetLess(compObj->ice_preferSecure(false), compObj->ice_preferSecure(true)));
-    test(!Ice::targetLess(compObj->ice_preferSecure(true), compObj->ice_preferSecure(false)));
+    test(Ice::targetGreaterEqual(compObj->ice_preferSecure(true), compObj->ice_preferSecure(false)));
 
     auto compObj1 = communicator->stringToProxy("foo:tcp -h 127.0.0.1 -p 10000");
     auto compObj2 = communicator->stringToProxy("foo:tcp -h 127.0.0.1 -p 10001");
-    test(!Ice::targetEquals(compObj1, compObj2));
+    test(Ice::targetNotEqualTo(compObj1, compObj2));
     test(Ice::targetLess(compObj1, compObj2));
-    test(!Ice::targetLess(compObj2, compObj1));
+    test(Ice::targetGreaterEqual(compObj2, compObj1));
 
     compObj1 = communicator->stringToProxy("foo@MyAdapter1");
     compObj2 = communicator->stringToProxy("foo@MyAdapter2");
-    test(!Ice::targetEquals(compObj1, compObj2));
+    test(Ice::targetNotEqualTo(compObj1, compObj2));
     test(Ice::targetLess(compObj1, compObj2));
-    test(!Ice::targetLess(compObj2, compObj1));
+    test(Ice::targetGreaterEqual(compObj2, compObj1));
 
-    test(Ice::targetEquals(compObj1->ice_locatorCacheTimeout(20), compObj1->ice_locatorCacheTimeout(20)));
-    test(!Ice::targetEquals(compObj1->ice_locatorCacheTimeout(10), compObj1->ice_locatorCacheTimeout(20)));
+    test(Ice::targetEqualTo(compObj1->ice_locatorCacheTimeout(20), compObj1->ice_locatorCacheTimeout(20)));
+    test(Ice::targetNotEqualTo(compObj1->ice_locatorCacheTimeout(10), compObj1->ice_locatorCacheTimeout(20)));
     test(Ice::targetLess(compObj1->ice_locatorCacheTimeout(10), compObj1->ice_locatorCacheTimeout(20)));
-    test(!Ice::targetLess(compObj1->ice_locatorCacheTimeout(20), compObj1->ice_locatorCacheTimeout(10)));
+    test(Ice::targetGreaterEqual(compObj1->ice_locatorCacheTimeout(20), compObj1->ice_locatorCacheTimeout(10)));
 
-    test(Ice::targetEquals(compObj1->ice_invocationTimeout(20), compObj1->ice_invocationTimeout(20)));
-    test(!Ice::targetEquals(compObj1->ice_invocationTimeout(10), compObj1->ice_invocationTimeout(20)));
+    test(Ice::targetEqualTo(compObj1->ice_invocationTimeout(20), compObj1->ice_invocationTimeout(20)));
+    test(Ice::targetNotEqualTo(compObj1->ice_invocationTimeout(10), compObj1->ice_invocationTimeout(20)));
     test(Ice::targetLess(compObj1->ice_invocationTimeout(10), compObj1->ice_invocationTimeout(20)));
-    test(!Ice::targetLess(compObj1->ice_invocationTimeout(20), compObj1->ice_invocationTimeout(10)));
+    test(Ice::targetGreaterEqual(compObj1->ice_invocationTimeout(20), compObj1->ice_invocationTimeout(10)));
 
     compObj1 = communicator->stringToProxy("foo:tcp -h 127.0.0.1 -p 1000");
     compObj2 = communicator->stringToProxy("foo@MyAdapter1");
-    test(!Ice::targetEquals(compObj1, compObj2));
+    test(Ice::targetNotEqualTo(compObj1, compObj2));
     test(Ice::targetLess(compObj1, compObj2));
-    test(!Ice::targetLess(compObj2, compObj1));
+    test(Ice::targetGreaterEqual(compObj2, compObj1));
 
     Ice::EndpointSeq endpts1 = communicator->stringToProxy("foo:tcp -h 127.0.0.1 -p 10000")->ice_getEndpoints();
     Ice::EndpointSeq endpts2 = communicator->stringToProxy("foo:tcp -h 127.0.0.1 -p 10001")->ice_getEndpoints();
 
-    test(endpts1.size() != endpts2.size() ||  !equal(endpts1.begin(), endpts1.end(), endpts2.begin(), Ice::TargetEquals<shared_ptr<Ice::Endpoint>>()));
-    test(lexicographical_compare(endpts1.begin(), endpts1.end(), endpts2.begin(), endpts2.end(), Ice::TargetLess<shared_ptr<Ice::Endpoint>>()));
-    test(!lexicographical_compare(endpts2.begin(), endpts2.end(), endpts1.begin(), endpts1.end(), Ice::TargetLess<shared_ptr<Ice::Endpoint>>()));
+    test(endpts1.size() != endpts2.size() ||  !equal(endpts1.begin(), endpts1.end(), endpts2.begin(), Ice::TargetCompare<shared_ptr<Ice::Endpoint>, std::equal_to>()));
+    test(lexicographical_compare(endpts1.begin(), endpts1.end(), endpts2.begin(), endpts2.end(), Ice::TargetCompare<shared_ptr<Ice::Endpoint>, std::less>()));
+    test(!lexicographical_compare(endpts2.begin(), endpts2.end(), endpts1.begin(), endpts1.end(), Ice::TargetCompare<shared_ptr<Ice::Endpoint>, std::less>()));
 
     Ice::EndpointSeq endpts3 =  communicator->stringToProxy("foo:tcp -h 127.0.0.1 -p 10000")->ice_getEndpoints();
-    test(endpts1.size() == endpts3.size() && equal(endpts1.begin(), endpts1.end(), endpts3.begin(), Ice::TargetEquals<shared_ptr<Ice::Endpoint>>()));
+    test(endpts1.size() == endpts3.size() && equal(endpts1.begin(), endpts1.end(), endpts3.begin(), Ice::TargetCompare<shared_ptr<Ice::Endpoint>, std::equal_to>()));
 
-    test(Ice::targetEquals(compObj1->ice_encodingVersion(Ice::Encoding_1_0), compObj1->ice_encodingVersion(Ice::Encoding_1_0)));
-    test(!Ice::targetEquals(compObj1->ice_encodingVersion(Ice::Encoding_1_0), compObj1->ice_encodingVersion(Ice::Encoding_1_1)));
+    test(Ice::targetEqualTo(compObj1->ice_encodingVersion(Ice::Encoding_1_0), compObj1->ice_encodingVersion(Ice::Encoding_1_0)));
+    test(Ice::targetNotEqualTo(compObj1->ice_encodingVersion(Ice::Encoding_1_0), compObj1->ice_encodingVersion(Ice::Encoding_1_1)));
     test(Ice::targetLess(compObj->ice_encodingVersion(Ice::Encoding_1_0), compObj->ice_encodingVersion(Ice::Encoding_1_1)));
-    test(!Ice::targetLess(compObj->ice_encodingVersion(Ice::Encoding_1_1), compObj->ice_encodingVersion(Ice::Encoding_1_0)));
+    test(Ice::targetGreaterEqual(compObj->ice_encodingVersion(Ice::Encoding_1_1), compObj->ice_encodingVersion(Ice::Encoding_1_0)));
 
     //
     // TODO: Ideally we should also test comparison of fixed proxies.
@@ -708,9 +835,9 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
     auto derived = Ice::checkedCast<Test::MyDerivedClassPrx>(cl);
     test(derived);
-    test(Ice::targetEquals(cl, base));
-    test(Ice::targetEquals(derived, base));
-    test(Ice::targetEquals(cl, derived));
+    test(Ice::targetEqualTo(cl, base));
+    test(Ice::targetEqualTo(derived, base));
+    test(Ice::targetEqualTo(cl, derived));
 
     auto loc = Ice::checkedCast<Ice::LocatorPrx>(base);
     test(loc == nullptr);
@@ -722,8 +849,8 @@ allTests(const Ice::CommunicatorPtr& communicator)
     auto obj = Ice::checkedCast<Ice::ObjectPrx>(derived);
     test(cl2);
     test(obj);
-    test(Ice::targetEquals(cl2, obj));
-    test(Ice::targetEquals(cl2, derived));
+    test(Ice::targetEqualTo(cl2, obj));
+    test(Ice::targetEqualTo(cl2, derived));
 #else
     test(communicator->stringToProxy("foo") == communicator->stringToProxy("foo"));
     test(communicator->stringToProxy("foo") != communicator->stringToProxy("foo2"));
@@ -757,10 +884,10 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(compObj->ice_connectionCached(false) < compObj->ice_connectionCached(true));
     test(!(compObj->ice_connectionCached(true) < compObj->ice_connectionCached(false)));
 
-    test(compObj->ice_endpointSelection(Ice::Random) == compObj->ice_endpointSelection(Ice::Random));
-    test(compObj->ice_endpointSelection(Ice::Random) != compObj->ice_endpointSelection(Ice::Ordered));
-    test(compObj->ice_endpointSelection(Ice::Random) < compObj->ice_endpointSelection(Ice::Ordered));
-    test(!(compObj->ice_endpointSelection(Ice::Ordered) < compObj->ice_endpointSelection(Ice::Random)));
+    test(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)) == compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)));
+    test(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)) != compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered)));
+    test(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random)) < compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered)));
+    test(!(compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Ordered)) < compObj->ice_endpointSelection(Ice::ICE_ENUM(EndpointSelectionType, Random))));
 
     test(compObj->ice_connectionId("id2") == compObj->ice_connectionId("id2"));
     test(compObj->ice_connectionId("id1") != compObj->ice_connectionId("id2"));
@@ -966,15 +1093,11 @@ allTests(const Ice::CommunicatorPtr& communicator)
     Test::MyClassPrxPtr cl13 = ICE_UNCHECKED_CAST(Test::MyClassPrx, communicator->stringToProxy(ref13));
     cl13->ice_ping();
 #ifdef ICE_CPP11_MAPPING
-    cl13->ice_ping_async().get();
+    cl13->ice_pingAsync().get();
 #else
     cl13->end_ice_ping(cl13->begin_ice_ping());
 #endif
 
-#ifndef ICE_CPP11_MAPPING
-    //
-    // TODO port this once the C++11 streaming API is done
-    //
     try
     {
         // Send request with bogus 1.2 encoding.
@@ -987,7 +1110,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         inEncaps[4] = version.major;
         inEncaps[5] = version.minor;
         vector<Ice::Byte> outEncaps;
-        cl->ice_invoke("ice_ping", Ice::Normal, inEncaps, outEncaps);
+        cl->ice_invoke("ice_ping", Ice::ICE_ENUM(OperationMode, Normal), inEncaps, outEncaps);
         test(false);
     }
     catch(const Ice::UnknownLocalException& ex)
@@ -1008,7 +1131,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         inEncaps[4] = version.major;
         inEncaps[5] = version.minor;
         vector<Ice::Byte> outEncaps;
-        cl->ice_invoke("ice_ping", Ice::Normal, inEncaps, outEncaps);
+        cl->ice_invoke("ice_ping", Ice::ICE_ENUM(OperationMode, Normal), inEncaps, outEncaps);
         test(false);
     }
     catch(const Ice::UnknownLocalException& ex)
@@ -1016,7 +1139,6 @@ allTests(const Ice::CommunicatorPtr& communicator)
         // The server thrown an UnsupportedEncodingException
         test(ex.unknown.find("UnsupportedEncodingException") != string::npos);
     }
-#endif
 
     cout << "ok" << endl;
 
@@ -1044,7 +1166,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cl13 = ICE_UNCHECKED_CAST(Test::MyClassPrx, communicator->stringToProxy(ref13));
     cl13->ice_ping();
 #ifdef ICE_CPP11_MAPPING
-    cl13->ice_ping_async().get();
+    cl13->ice_pingAsync().get();
 #else
     cl13->end_ice_ping(cl13->begin_ice_ping());
 #endif
@@ -1187,10 +1309,6 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
 
         const bool tcp = communicator->getProperties()->getProperty("Ice.Default.Protocol") == "tcp";
-        if(tcp)
-        {
-            p1->ice_encodingVersion(Ice::Encoding_1_0)->ice_ping();
-        }
 
         // Two legal TCP endpoints expressed as opaque endpoints
         p1 = communicator->stringToProxy("test -e 1.0:opaque -e 1.0 -t 1 -v CTEyNy4wLjAuMeouAAAQJwAAAA==:opaque -e 1.0 -t 1 -v CTEyNy4wLjAuMusuAAAQJwAAAA==");
@@ -1215,23 +1333,6 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
 
         //
-        // Try to invoke on the endpoint to verify that we get a
-        // NoEndpointException (or ConnectionRefusedException when
-        // running with SSL).
-        //
-        if(ssl)
-        {
-            try
-            {
-                p1->ice_encodingVersion(Ice::Encoding_1_0)->ice_ping();
-                test(false);
-            }
-            catch(const Ice::ConnectFailedException&)
-            {
-            }
-        }
-
-        //
         // Test that the proxy with an SSL endpoint and a nonsense
         // endpoint (which the server doesn't understand either) can be
         // sent over the wire and returned by the server without losing
@@ -1245,6 +1346,10 @@ allTests(const Ice::CommunicatorPtr& communicator)
         }
         else if(tcp)
         {
+            if(pstr != "test -t -e 1.0:opaque -t 2 -e 1.0 -v CTEyNy4wLjAuMREnAAD/////AA==:opaque -t 99 -e 1.0 -v abch")
+            {
+                cerr << pstr << endl;
+            }
             test(pstr ==
                  "test -t -e 1.0:opaque -t 2 -e 1.0 -v CTEyNy4wLjAuMREnAAD/////AA==:opaque -t 99 -e 1.0 -v abch");
         }

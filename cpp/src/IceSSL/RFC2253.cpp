@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -271,7 +271,7 @@ parseAttributeType(const string& data, size_t& pos)
     //
     // Here we must also check for "oid." and "OID." before parsing
     // according to the ALPHA KEYCHAR* rule.
-    // 
+    //
     // First the OID case.
     //
     if(IceUtilInternal::isDigit(data[pos]) ||
@@ -318,7 +318,7 @@ parseAttributeType(const string& data, size_t& pos)
         result += data[pos];
         ++pos;
         // 1* KEYCHAR
-        while(pos < data.size() && 
+        while(pos < data.size() &&
               (IceUtilInternal::isAlpha(data[pos]) || IceUtilInternal::isDigit(data[pos]) || data[pos] == '-'))
         {
             result += data[pos];
@@ -448,7 +448,7 @@ parsePair(const string& data, size_t& pos)
     }
     return parseHexPair(data, pos, false);
 }
-    
+
 //
 // RFC 2253
 // hexpair    = hexchar hexchar
@@ -494,48 +494,3 @@ eatWhite(const string& data, size_t& pos)
         ++pos;
     }
 }
-
-#ifdef never
-void
-print(const list< list<pair<string, string> > >& r)
-{
-    if(r.size() > 1)
-    {
-        cout << "result: " << r.size() << " DNs" << endl;
-    }
-    for(list< list<pair<string, string> > >::const_iterator q = r.begin(); q != r.end(); ++q)
-    {
-        list<pair<string, string> > l = *q;
-        cout << "result: " << l.size() << " RDNs" << endl;
-        for(list<pair<string, string> >::const_iterator p = l.begin(); p != l.end(); ++p)
-        {
-            cout << "\t\"" << p->first << "\"=\"" << p->second << "\"" << endl;
-        }
-    }
-}
-
-int
-main()
-{
-    string examples[] = {
-        "CN=Steve Kille,O=Isode Limited,C=GB",
-        "OU=Sales+CN=J. Smith,O=Widget Inc.,C=US",
-        "CN=L. Eagle,O=Sue\\, Grabbit and Runn,C=GB",
-        "CN=Before\\0DAfter,O=Test,C=GB",
-        "1.3.6.1.4.1.1466.0=#04024869,O=Test,C=GB",
-        "SN=Lu\\C4\\8Di\\C4\\87",
-    };
-    try
-    {
-        for(int i = 0; i < sizeof(examples)/sizeof(examples[0]); ++i)
-        {
-            cout << "string: " << examples[i] << endl;
-            print(RFC2253::parse(examples[i]));
-        }
-    }
-    catch(const RFC2253::ParseException& e)
-    {
-        cout << "error: " << e.reason << endl;
-    }
-}
-#endif

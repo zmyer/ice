@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2015 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -64,7 +64,7 @@ local_admin_srcs	= Internal.ice \
 		     	  Scanner.cpp \
 		     	  Util.cpp
 
-$(project)_programs 		= icegridnode icegridregistry icegridadmin icegriddb
+$(project)_programs 		= icegridnode icegridregistry icegridadmin
 $(project)_sliceflags		:= -Isrc --include-dir IceGrid
 $(project)_generated_includedir := $(project)/generated/IceGrid
 $(project)_dependencies 	:= IceGrid Glacier2 Ice
@@ -72,18 +72,15 @@ $(project)_targetdir		:= $(bindir)
 
 icegridnode_sources	 	:= $(addprefix $(currentdir)/,$(local_node_srcs) $(local_registry_srcs) IceGridNode.cpp)
 icegridnode_dependencies 	:= IceBox IceStormService IceStorm IceXML IceSSL IcePatch2 IceDB
-icegridnode_libs		:= lmdb
+icegridnode_cppflags		:= $(if $(lmdb_includedir),-I$(lmdb_includedir))
 
 icegridregistry_sources	 	:= $(addprefix $(currentdir)/,$(local_registry_srcs) IceGridRegistry.cpp)
 icegridregistry_dependencies 	:= IceBox IceStormService IceStorm IceXML IceSSL IcePatch2 IceDB $(local_dependencies)
-icegridregistry_libs		:= lmdb
+icegridregistry_cppflags	:= $(if $(lmdb_includedir),-I$(lmdb_includedir))
 
 icegridadmin_dependencies 	:= IcePatch2 IceBox IceXML
 icegridadmin_sources	 	:= $(slicedir)/IceLocatorDiscovery/IceLocatorDiscovery.ice \
 				   $(addprefix $(currentdir)/,$(local_admin_srcs))
 
-icegriddb_dependencies 		:= IcePatch2 IceDB
-icegriddb_libs			:= lmdb
-icegriddb_sources	 	:= $(addprefix $(currentdir)/,IceGridDB.cpp DBTypes.ice)
 
 projects += $(project)

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -481,7 +481,7 @@ Ice::PluginManagerI::loadPlugin(const string& name, const string& pluginSpec, St
         }
 
 #ifdef __IBMCPP__
-	// xlC warns when casting a void* to function pointer
+    // xlC warns when casting a void* to function pointer
 #   pragma report(disable, "1540-0216")
 #endif
 

@@ -1,8 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\..\..\..\msbuild\packages\zeroc.ice.net.3.7.0-alpha4\build\zeroc.ice.net.props" Condition="Exists('..\..\..\..\..\msbuild\packages\zeroc.ice.net.3.7.0-alpha4\build\zeroc.ice.net.props') and '$(UseBinDist)' == 'yes'" />
   <PropertyGroup Label="Globals">
-    <IceBuilderCsharpProps Condition="!Exists('$(IceBuilderCsharpProps)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Csharp.props', SearchOption.AllDirectories))</IceBuilderCsharpProps>
-    <IceBuilderCsharpTargets Condition="!Exists('$(IceBuilderCsharpTargets)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Csharp.targets', SearchOption.AllDirectories))</IceBuilderCsharpTargets>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+    <IceBuilderInstallDir>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\SOFTWARE\ZeroC\IceBuilder', 'InstallDir.$(VisualStudioVersion)'))</IceBuilderInstallDir>
+    <IceBuilderCsharpProps>$(IceBuilderInstallDir)\Resources\IceBuilder.CSharp.props</IceBuilderCsharpProps>
+    <IceBuilderCsharpTargets>$(IceBuilderInstallDir)\Resources\IceBuilder.CSharp.targets</IceBuilderCsharpTargets>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -12,47 +16,21 @@
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <AssemblyName>server</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{3C53C28F-DC44-46B0-8B85-0C96B85B2042};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>..\..\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>..\..\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|Win32'">
-    <OutputPath>..\..\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
-    <OutputPath>..\..\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|Win32'">
-    <OutputPath>..\..\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
-    <OutputPath>..\..\</OutputPath>
+    <OutputPath>$(MSBuildThisFileDirectory)</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Ice, Version=3.7.0.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="Ice, Version=3.7.54.0, Culture=neutral, PublicKeyToken=1f998c50fec78381, processorArchitecture=MSIL">
+      <HintPath>$(IceAssembliesDir)\Ice.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
       <Private>False</Private>
-      <HintPath>$(IceAssembliesDir)\Ice.dll</HintPath>
+    </Reference>
+    <Reference Include="IceSSL, Version=3.7.54.0, Culture=neutral, PublicKeyToken=1f998c50fec78381, processorArchitecture=MSIL">
+      <HintPath>$(IceAssembliesDir)\IceSSL.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+      <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -62,24 +40,38 @@
     <Folder Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\..\TestCommon\TestApp.cs">
+      <Link>TestApp.cs</Link>
+    </Compile>
     <Compile Include="..\..\Server.cs">
       <Link>Server.cs</Link>
     </Compile>
     <Compile Include="generated\Test.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\server.exe.config">
-      <Link>server.exe.config</Link>
-    </None>
+    <None Include="packages.config" />
+    <None Include="server.exe.config" />
     <None Include="..\..\Test.ice">
       <Link>Test.ice</Link>
     </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)\..\..\..\..\..\msbuild\ice.test.props" />
   <Import Project="$(IceBuilderCsharpProps)" Condition="Exists('$(IceBuilderCsharpProps)')" />
   <PropertyGroup Label="IceBuilder">
     <IceBuilderIncludeDirectories>$(IceHome)\slice</IceBuilderIncludeDirectories>
-    <IceBuilderAllowIcePrefix>yes</IceBuilderAllowIcePrefix>
   </PropertyGroup>
   <Import Project="$(IceBuilderCsharpTargets)" Condition="Exists('$(IceBuilderCsharpTargets)')" />
+  <Target Name="EnsureIceBuilderImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project requires the Ice Builder for Visual Studio extension. Use "Tools &amp;gt; Extensions and Updates" to install it. For more information, see https://visualstudiogallery.msdn.microsoft.com/1a64e701-63f2-4740-8004-290e6c682ce0.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(IceBuilderCSharpProps)')" Text="$(ErrorText)" />
+  </Target>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\..\..\..\msbuild\packages\zeroc.ice.net.3.7.0-alpha4\build\zeroc.ice.net.props') and '$(UseBinDist)' == 'yes'" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\..\msbuild\packages\zeroc.ice.net.3.7.0-alpha4\build\zeroc.ice.net.props'))" />
+  </Target>
 </Project>

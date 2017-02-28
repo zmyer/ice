@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -32,8 +32,7 @@ main(int argc, char* argv[])
     Ice::registerIceSSL();
 #endif
 
-    Ice::InitializationData initData;
-    initData.properties = Ice::createProperties(argc, argv);
+    Ice::InitializationData initData = getTestInitData(argc, argv);
 
     //
     // We want to check whether the client retries for evicted
@@ -49,7 +48,7 @@ int
 AttackClient::run(int, char**)
 {
     cout << "getting router... " << flush;
-    ObjectPrx routerBase = communicator()->stringToProxy("Glacier2/router:default -p 12347");
+    ObjectPrx routerBase = communicator()->stringToProxy("Glacier2/router:" + getTestEndpoint(communicator(), 10));
     Glacier2::RouterPrx router = Glacier2::RouterPrx::checkedCast(routerBase);
     test(router);
     communicator()->setDefaultRouter(router);
@@ -60,7 +59,7 @@ AttackClient::run(int, char**)
     cout << "ok" << endl;
 
     cout << "making thousands of invocations on proxies... " << flush;
-    ObjectPrx backendBase = communicator()->stringToProxy("dummy:tcp -p 12010");
+    ObjectPrx backendBase = communicator()->stringToProxy("dummy:" + getTestEndpoint(communicator(), 0));
     BackendPrx backend = BackendPrx::uncheckedCast(backendBase);
     backend->ice_ping();
 
@@ -118,7 +117,8 @@ AttackClient::run(int, char**)
     cout << "testing server and router shutdown... " << flush;
     backend->shutdown();
     communicator()->setDefaultRouter(0);
-    ObjectPrx adminBase = communicator()->stringToProxy("Glacier2/admin -f Process:tcp -h 127.0.0.1 -p 12348");
+    ObjectPrx adminBase = communicator()->stringToProxy("Glacier2/admin -f Process:" +
+                                                        getTestEndpoint(communicator(), 11));
     Ice::ProcessPrx process = Ice::ProcessPrx::checkedCast(adminBase);
     test(process);
     process->shutdown();

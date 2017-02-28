@@ -1,21 +1,27 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
 #
 # **********************************************************************
 
-top_srcdir 	:= ..
-lang_srcdir	:= $(top_srcdir)/python
+top_srcdir	:= ..
+lang_srcdir	:= $(top_srcdir)/$(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
+
+ifeq ($(PYTHON),)
+    PYTHON = python
+endif
+
+ifeq ($(filter all python,$(ICE_BIN_DIST)),)
 
 include $(top_srcdir)/config/Make.rules
 
 #
 # Load C++ dependencies
 #
-$(eval $(call load-dependencies,$(addprefix $(top_srcdir)/cpp/src/,Ice IceSSL)))
+$(eval $(call load-dependencies,$(addprefix $(top_srcdir)/cpp/src/,Ice IceSSL IceLocatorDiscovery IceDiscovery)))
 
 #
 # Load python rules after loading C++ dependencies
@@ -39,3 +45,5 @@ $(call make-projects,$(projects))
 #
 all generate-srcs clean distclean install::
 	+$(Q)$(MAKE) -C python $@
+
+endif

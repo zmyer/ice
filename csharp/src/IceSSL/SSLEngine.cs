@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,6 @@
 namespace IceSSL
 {
     using System;
-    using System.Collections;
     using System.Collections.Generic;
     using System.IO;
     using System.Security;
@@ -31,15 +30,6 @@ namespace IceSSL
             _securityTraceCategory = "Security";
             _initialized = false;
             _trustManager = new TrustManager(_communicator);
-            _tls12Support = false;
-            try
-            {
-                Enum.Parse(typeof(System.Security.Authentication.SslProtocols), "Tls12");
-                _tls12Support = true;
-            }
-            catch(Exception)
-            {
-            }
         }
 
         internal void initialize()
@@ -75,65 +65,13 @@ namespace IceSSL
                 storeLocation = StoreLocation.CurrentUser;
             }
             _useMachineContext = certStoreLocation == "LocalMachine";
-            X509KeyStorageFlags keyStorageFlags;
-            if(_useMachineContext)
-            {
-                keyStorageFlags = X509KeyStorageFlags.MachineKeySet;
-            }
-            else
-            {
-                keyStorageFlags = X509KeyStorageFlags.UserKeySet;
-            }
-
-            string keySet = properties.getProperty(prefix + "KeySet"); // Deprecated property
-            if(keySet.Length > 0)
-            {
-                if(keySet.Equals("DefaultKeySet"))
-                {
-                    keyStorageFlags = X509KeyStorageFlags.DefaultKeySet;
-                }
-                else if(keySet.Equals("UserKeySet"))
-                {
-                    keyStorageFlags = X509KeyStorageFlags.UserKeySet;
-                }
-                else if(keySet.Equals("MachineKeySet"))
-                {
-                    keyStorageFlags = X509KeyStorageFlags.MachineKeySet;
-                }
-                else
-                {
-                    _logger.warning("Invalid IceSSL.KeySet value `" + keySet + "' adjusted to `DefaultKeySet'");
-                    keyStorageFlags = X509KeyStorageFlags.DefaultKeySet;
-                }
-            }
-
-            if(properties.getPropertyAsIntWithDefault(prefix + "PersistKeySet", 0) > 0) // Deprecated property
-            {
-                keyStorageFlags |= X509KeyStorageFlags.PersistKeySet;
-            }
-
-            //
-            // Process IceSSL.ImportCert.* properties.
-            //
-            Dictionary<string, string> certs = properties.getPropertiesForPrefix(prefix + "ImportCert.");
-            foreach(KeyValuePair<string, string> entry in certs)
-            {
-                string name = entry.Key;
-                string val = entry.Value;
-                if(val.Length > 0)
-                {
-                    importCertificate(name, val, keyStorageFlags);
-                }
-            }
 
             //
             // Protocols selects which protocols to enable, by default we only enable TLS1.0
             // TLS1.1 and TLS1.2 to avoid security issues with SSLv3
             //
             _protocols = parseProtocols(
-                properties.getPropertyAsListWithDefault(prefix + "Protocols",
-                                                        _tls12Support ? new string[]{"TLS1_0", "TLS1_1", "TLS1_2"} :
-                                                                        new string[]{"TLS1_0", "TLS1_1"}));
+                properties.getPropertyAsListWithDefault(prefix + "Protocols", new string[]{"TLS1_0", "TLS1_1", "TLS1_2"}));
             //
             // CheckCertName determines whether we compare the name in a peer's
             // certificate against its hostname.
@@ -469,6 +407,11 @@ namespace IceSSL
             return _verifier;
         }
 
+        internal bool getCheckCertName()
+        {
+            return _checkCertName;
+        }
+
         internal void setPasswordCallback(PasswordCallback callback)
         {
             _passwordCallback = callback;
@@ -534,206 +477,15 @@ namespace IceSSL
             _logger.trace(_securityTraceCategory, s.ToString());
         }
 
-        internal void verifyPeer(NativeConnectionInfo info, System.Net.Sockets.Socket fd, string address)
+        internal void verifyPeer(string address, NativeConnectionInfo info, string desc)
         {
-            //
-            // For an outgoing connection, we compare the proxy address (if any) against
-            // fields in the server's certificate (if any).
-            //
-            if(info.nativeCerts != null && info.nativeCerts.Length > 0 && address.Length > 0)
-            {
-                //
-                // Extract the IP addresses and the DNS names from the subject
-                // alternative names.
-                //
-                List<string> dnsNames = null;
-                List<string> ipAddresses = null;
-
-                //
-                // Search for "subject alternative name" extensions. The OID value
-                // of interest is 2.5.29.17 and the encoded data has the following
-                // ASN.1 syntax:
-                //
-                // GeneralNames ::= SEQUENCE SIZE (1..MAX) OF GeneralName
-                //
-                // GeneralName ::= CHOICE {
-                //    otherName                       [0]     OtherName,
-                //    rfc822Name                      [1]     IA5String,
-                //    dNSName                         [2]     IA5String,
-                //    x400Address                     [3]     ORAddress,
-                //    directoryName                   [4]     Name,
-                //    ediPartyName                    [5]     EDIPartyName,
-                //    uniformResourceIdentifier       [6]     IA5String,
-                //    iPAddress                       [7]     OCTET STRING,
-                //    registeredID                    [8]     OBJECT IDENTIFIER
-                // }
-                //
-                foreach(X509Extension ext in info.nativeCerts[0].Extensions)
-                {
-                    if(ext.Oid.Value.Equals("2.5.29.17") && ext.RawData.Length > 0)
-                    {
-                        byte[] data = ext.RawData;
-                        if(data.Length < 2 || data[0] != 0x30) // ASN.1 sequence
-                        {
-                            continue;
-                        }
-
-                        int seqLen, pos;
-                        if(!decodeASN1Length(data, 1, out seqLen, out pos))
-                        {
-                            continue;
-                        }
-
-                        while(pos < data.Length)
-                        {
-                            int tag = data[pos];
-
-                            int len;
-                            if(!decodeASN1Length(data, pos + 1, out len, out pos))
-                            {
-                                break;
-                            }
-
-                            if(tag == 0x82)
-                            {
-                                //
-                                // Extract DNS name.
-                                //
-                                StringBuilder b = new StringBuilder();
-                                for(int j = pos; j < pos + len; ++j)
-                                {
-                                    b.Append((char)data[j]);
-                                }
-                                if(dnsNames == null)
-                                {
-                                    dnsNames = new List<string>();
-                                }
-                                dnsNames.Add(b.ToString().ToUpperInvariant());
-                            }
-                            else if(tag == 0x87)
-                            {
-                                //
-                                // Extract IP address.
-                                //
-                                char sep = len == 4 ? '.' : ':';
-                                StringBuilder b = new StringBuilder();
-                                for(int j = pos; j < pos + len; ++j)
-                                {
-                                    if(j > pos)
-                                    {
-                                        b.Append(sep);
-                                    }
-                                    b.Append(data[j].ToString(CultureInfo.InvariantCulture));
-                                }
-                                if(ipAddresses == null)
-                                {
-                                    ipAddresses = new List<string>();
-                                }
-                                ipAddresses.Add(b.ToString().ToUpperInvariant());
-                            }
-
-                            pos += len;
-                        }
-                    }
-                }
-
-                //
-                // Compare the peer's address against the common name as well as
-                // the dnsName and ipAddress values in the subject alternative name.
-                //
-                string dn = info.nativeCerts[0].Subject;
-                string addrLower = address.ToUpperInvariant();
-                bool certNameOK = false;
-                {
-                    string cn = "cn=" + addrLower;
-                    int pos = dn.ToLower(CultureInfo.InvariantCulture).IndexOf(cn, StringComparison.Ordinal);
-                    if(pos >= 0)
-                    {
-                        //
-                        // Ensure we match the entire common name.
-                        //
-                        certNameOK = (pos + cn.Length == dn.Length) || (dn[pos + cn.Length] == ',');
-                    }
-                }
-
-                //
-                // Compare the peer's address against the dnsName and ipAddress
-                // values in the subject alternative name.
-                //
-                if(!certNameOK && ipAddresses != null)
-                {
-                    certNameOK = ipAddresses.Contains(addrLower);
-                }
-                if(!certNameOK && dnsNames != null)
-                {
-                    certNameOK = dnsNames.Contains(addrLower);
-                }
-
-                //
-                // Log a message if the name comparison fails. If CheckCertName is defined,
-                // we also raise an exception to abort the connection. Don't log a message if
-                // CheckCertName is not defined and a verifier is present.
-                //
-                if(!certNameOK && (_checkCertName || (_securityTraceLevel >= 1 && _verifier == null)))
-                {
-                    StringBuilder sb = new StringBuilder();
-                    sb.Append("IceSSL: ");
-                    if(!_checkCertName)
-                    {
-                        sb.Append("ignoring ");
-                    }
-                    sb.Append("certificate validation failure:\npeer certificate does not have `");
-                    sb.Append(address);
-                    sb.Append("' as its commonName or in its subjectAltName extension");
-                    if(dn.Length > 0)
-                    {
-                        sb.Append("\nSubject DN: ");
-                        sb.Append(dn);
-                    }
-                    if(dnsNames != null)
-                    {
-                        sb.Append("\nDNS names found in certificate: ");
-                        for(int j = 0; j < dnsNames.Count; ++j)
-                        {
-                            if(j > 0)
-                            {
-                                sb.Append(", ");
-                            }
-                            sb.Append(dnsNames[j]);
-                        }
-                    }
-                    if(ipAddresses != null)
-                    {
-                        sb.Append("\nIP addresses found in certificate: ");
-                        for(int j = 0; j < ipAddresses.Count; ++j)
-                        {
-                            if(j > 0)
-                            {
-                                sb.Append(", ");
-                            }
-                            sb.Append(ipAddresses[j]);
-                        }
-                    }
-                    string msg = sb.ToString();
-                    if(_securityTraceLevel >= 1)
-                    {
-                        _logger.trace(_securityTraceCategory, msg);
-                    }
-                    if(_checkCertName)
-                    {
-                        Ice.SecurityException ex = new Ice.SecurityException();
-                        ex.reason = msg;
-                        throw ex;
-                    }
-                }
-            }
+            
 
             if(_verifyDepthMax > 0 && info.nativeCerts != null && info.nativeCerts.Length > _verifyDepthMax)
             {
                 string msg = (info.incoming ? "incoming" : "outgoing") + " connection rejected:\n" +
                     "length of peer's certificate chain (" + info.nativeCerts.Length + ") exceeds maximum of " +
-                    _verifyDepthMax + "\n" +
-                    IceInternal.Network.fdToString(fd);
+                    _verifyDepthMax + "\n" + desc;
                 if(_securityTraceLevel >= 1)
                 {
                     _logger.trace(_securityTraceCategory, msg);
@@ -743,10 +495,10 @@ namespace IceSSL
                 throw ex;
             }
 
-            if(!_trustManager.verify(info))
+            if(!_trustManager.verify(info, desc))
             {
                 string msg = (info.incoming ? "incoming" : "outgoing") + " connection rejected by trust manager\n" +
-                    IceInternal.Network.fdToString(fd);
+                    desc;
                 if(_securityTraceLevel >= 1)
                 {
                     _logger.trace(_securityTraceCategory, msg);
@@ -760,7 +512,7 @@ namespace IceSSL
             if(_verifier != null && !_verifier.verify(info))
             {
                 string msg = (info.incoming ? "incoming" : "outgoing") +
-                    " connection rejected by certificate verifier\n" + IceInternal.Network.fdToString(fd);
+                    " connection rejected by certificate verifier\n" + desc;
                 if(_securityTraceLevel >= 1)
                 {
                     _logger.trace(_securityTraceCategory, msg);
@@ -871,175 +623,6 @@ namespace IceSSL
             }
 
             return false;
-        }
-
-        private void importCertificate(string propName, string propValue, X509KeyStorageFlags keyStorageFlags)
-        {
-            //
-            // Expecting a property of the following form:
-            //
-            // IceSSL.ImportCert.<location>.<name>=<file>[;password]
-            //
-            const string prefix = "IceSSL.ImportCert.";
-            StoreLocation loc = 0;
-            StoreName name = 0;
-            string sname = null;
-            parseStore(propName, propName.Substring(prefix.Length), ref loc, ref name, ref sname);
-
-            //
-            // Extract the filename and password. Either or both can be quoted.
-            //
-            string[] arr = splitString(propValue, ';');
-            if(arr == null)
-            {
-                Ice.PluginInitializationException e = new Ice.PluginInitializationException();
-                e.reason = "IceSSL: unmatched quote in `" + propValue + "'";
-                throw e;
-            }
-            if(arr.Length == 0)
-            {
-                return;
-            }
-            string file = arr[0];
-            string passwordStr = null;
-            if(arr.Length > 1)
-            {
-                passwordStr = arr[1];
-            }
-
-            //
-            // Open the X509 certificate store.
-            //
-            X509Store store = null;
-            try
-            {
-                if(sname != null)
-                {
-                    store = new X509Store(sname, loc);
-                }
-                else
-                {
-                    store = new X509Store(name, loc);
-                }
-                store.Open(OpenFlags.ReadWrite);
-            }
-            catch(Exception ex)
-            {
-                Ice.PluginInitializationException e = new Ice.PluginInitializationException(ex);
-                e.reason = "IceSSL: failure while opening store specified by " + propName;
-                throw e;
-            }
-
-            if(!checkPath(ref file))
-            {
-                Ice.PluginInitializationException e = new Ice.PluginInitializationException();
-                e.reason = "IceSSL: certificate file not found:\n" + file;
-                throw e;
-            }
-
-            SecureString password = null;
-            if(passwordStr != null)
-            {
-                password = createSecureString(passwordStr);
-            }
-            else if(_passwordCallback != null)
-            {
-                password = _passwordCallback.getImportPassword(file);
-            }
-
-            //
-            // Add the certificate to the store.
-            //
-            try
-            {
-                X509Certificate2 cert;
-                if(password != null)
-                {
-                    cert = new X509Certificate2(file, password, keyStorageFlags);
-                }
-                else
-                {
-                    cert = new X509Certificate2(file, "", keyStorageFlags);
-                }
-                store.Add(cert);
-            }
-            catch(Exception ex)
-            {
-                Ice.PluginInitializationException e = new Ice.PluginInitializationException(ex);
-                e.reason = "IceSSL: failure while adding certificate file:\n" + file;
-                throw e;
-            }
-            finally
-            {
-                store.Close();
-            }
-        }
-
-        //
-        // Split strings using a delimiter. Quotes are supported.
-        // Returns null for an unmatched quote.
-        //
-        private static string[] splitString(string str, char delim)
-        {
-            ArrayList l = new ArrayList();
-            char[] arr = new char[str.Length];
-            int pos = 0;
-
-            while(pos < str.Length)
-            {
-                int n = 0;
-                char quoteChar = '\0';
-                if(str[pos] == '"' || str[pos] == '\'')
-                {
-                    quoteChar = str[pos];
-                    ++pos;
-                }
-                bool trim = true;
-                while(pos < str.Length)
-                {
-                    if(quoteChar != '\0' && str[pos] == '\\' && pos + 1 < str.Length && str[pos + 1] == quoteChar)
-                    {
-                        ++pos;
-                    }
-                    else if(quoteChar != '\0' && str[pos] == quoteChar)
-                    {
-                        trim = false;
-                        ++pos;
-                        quoteChar = '\0';
-                        break;
-                    }
-                    else if(str[pos] == delim)
-                    {
-                        if(quoteChar == '\0')
-                        {
-                            ++pos;
-                            break;
-                        }
-                    }
-                    if(pos < str.Length)
-                    {
-                        arr[n++] = str[pos++];
-                    }
-                }
-                if(quoteChar != '\0')
-                {
-                    return null; // Unmatched quote.
-                }
-                if(n > 0)
-                {
-                    string s = new string(arr, 0, n);
-                    if(trim)
-                    {
-                        s = s.Trim();
-                    }
-                    if(s.Length > 0)
-                    {
-                        l.Add(s);
-                    }
-                }
-            }
-
-            return (string[])l.ToArray(typeof(string));
         }
 
         private SslProtocols parseProtocols(string[] arr)
@@ -1358,6 +941,5 @@ namespace IceSSL
         private CertificateVerifier _verifier;
         private PasswordCallback _passwordCallback;
         private TrustManager _trustManager;
-        private bool _tls12Support;
     }
 }

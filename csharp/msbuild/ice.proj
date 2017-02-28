@@ -1,11 +1,15 @@
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup Condition="'$(Configuration)' == ''">
+      <Configuration>Debug</Configuration>
+    </PropertyGroup>
+
     <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
 
     <Import Project="$(MSBuildThisFileDirectory)\..\..\config\Ice.common.targets" />
 
-    <PropertyGroup Condition="'$(Configuration)' == ''">
-      <Configuration>Debug</Configuration>
-    </PropertyGroup>
+    <Target Name="TestNugetRestore" DependsOnTargets="GetNuget" Condition="'$(UseBinDist)' == 'yes'">
+      <Exec Command="$(NugetExe) restore $(MSBuildThisFileDirectory)ice.test.sln"/>
+    </Target>
 
     <ItemGroup>
         <DistSolution Include="ice.sln">
@@ -13,7 +17,7 @@
         </DistSolution>
 
         <TestSoution Include="ice.test.sln">
-          <Properties>Configuration=$(Configuration);Platform=Any CPU</Properties>
+          <Properties>Configuration=$(Configuration.Replace("-Managed", ""));Platform=Any CPU</Properties>
         </TestSoution>
     </ItemGroup>
 
@@ -30,19 +34,45 @@
                  Targets="Clean" />
     </Target>
 
-    <!-- Build all the test solution configurations -->
-    <Target Name="Build" DependsOnTargets="BuildDist">
+    <Target Name="Build" DependsOnTargets="TestNugetRestore;BuildDist">
         <MSBuild Projects="@(TestSoution)"
                  BuildInParallel="true"
                  Properties="%(Properties)" />
     </Target>
 
-    <!-- Clean all the test solution configurations -->
     <Target Name="Clean" DependsOnTargets="CleanDist">
         <MSBuild Projects="@(TestSoution)" BuildInParallel="true" Targets="Clean" Properties="%(Properties)" />
     </Target>
 
+    <Import Project="$(MSBuildThisFileDirectory)ice.common.targets" />
+
     <Target Name="NugetPack" DependsOnTargets="BuildDist">
-        <MSBuild Projects="ice.nuget.targets" Properties="NugetExe=$(NugetExe)"/>
+        <RemoveDir Directories="zeroc.ice.net" />
+        <MSBuild Projects="ice.nuget.targets"
+                 Properties="PackageDirectory=zeroc.ice.net"/>
+
+        <Copy SourceFiles="zeroc.ice.net.nuspec"
+              DestinationFolder="zeroc.ice.net" />
+
+        <!-- Generate iceboxnet.exe.config with the correct assembly 
+             pulbic key token and assembly paths -->
+        <GetPublicKeyToken AssemblyFile="$(MSBuildThisFileDirectory)..\Assemblies\Ice.dll">
+          <Output TaskParameter="PublicKeyToken" PropertyName="PublicKeyToken"/>
+        </GetPublicKeyToken>
+
+        <WriteFileWithReplacements InputFile="$(MSBuildThisFileDirectory)iceboxnet.exe.config"
+                                   OutputFile="$(MSBuildThisFileDirectory)zeroc.ice.net\tools\iceboxnet.exe.config"
+                                   Tokens="@PublicKeyToken@;@AssemblyDir@"
+                                   Replacements="$(PublicKeyToken);..\lib"/>
+
+        <!-- Copy bzip2 native dll next to iceboxnet.exe -->
+        <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\cpp\msbuild\packages\bzip2.v140.1.0.6.4\build\native\bin\x64\Release\bzip2.dll"
+              DestinationFiles="$(MSBuildThisFileDirectory)zeroc.ice.net\tools\bzip2.dll" />
+
+        <Copy SourceFiles="zeroc.ice.net.props"
+              DestinationFiles="zeroc.ice.net\build\zeroc.ice.net.props" />
+
+        <Exec Command="$(NugetExe) pack -NoPackageAnalysis -NonInteractive"
+              WorkingDirectory="zeroc.ice.net"/>
     </Target>
 </Project>

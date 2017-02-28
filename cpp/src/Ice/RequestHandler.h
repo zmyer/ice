@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,7 +11,7 @@
 #define ICE_REQUEST_HANDLER_H
 
 #include <IceUtil/Shared.h>
-#include <IceUtil/UniquePtr.h>
+#include <Ice/UniquePtr.h>
 
 #include <Ice/RequestHandlerF.h>
 #include <Ice/ReferenceF.h>
@@ -29,28 +29,10 @@ class LocalException;
 namespace IceInternal
 {
 
-class OutgoingBase;
-class ProxyOutgoingBase;
-
 //
 // An exception wrapper, which is used to notify that the request
 // handler should be cleared and the invocation retried.
 //
-#ifdef ICE_CPP11_MAPPING
-class RetryException
-{
-public:
-
-    RetryException(std::exception_ptr);
-    RetryException(const RetryException&);
-
-    std::exception_ptr get() const;
-
-private:
-
-    std::exception_ptr _ex;
-};
-#else
 class RetryException
 {
 public:
@@ -62,9 +44,8 @@ public:
 
 private:
 
-    IceUtil::UniquePtr<Ice::LocalException> _ex;
+    IceInternal::UniquePtr<Ice::LocalException> _ex;
 };
-#endif
 
 
 class CancellationHandler
@@ -74,19 +55,17 @@ class CancellationHandler
 {
 public:
 
-    virtual void requestCanceled(OutgoingBase*, const Ice::LocalException&) = 0;
     virtual void asyncRequestCanceled(const OutgoingAsyncBasePtr&, const Ice::LocalException&) = 0;
 };
 
 class RequestHandler : public CancellationHandler
 {
 public:
-    
+
     RequestHandler(const ReferencePtr&);
 
     virtual RequestHandlerPtr update(const RequestHandlerPtr&, const RequestHandlerPtr&) = 0;
 
-    virtual bool sendRequest(ProxyOutgoingBase*) = 0;
     virtual AsyncStatus sendAsyncRequest(const ProxyOutgoingAsyncBasePtr&) = 0;
 
     const ReferencePtr& getReference() const { return _reference; } // Inlined for performances.

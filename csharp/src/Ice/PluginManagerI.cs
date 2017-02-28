@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -168,8 +168,8 @@ namespace Ice
                             }
                             catch(System.Exception ex)
                             {
-                                Ice.Util.getProcessLogger().warning("unexpected exception raised by plug-in `" +
-                                                                    p.name + "' destruction:\n" + ex.ToString());
+                                Util.getProcessLogger().warning("unexpected exception raised by plug-in `" +
+                                                                p.name + "' destruction:\n" + ex.ToString());
                             }
                         }
                     }
@@ -354,7 +354,7 @@ namespace Ice
             //
             string err = "unable to load plug-in `" + entryPoint + "': ";
             int sepPos = entryPoint.IndexOf(':');
-            if(sepPos != -1 && IceInternal.AssemblyUtil.platform_ == IceInternal.AssemblyUtil.Platform.Windows)
+            if(sepPos != -1)
             {
                 const string driveLetters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
                 if(entryPoint.Length > 3 &&
@@ -433,13 +433,13 @@ namespace Ice
                     throw e;
                 }
             }
-            catch(System.InvalidCastException ex)
+            catch(InvalidCastException ex)
             {
                 PluginInitializationException e = new PluginInitializationException(ex);
                 e.reason = err + "InvalidCastException to Ice.PluginFactory";
                 throw e;
             }
-            catch(System.UnauthorizedAccessException ex)
+            catch(UnauthorizedAccessException ex)
             {
                 PluginInitializationException e = new PluginInitializationException(ex);
                 e.reason = err + "UnauthorizedAccessException: " + ex.ToString();

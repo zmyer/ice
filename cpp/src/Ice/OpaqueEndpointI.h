@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -16,7 +16,10 @@
 namespace IceInternal
 {
 
-class OpaqueEndpointI : public EndpointI, public Ice::EnableSharedFromThis<OpaqueEndpointI>
+class OpaqueEndpointI : public EndpointI
+#ifdef ICE_CPP11_MAPPING
+                      , public std::enable_shared_from_this<OpaqueEndpointI>
+#endif
 {
 public:
 
@@ -57,6 +60,7 @@ public:
 
 protected:
 
+    virtual void streamWriteImpl(Ice::OutputStream*) const;
     virtual bool checkOption(const std::string&, const std::string&, const std::string&);
 
 private:

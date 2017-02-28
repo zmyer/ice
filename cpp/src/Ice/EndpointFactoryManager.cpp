@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -62,7 +62,7 @@ IceInternal::EndpointFactoryManager::get(Short type) const
             return _factories[i];
         }
     }
-    return 0;
+    return ICE_NULLPTR;
 }
 
 EndpointIPtr
@@ -129,8 +129,8 @@ IceInternal::EndpointFactoryManager::create(const string& str, bool oaEndpoint) 
         short type;
         bs.read(type);
         EndpointIPtr ue = new IceInternal::OpaqueEndpointI(type, &bs);
-        cerr << "Normal: " << e->toString() << endl;
-        cerr << "Opaque: " << ue->toString() << endl;
+        consoleErr << "Normal: " << e->toString() << endl;
+        consoleErr << "Opaque: " << ue->toString() << endl;
         return e;
 #endif
     }
@@ -170,7 +170,7 @@ IceInternal::EndpointFactoryManager::create(const string& str, bool oaEndpoint) 
         return ue; // Endpoint is opaque, but we don't have a factory for its type.
     }
 
-    return 0;
+    return ICE_NULLPTR;
 }
 
 EndpointIPtr

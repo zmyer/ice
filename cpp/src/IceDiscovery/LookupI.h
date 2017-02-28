@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,7 +15,6 @@
 
 #include <IceUtil/Timer.h>
 #include <Ice/Properties.h>
-#include <Ice/VirtualShared.h>
 
 namespace IceDiscovery
 {
@@ -45,7 +44,7 @@ public:
         return --_nRetry >= 0;
     }
 
-    bool addCallback(std::function<void (const std::shared_ptr<::Ice::ObjectPrx>&)> cb)
+    bool addCallback(std::function<void(const std::shared_ptr<::Ice::ObjectPrx>&)> cb)
     {
         _callbacks.push_back(cb);
         return _callbacks.size() == 1;
@@ -65,10 +64,10 @@ protected:
     LookupIPtr _lookup;
     const T _id;
     int _nRetry;
-    std::vector<std::function<void (const std::shared_ptr<::Ice::ObjectPrx>&)>> _callbacks;
+    std::vector<std::function<void(const std::shared_ptr<::Ice::ObjectPrx>&)>> _callbacks;
 };
 
-class ObjectRequest : public Request<Ice::Identity>, public Ice::EnableSharedFromThis<ObjectRequest>
+class ObjectRequest : public Request<Ice::Identity>, public std::enable_shared_from_this<ObjectRequest>
 {
 public:
 
@@ -85,7 +84,7 @@ private:
 };
 typedef std::shared_ptr<ObjectRequest> ObjectRequestPtr;
 
-class AdapterRequest : public Request<std::string>, public Ice::EnableSharedFromThis<AdapterRequest>
+class AdapterRequest : public Request<std::string>, public std::enable_shared_from_this<AdapterRequest>
 {
 public:
 
@@ -159,8 +158,7 @@ protected:
     std::vector<CB> _callbacks;
 };
 
-class ObjectRequest : public RequestT<Ice::Identity, Ice::AMD_Locator_findObjectByIdPtr>,
-                      public Ice::EnableSharedFromThis<ObjectRequest>
+class ObjectRequest : public RequestT<Ice::Identity, Ice::AMD_Locator_findObjectByIdPtr>
 {
 public:
 
@@ -177,7 +175,7 @@ private:
 };
 typedef IceUtil::Handle<ObjectRequest> ObjectRequestPtr;
 
-class AdapterRequest : public RequestT<std::string, Ice::AMD_Locator_findAdapterByIdPtr>, public Ice::EnableSharedFromThis<AdapterRequest>
+class AdapterRequest : public RequestT<std::string, Ice::AMD_Locator_findAdapterByIdPtr>
 {
 public:
 
@@ -204,8 +202,10 @@ typedef IceUtil::Handle<AdapterRequest> AdapterRequestPtr;
 #endif
 
 class LookupI : public Lookup,
-                private IceUtil::Mutex,
-                public Ice::EnableSharedFromThis<LookupI>
+                private IceUtil::Mutex
+#ifdef ICE_CPP11_MAPPING
+              , public std::enable_shared_from_this<LookupI>
+#endif
 {
 public:
 
@@ -223,8 +223,8 @@ public:
                                 const Ice::Current&);
     virtual void findAdapterById(std::string, std::string, ::std::shared_ptr<IceDiscovery::LookupReplyPrx>,
                                  const Ice::Current&);
-    void findObject(std::function<void (const std::shared_ptr<Ice::ObjectPrx>&)>, const Ice::Identity&);
-    void findAdapter(std::function<void (const std::shared_ptr<Ice::ObjectPrx>&)>, const std::string&);
+    void findObject(std::function<void(const std::shared_ptr<Ice::ObjectPrx>&)>, const Ice::Identity&);
+    void findAdapter(std::function<void(const std::shared_ptr<Ice::ObjectPrx>&)>, const std::string&);
 #else
     virtual void findObjectById(const std::string&, const Ice::Identity&, const IceDiscovery::LookupReplyPrx&,
                                 const Ice::Current&);

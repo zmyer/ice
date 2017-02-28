@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -21,17 +21,11 @@ IceInternal::WSAcceptor::getNativeInfo()
     return _delegate->getNativeInfo();
 }
 
-#if defined(ICE_USE_IOCP)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 IceInternal::AsyncInfo*
 IceInternal::WSAcceptor::getAsyncInfo(IceInternal::SocketOperation status)
 {
     return _delegate->getNativeInfo()->getAsyncInfo(status);
-}
-#elif defined(ICE_OS_WINRT)
-void
-IceInternal::WSAcceptor::setCompletedHandler(IceInternal::SocketOperationCompletedHandler^ handler)
-{
-    _delegate->getNativeInfo()->setCompletedHandler(handler);
 }
 #endif
 
@@ -48,7 +42,7 @@ IceInternal::WSAcceptor::listen()
     return _endpoint;
 }
 
-#if defined(ICE_USE_IOCP) || defined(ICE_OS_WINRT)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 void
 IceInternal::WSAcceptor::startAccept()
 {

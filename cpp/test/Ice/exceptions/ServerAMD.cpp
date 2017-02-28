@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -27,9 +27,9 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
     Ice::ObjectAdapterPtr adapter2 = communicator->createObjectAdapter("TestAdapter2");
     Ice::ObjectAdapterPtr adapter3 = communicator->createObjectAdapter("TestAdapter3");
     Ice::ObjectPtr object = ICE_MAKE_SHARED(ThrowerI);
-    adapter->add(object, communicator->stringToIdentity("thrower"));
-    adapter2->add(object, communicator->stringToIdentity("thrower"));
-    adapter3->add(object, communicator->stringToIdentity("thrower"));
+    adapter->add(object, Ice::stringToIdentity("thrower"));
+    adapter2->add(object, Ice::stringToIdentity("thrower"));
+    adapter3->add(object, Ice::stringToIdentity("thrower"));
     adapter->activate();
     adapter2->activate();
     adapter3->activate();
@@ -47,8 +47,7 @@ main(int argc, char* argv[])
 
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
         initData.properties->setProperty("Ice.Warn.Dispatch", "0");
         initData.properties->setProperty("Ice.Warn.Connections", "0");
         initData.properties->setProperty("Ice.MessageSizeMax", "10"); // 10KB max

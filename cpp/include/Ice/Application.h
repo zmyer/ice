@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,52 +10,25 @@
 #ifndef ICE_APPLICATION_H
 #define ICE_APPLICATION_H
 
-#include <Ice/Ice.h>
-
+#include <Ice/Initialize.h>
 #include <IceUtil/Mutex.h>
+#include <IceUtil/Cond.h>
 
 namespace Ice
 {
-    enum SignalPolicy { HandleSignals, NoSignalHandling } ;
-    class Application;
-}
 
-namespace IceInternal
-{
-    
-namespace Application
-{
-    extern ICE_API IceUtil::Mutex* mutex;
-    extern ICE_API IceUtil::Cond* _condVar;
-
-    //
-    // Variables than can change while run() and communicator->destroy() are running!
-    //
-    extern ICE_API bool _callbackInProgress;
-    extern ICE_API bool _destroyed;
-    extern ICE_API bool _interrupted;
-    
-    //
-    // Variables that are immutable during run() and until communicator->destroy() has returned;
-    // before and after run(), and once communicator->destroy() has returned, we assume that 
-    // only the main thread and CtrlCHandler threads are running.
-    //
-    extern ICE_API std::string _appName;
-    extern ICE_API Ice::CommunicatorPtr _communicator;
-    extern ICE_API Ice::SignalPolicy _signalPolicy;
-    extern ICE_API Ice::Application* _application;
-}
-
-}
-
-namespace Ice
-{
+#ifdef ICE_CPP11_MAPPING
+enum class SignalPolicy : unsigned char
+#else
+enum SignalPolicy
+#endif
+{ HandleSignals, NoSignalHandling };
 
 class ICE_API Application : private IceUtil::noncopyable
 {
 public:
 
-    Application(SignalPolicy = HandleSignals);
+    Application(SignalPolicy = ICE_ENUM(SignalPolicy, HandleSignals));
     virtual ~Application();
 
     //
@@ -143,12 +116,36 @@ protected:
 
     virtual int doMain(int, char*[], const Ice::InitializationData&);
 
-#if defined(__SUNPRO_CC)
-//
-// Sun C++ 5.x does not like classes with no data members 
-//
-    char _dummy;
-#endif
+    //
+    // _mutex and _condVar are used to synchronize the main thread and
+    // the CtrlCHandler thread
+    //
+    static IceUtil::Mutex _mutex;
+    static IceUtil::Cond _condVar;
+
+    //
+    // Variables than can change while run() and communicator->destroy() are running!
+    //
+    static bool _callbackInProgress;
+    static bool _destroyed;
+    static bool _interrupted;
+
+    //
+    // Variables that are immutable during run() and until communicator->destroy() has returned;
+    // before and after run(), and once communicator->destroy() has returned, we assume that
+    // only the main thread and CtrlCHandler threads are running.
+    //
+    static std::string _appName;
+    static Ice::CommunicatorPtr _communicator;
+    static Ice::SignalPolicy _signalPolicy;
+    static Ice::Application* _application;
+
+private:
+
+    static void holdInterruptCallback(int);
+    static void destroyOnInterruptCallback(int);
+    static void shutdownOnInterruptCallback(int);
+    static void callbackOnInterruptCallback(int);
 };
 
 }

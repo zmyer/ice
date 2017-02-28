@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,16 +18,19 @@
 class EndpointI;
 ICE_DEFINE_PTR(EndpointIPtr, EndpointI);
 
-class EndpointI : public IceInternal::EndpointI, public Ice::EnableSharedFromThis<EndpointI>
+class EndpointI : public IceInternal::EndpointI
+#ifdef ICE_CPP11_MAPPING
+                , public std::enable_shared_from_this<EndpointI>
+#endif
 {
 public:
 
     static Ice::Short TYPE_BASE;
-    
+
     EndpointI(const IceInternal::EndpointIPtr&);
 
     // From EndpointI
-    virtual void streamWrite(Ice::OutputStream*) const;
+    virtual void streamWriteImpl(Ice::OutputStream*) const;
     virtual Ice::Short type() const;
     virtual const std::string& protocol() const;
     virtual IceInternal::EndpointIPtr timeout(Ice::Int) const;

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,7 +13,6 @@ using System.Text;
 
 namespace IceInternal
 {
-
     public sealed class DefaultsAndOverrides
     {
         internal DefaultsAndOverrides(Ice.Properties properties, Ice.Logger logger)
@@ -114,8 +113,7 @@ namespace IceInternal
                 overrideCompressValue = properties.getPropertyAsInt("Ice.Override.Compress") > 0;
                 if(!BZip2.supported() && overrideCompressValue)
                 {
-                    string lib = AssemblyUtil.runtime_ == AssemblyUtil.Runtime.Mono ? "bzip2 library" : "bzip2.dll";
-                    Console.Error.WriteLine("warning: " + lib + " not found, Ice.Override.Compress ignored.");
+                    Console.Error.WriteLine("warning: bzip2.dll not found, Ice.Override.Compress ignored.");
                     overrideCompressValue = false;
                 }
             }

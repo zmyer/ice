@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,10 +13,26 @@
 #include <Ice/Config.h>
 #include <Ice/ValueFactory.h>
 
-#ifndef ICE_CPP11_MAPPING
 namespace IceInternal
 {
-template<class O>
+
+#ifdef ICE_CPP11_MAPPING
+
+template<class V>
+::std::shared_ptr<::Ice::Value>
+#ifdef NDEBUG
+defaultValueFactory(const std::string&)
+#else
+defaultValueFactory(const std::string& typeId)
+#endif
+{
+    assert(typeId == V::ice_staticId());
+    return std::make_shared<V>();
+}
+
+#else
+
+template<class V>
 class DefaultValueFactory : public Ice::ValueFactory
 {
 public:
@@ -33,14 +49,14 @@ public:
 #endif
     {
         assert(typeId == _typeId);
-        return new O;
+        return new V;
     }
 
 private:
     const ::std::string _typeId;
 };
 
-}
 #endif
 
+}
 #endif

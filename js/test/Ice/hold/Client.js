@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,7 +11,6 @@
 {
     var Ice = require("ice").Ice;
     var Test = require("Test").Test;
-    var Promise = Ice.Promise;
 
     function loop(fn, repetitions, condition)
     {
@@ -38,7 +37,7 @@
         var value = 0;
         var all = [];
 
-        var p = new Promise();
+        var p = new Ice.Promise();
         var test = function(b)
         {
             if(!b)
@@ -49,14 +48,14 @@
                 }
                 catch(err)
                 {
-                    p.fail(err);
+                    p.reject(err);
                     throw err;
                 }
             }
         };
 
         var seq;
-        Promise.try(
+        Ice.Promise.try(
             function()
             {
                 var ref = "hold:default -p 12010";
@@ -82,7 +81,7 @@
                 out.write("changing state between active and hold rapidly... ");
 
                 var i;
-                var r = new Ice.Promise().succeed();
+                var r = Ice.Promise.resolve();
                 /*jshint -W083 */
                 // Ignore this since we do not use i and
                 // have only a small number of iterations
@@ -138,7 +137,7 @@
             {
                 test(!condition.value || value >= 100000);
                 out.writeLine("ok");
-                return Promise.all(all);
+                return Ice.Promise.all(all);
             }
         ).then(
             function()
@@ -173,7 +172,7 @@
             function()
             {
                 test(condition.value);
-                return Promise.all(all);
+                return Ice.Promise.all(all);
             }
         ).then(
             function()
@@ -193,7 +192,7 @@
             function()
             {
                 out.writeLine("ok");
-                return Promise.all(all);
+                return Ice.Promise.all(all);
             }
         ).then(
             function()
@@ -230,7 +229,7 @@
                             ).then(
                                 function(con)
                                 {
-                                    return con.close(false);
+                                    return con.close(Ice.ConnectionClose.GracefullyWithWait);
                                 }
                             );
                         }
@@ -241,7 +240,7 @@
             function()
             {
                 out.writeLine("ok");
-                return Promise.all(all);
+                return Ice.Promise.all(all);
             }
         ).then(
             function()
@@ -271,7 +270,7 @@
                 ).then(
                     function()
                     {
-                        Promise.all(all);
+                        Ice.Promise.all(all);
                     }
                 ).then(
                     function()
@@ -307,12 +306,13 @@
             function()
             {
                 out.writeLine("ok");
-                p.succeed();
+                p.resolve();
             },
             function(ex)
             {
+                console.log(ex);
                 out.writeLine("failed!");
-                p.fail(ex);
+                p.reject(ex);
             });
         return p;
     };
@@ -338,7 +338,7 @@
         id.properties.setProperty("Ice.RetryIntervals", "-1");
 
         var c = Ice.initialize(id);
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 return allTests(out, c);
@@ -350,9 +350,9 @@
             }
         );
     };
-    exports.__test__ = run;
-    exports.__runServer__ = true;
+    exports._test = run;
+    exports._runServer = true;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,20 +19,24 @@ namespace IceSSL
 {
 
 class SSLEngine;
-ICE_SSL_API IceUtil::Shared* upCast(IceSSL::SSLEngine*);
+ICESSL_API IceUtil::Shared* upCast(SSLEngine*);
 typedef IceInternal::Handle<SSLEngine> SSLEnginePtr;
 
 #if defined(ICE_USE_SECURE_TRANSPORT)
 class SecureTransportEngine;
-ICE_SSL_API IceUtil::Shared* upCast(IceSSL::SecureTransportEngine*);
+ICESSL_API IceUtil::Shared* upCast(SecureTransportEngine*);
 typedef IceInternal::Handle<SecureTransportEngine> SecureTransportEnginePtr;
 #elif defined(ICE_USE_SCHANNEL)
 class SChannelEngine;
-ICE_SSL_API IceUtil::Shared* upCast(IceSSL::SChannelEngine*);
+ICESSL_API IceUtil::Shared* upCast(SChannelEngine*);
 typedef IceInternal::Handle<SChannelEngine> SChannelEnginePtr;
+#elif defined(ICE_OS_UWP)
+class UWPEngine;
+ICESSL_API IceUtil::Shared* upCast(UWPEngine*);
+typedef IceInternal::Handle<UWPEngine> UWPEnginePtr;
 #else // OpenSSL
 class OpenSSLEngine;
-ICE_SSL_API IceUtil::Shared* upCast(IceSSL::OpenSSLEngine*);
+ICESSL_API IceUtil::Shared* upCast(OpenSSLEngine*);
 typedef IceInternal::Handle<OpenSSLEngine> OpenSSLEnginePtr;
 #endif
 

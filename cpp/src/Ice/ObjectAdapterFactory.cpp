@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,7 @@
 #include <Ice/Object.h>
 #include <Ice/LocalException.h>
 #include <Ice/Functional.h>
-#include <IceUtil/UUID.h>
+#include <Ice/UUID.h>
 
 using namespace std;
 using namespace Ice;
@@ -134,7 +134,7 @@ IceInternal::ObjectAdapterFactory::updateObservers(void (ObjectAdapterI::*fn)())
         adapters = _adapters;
     }
 #ifdef ICE_CPP11_MAPPING
-    for_each(adapters.begin(), adapters.end(), 
+    for_each(adapters.begin(), adapters.end(),
         [fn](const ObjectAdapterIPtr& adapter)
         {
             (adapter.get() ->* fn)();
@@ -157,7 +157,7 @@ IceInternal::ObjectAdapterFactory::createObjectAdapter(const string& name, const
     ObjectAdapterIPtr adapter;
     if(name.empty())
     {
-        string uuid = IceUtil::generateUUID();
+        string uuid = Ice::generateUUID();
         adapter = ICE_MAKE_SHARED(ObjectAdapterI, _instance, _communicator, ICE_SHARED_FROM_THIS, uuid, true);
         adapter->initialize(ICE_NULLPTR);
     }
@@ -231,7 +231,8 @@ IceInternal::ObjectAdapterFactory::removeObjectAdapter(const ObjectAdapterPtr& a
 }
 
 void
-IceInternal::ObjectAdapterFactory::flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr& outAsync) const
+IceInternal::ObjectAdapterFactory::flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr& outAsync,
+                                                           CompressBatch compressBatch) const
 {
     list<ObjectAdapterIPtr> adapters;
     {
@@ -242,7 +243,7 @@ IceInternal::ObjectAdapterFactory::flushAsyncBatchRequests(const CommunicatorFlu
 
     for(list<ObjectAdapterIPtr>::const_iterator p = adapters.begin(); p != adapters.end(); ++p)
     {
-        (*p)->flushAsyncBatchRequests(outAsync);
+        (*p)->flushAsyncBatchRequests(outAsync, compressBatch);
     }
 }
 

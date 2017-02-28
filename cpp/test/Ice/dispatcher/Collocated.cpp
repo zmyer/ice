@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -28,37 +28,16 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 
     TestIntfControllerIPtr testController = ICE_MAKE_SHARED(TestIntfControllerI, adapter);
 
-    adapter->add(ICE_MAKE_SHARED(TestIntfI), communicator->stringToIdentity("test"));
+    adapter->add(ICE_MAKE_SHARED(TestIntfI), Ice::stringToIdentity("test"));
     //adapter->activate(); // Don't activate OA to ensure collocation is used.
 
-    adapter2->add(testController, communicator->stringToIdentity("testController"));
+    adapter2->add(testController, Ice::stringToIdentity("testController"));
     //adapter2->activate(); // Don't activate OA to ensure collocation is used.
 
     void allTests(const Ice::CommunicatorPtr&);
     allTests(communicator);
     return EXIT_SUCCESS;
 }
-
-#ifdef ICE_CPP11_MAPPING
-class DispatcherCall : public Ice::DispatcherCall
-{
-public:
-
-    DispatcherCall(function<void ()> call) :
-        _call(move(call))
-    {
-    }
-
-    virtual void run()
-    {
-        _call();
-    }
-
-private:
-
-    function<void ()> _call;
-};
-#endif
 
 int
 main(int argc, char* argv[])
@@ -69,13 +48,12 @@ main(int argc, char* argv[])
     int status;
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
 #ifdef ICE_CPP11_MAPPING
-        Ice::DispatcherPtr dispatcher = new Dispatcher();
-        initData.dispatcher = [=](function<void ()> call, const shared_ptr<Ice::Connection>& conn)
+        IceUtil::Handle<Dispatcher> dispatcher = new Dispatcher;
+        initData.dispatcher = [=](function<void()> call, const shared_ptr<Ice::Connection>& conn)
             {
-                dispatcher->dispatch(new DispatcherCall(call), conn);
+                dispatcher->dispatch(make_shared<DispatcherCall>(call), conn);
             };
 #else
         initData.dispatcher = new Dispatcher();

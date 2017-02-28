@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,9 +14,10 @@
 #include <Ice/SlicedData.h>
 #include <Ice/OutputStream.h>
 #include <Ice/InputStream.h>
+#include <Ice/Initialize.h>
 #include <IceUtil/StringUtil.h>
-#ifdef ICE_OS_WINRT
-#    include <IceUtil/StringConverter.h>
+#ifdef ICE_OS_UWP
+#    include <Ice/StringConverter.h>
 #endif
 #include <iomanip>
 
@@ -34,7 +35,7 @@ socketErrorToString(int error)
     {
         return "unknown error";
     }
-#ifdef ICE_OS_WINRT
+#ifdef ICE_OS_UWP
     if(error == E_ACCESSDENIED)
     {
         ostringstream os;
@@ -48,9 +49,9 @@ socketErrorToString(int error)
         // Don't need to use a wide string converter as the wide string come
         // from Windows API.
         //
-        return IceUtil::wstringToString(
+        return wstringToString(
             static_cast<Windows::Networking::Sockets::SocketErrorStatus>(error).ToString()->Data(),
-            IceUtil::getProcessStringConverter());
+            getProcessStringConverter());
     }
 #else
     return IceUtilInternal::errorToString(error);
@@ -102,24 +103,48 @@ throwMarshalException(const char* file, int line, const string& reason)
 }
 }
 
+namespace
+{
+
+const string userException_ids[] =
+{
+    "::Ice::UserException"
+};
+
+}
+
+const std::string&
+Ice::UserException::ice_staticId()
+{
+    return userException_ids[0];
+}
+
+#ifdef ICE_CPP11_MAPPING
+unique_ptr<Ice::UserException>
+Ice::UserException::ice_clone() const
+{
+    return unique_ptr<UserException>(static_cast<UserException*>(ice_cloneImpl()));
+}
+#endif
+
 void
-Ice::UserException::__write(::Ice::OutputStream* os) const
+Ice::UserException::_write(::Ice::OutputStream* os) const
 {
     os->startException(0);
-    __writeImpl(os);
+    _writeImpl(os);
     os->endException();
 }
 
 void
-Ice::UserException::__read(::Ice::InputStream* is)
+Ice::UserException::_read(::Ice::InputStream* is)
 {
     is->startException();
-    __readImpl(is);
+    _readImpl(is);
     is->endException(false);
 }
 
 bool
-Ice::UserException::__usesClasses() const
+Ice::UserException::_usesClasses() const
 {
     return false;
 }
@@ -129,8 +154,36 @@ Ice::LocalException::LocalException(const char* file, int line) :
 {
 }
 
-Ice::LocalException::~LocalException() ICE_NOEXCEPT
+Ice::LocalException::~LocalException()
+#ifndef ICE_CPP11_COMPILER
+    throw()
+#endif
 {
+   // Out of line to avoid weak vtable
+}
+
+#ifdef ICE_CPP11_MAPPING
+unique_ptr<Ice::LocalException>
+Ice::LocalException::ice_clone() const
+{
+    return unique_ptr<LocalException>(static_cast<LocalException*>(ice_cloneImpl()));
+}
+#endif
+
+namespace
+{
+
+const string localException_ids[] =
+{
+    "::Ice::LocalException"
+};
+
+}
+
+const std::string&
+Ice::LocalException::ice_staticId()
+{
+    return localException_ids[0];
 }
 
 Ice::SystemException::SystemException(const char* file, int line) :
@@ -138,32 +191,36 @@ Ice::SystemException::SystemException(const char* file, int line) :
 {
 }
 
-Ice::SystemException::~SystemException() ICE_NOEXCEPT
+Ice::SystemException::~SystemException()
+#ifndef ICE_CPP11_COMPILER
+    throw()
+#endif
 {
 }
 
-#if defined(__SUNPRO_CC)
-ostream&
-Ice::operator<<(ostream& out, const Ice::UserException& ex)
+#ifdef ICE_CPP11_MAPPING
+unique_ptr<Ice::SystemException>
+Ice::SystemException::ice_clone() const
 {
-    ex.ice_print(out);
-    return out;
-}
-
-ostream&
-Ice::operator<<(ostream& out, const Ice::LocalException& ex)
-{
-    ex.ice_print(out);
-    return out;
-}
-
-ostream&
-Ice::operator<<(ostream& out, const Ice::SystemException& ex)
-{
-    ex.ice_print(out);
-    return out;
+    return unique_ptr<SystemException>(static_cast<SystemException*>(ice_cloneImpl()));
 }
 #endif
+
+namespace
+{
+
+const string systemException_ids[] =
+{
+    "::Ice::SystemException"
+};
+
+}
+
+const std::string&
+Ice::SystemException::ice_staticId()
+{
+    return systemException_ids[0];
+}
 
 void
 Ice::InitializationException::ice_print(ostream& out) const
@@ -283,16 +340,7 @@ void
 Ice::IllegalIdentityException::ice_print(ostream& out) const
 {
     Exception::ice_print(out);
-    out << ":\nillegal identity: `";
-    if(id.category.empty())
-    {
-        out << IceUtilInternal::escapeString(id.name, "/");
-    }
-    else
-    {
-        out << IceUtilInternal::escapeString(id.category, "/") << '/' << IceUtilInternal::escapeString(id.name, "/");
-    }
-    out << "'";
+    out << ":\nillegal identity: `" << identityToString(id, ICE_ENUM(ToStringMode, Unicode)) << "'";
 }
 
 void
@@ -306,16 +354,7 @@ Ice::IllegalServantException::ice_print(ostream& out) const
 static void
 printFailedRequestData(ostream& out, const RequestFailedException& ex)
 {
-    out << ":\nidentity: `";
-    if(ex.id.category.empty())
-    {
-        out << IceUtilInternal::escapeString(ex.id.name, "/");
-    }
-    else
-    {
-        out << IceUtilInternal::escapeString(ex.id.category, "/") << '/' << IceUtilInternal::escapeString(ex.id.name, "/");
-    }
-    out << "'";
+    out << ":\nidentity: `" << identityToString(ex.id, ICE_ENUM(ToStringMode, Unicode)) << "'";
     out << "\nfacet: " << ex.facet;
     out << "\noperation: " << ex.operation;
 }
@@ -422,7 +461,7 @@ Ice::DNSException::ice_print(ostream& out) const
 {
     Exception::ice_print(out);
     out << ":\nDNS error: ";
-#ifdef ICE_OS_WINRT
+#ifdef ICE_OS_UWP
     out << socketErrorToString(error);
 #else
     out << errorToStringDNS(error);
@@ -593,14 +632,10 @@ Ice::CloseConnectionException::ice_print(ostream& out) const
 }
 
 void
-Ice::ForcedCloseConnectionException::ice_print(ostream& out) const
+Ice::ConnectionManuallyClosedException::ice_print(ostream& out) const
 {
     Exception::ice_print(out);
-    out << ":\nprotocol error: connection forcefully closed";
-    if(!reason.empty())
-    {
-        out << ":\n" << reason;
-    }
+    out << ":\nprotocol error: connection manually closed (" << (graceful ? "gracefully" : "forcefully") << ")";
 }
 
 void
@@ -803,11 +838,9 @@ Ice::ResponseSentException::ice_print(ostream& out) const
     out << ":\nresponse sent exception";
 }
 
-#ifdef ICE_USE_CFSTREAM
 void
 Ice::CFNetworkException::ice_print(ostream& out) const
 {
     Exception::ice_print(out);
     out << ":\nnetwork exception: domain: " << domain << " error: " << error;
 }
-#endif

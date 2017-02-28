@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,7 +14,6 @@
 #include <Ice/Transceiver.h>
 #include <Ice/Network.h>
 #include <Ice/StreamSocket.h>
-#include <Ice/WSTransceiver.h>
 
 namespace IceInternal
 {
@@ -22,22 +21,19 @@ namespace IceInternal
 class TcpConnector;
 class TcpAcceptor;
 
-class TcpTransceiver : public Transceiver, public WSTransceiverDelegate
+class TcpTransceiver : public Transceiver
 {
 public:
 
     virtual NativeInfoPtr getNativeInfo();
 
     virtual SocketOperation initialize(Buffer&, Buffer&);
-#ifdef ICE_CPP11_MAPPING
-    virtual SocketOperation closing(bool, std::exception_ptr);
-#else
     virtual SocketOperation closing(bool, const Ice::LocalException&);
-#endif
+
     virtual void close();
     virtual SocketOperation write(Buffer&);
     virtual SocketOperation read(Buffer&);
-#ifdef ICE_USE_IOCP
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
     virtual bool startWrite(Buffer&);
     virtual void finishWrite(Buffer&);
     virtual void startRead(Buffer&);
@@ -47,7 +43,6 @@ public:
     virtual std::string toString() const;
     virtual std::string toDetailedString() const;
     virtual Ice::ConnectionInfoPtr getInfo() const;
-    virtual Ice::ConnectionInfoPtr getWSInfo(const Ice::HeaderDict&) const;
     virtual void checkSendSize(const Buffer&);
     virtual void setBufferSize(int rcvSize, int sndSize);
 
@@ -55,8 +50,6 @@ private:
 
     TcpTransceiver(const ProtocolInstancePtr&, const StreamSocketPtr&);
     virtual ~TcpTransceiver();
-
-    void fillConnectionInfo(const Ice::TCPConnectionInfoPtr&) const;
 
     friend class TcpConnector;
     friend class TcpAcceptor;

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,14 +8,15 @@
 // **********************************************************************
 
 
-var __M = require("../Ice/ModuleRegistry").Ice.__M;
+const _ModuleRegistry = require("../Ice/ModuleRegistry").Ice._ModuleRegistry;
 
-module.exports.Ice = __M.require(module,
+module.exports.Ice = _ModuleRegistry.require(module,
     [
         "../Ice/Initialize",
         "../Ice/Communicator",
         "../Ice/HashMap",
         "../Ice/Object",
+        "../Ice/Value",
         "../Ice/Long",
         "../Ice/Logger",
         "../Ice/ObjectPrx",
@@ -34,11 +35,12 @@ module.exports.Ice = __M.require(module,
         "../Ice/Locator",
         "../Ice/Router",
         "../Ice/Version",
-        "../Ice/ObjectFactory",
         "../Ice/Buffer",
         "../Ice/ArrayUtil",
         "../Ice/UnknownSlicedValue",
-        "../Ice/Process"
+        "../Ice/Process",
+        "../Ice/MapUtil",
+        "../Ice/ToStringMode"
     ]).Ice;
 
 module.exports.IceMX = require("../Ice/Metrics").IceMX;

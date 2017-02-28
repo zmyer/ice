@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -8,6 +8,20 @@
 # **********************************************************************
 
 require './TestI.rb'
+
+
+class II < ::Ice::InterfaceByValue
+    def initialize()
+        super("::Test::I")
+    end
+end
+
+class JI < ::Ice::InterfaceByValue
+    def initialize()
+        super("::Test::J")
+    end
+end
+
 
 #
 # Ice for Ruby behaves differently than Ice for C++, because
@@ -28,9 +42,13 @@ class MyValueFactory
         #elsif type == '::Test::D'
         #      return DI.new
         elsif type == '::Test::E'
-              return EI.new
+            return EI.new
         elsif type == '::Test::F'
-              return FI.new
+            return FI.new
+        elsif type == '::Test::I'
+            return II.new
+        elsif type == '::Test::J'
+            return JI.new
         end
         fail "unknown type"
     end
@@ -60,6 +78,8 @@ def allTests(communicator)
     #communicator.getValueFactoryManager().add(factory, '::Test::D')
     communicator.getValueFactoryManager().add(factory, '::Test::E')
     communicator.getValueFactoryManager().add(factory, '::Test::F')
+    communicator.getValueFactoryManager().add(factory, '::Test::I')
+    communicator.getValueFactoryManager().add(factory, '::Test::J')
 
     communicator.addObjectFactory(MyObjectFactory.new, 'TestOF')
 
@@ -117,11 +137,11 @@ def allTests(communicator)
     test(b1.theA.theC)
     test(b1.theA.theC.theB == b1.theA)
     test(b1.preMarshalInvoked)
-    test(b1.postUnmarshalInvoked())
+    test(b1.postUnmarshalInvoked)
     test(b1.theA.preMarshalInvoked)
-    test(b1.theA.postUnmarshalInvoked())
+    test(b1.theA.postUnmarshalInvoked)
     test(b1.theA.theC.preMarshalInvoked)
-    test(b1.theA.theC.postUnmarshalInvoked())
+    test(b1.theA.theC.postUnmarshalInvoked)
     # More tests possible for b2 and d, but I think this is already sufficient.
     test(b2.theA == b2)
     test(d.theC == nil)
@@ -155,13 +175,13 @@ def allTests(communicator)
     test(d.theB == b2)
     test(d.theC == nil)
     test(d.preMarshalInvoked)
-    test(d.postUnmarshalInvoked())
+    test(d.postUnmarshalInvoked)
     test(d.theA.preMarshalInvoked)
-    test(d.theA.postUnmarshalInvoked())
+    test(d.theA.postUnmarshalInvoked)
     test(d.theB.preMarshalInvoked)
-    test(d.theB.postUnmarshalInvoked())
+    test(d.theB.postUnmarshalInvoked)
     test(d.theB.theC.preMarshalInvoked)
-    test(d.theB.theC.postUnmarshalInvoked())
+    test(d.theB.theC.postUnmarshalInvoked)
     puts "ok"
 
     print "testing protected members... "
@@ -245,6 +265,14 @@ def allTests(communicator)
         test(r != nil)
     rescue Ice::OperationNotExistException
     end
+    puts "ok"
+
+    print "testing marshaled results..."
+    STDOUT.flush
+    b1 = initial.getMB()
+    test(b1 != nil && b1.theB == b1);
+    b1 = initial.getAMDMB()
+    test(b1 != nil && b1.theB == b1);
     puts "ok"
 
     print "testing UnexpectedObjectException... "

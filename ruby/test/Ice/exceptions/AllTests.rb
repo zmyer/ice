@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -288,7 +288,7 @@ def allTests(communicator)
     print "catching object not exist exception... "
     STDOUT.flush
 
-    id = communicator.stringToIdentity("does not exist")
+    id = Ice::stringToIdentity("does not exist")
     begin
         thrower2 = Test::ThrowerPrx::uncheckedCast(thrower.ice_identity(id))
         thrower2.throwAasA(1)

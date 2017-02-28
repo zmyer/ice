@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,12 +13,7 @@
 #include <Test.h>
 #include <TestCommon.h>
 
-class MyDerivedClassI : 
-#ifdef ICE_CPP11_MAPPING
-    public Test::MyDerivedClassDisp
-#else
-    public Test::MyDerivedClass
-#endif
+class MyDerivedClassI : public Test::MyDerivedClass
 {
 public:
 
@@ -30,11 +25,13 @@ public:
     virtual bool ice_isA(ICE_IN(std::string), const Ice::Current&) const;
     virtual void ice_ping(const Ice::Current&) const;
     virtual std::vector<std::string> ice_ids(const Ice::Current&) const;
+#ifdef ICE_CPP11_MAPPING
+    virtual std::string ice_id(const Ice::Current&) const;
+#else
     virtual const std::string& ice_id(const Ice::Current&) const;
+#endif
 
     virtual void shutdown(const Ice::Current&);
-
-    virtual void delay(Ice::Int, const Ice::Current&);
 
     virtual void opVoid(const Ice::Current&);
 
@@ -75,7 +72,7 @@ public:
                                           Test::MyClassPrxPtr&, Test::MyClassPrxPtr&,
                                           const Ice::Current&);
 
-    virtual Test::Structure opStruct(ICE_IN(Test::Structure), 
+    virtual Test::Structure opStruct(ICE_IN(Test::Structure),
                                      ICE_IN(Test::Structure),
                                      Test::Structure&,
                                      const Ice::Current&);
@@ -290,18 +287,44 @@ public:
     virtual Test::StringS opStringS1(ICE_IN(Test::StringS), const Ice::Current&);
 
     virtual Test::ByteBoolD opByteBoolD1(ICE_IN(Test::ByteBoolD), const Ice::Current&);
-    
+
     virtual Test::StringS opStringS2(ICE_IN(Test::StringS), const Ice::Current&);
-    
+
     virtual Test::ByteBoolD opByteBoolD2(ICE_IN(Test::ByteBoolD), const Ice::Current&);
-    
+
     virtual Test::MyStruct1 opMyStruct1(ICE_IN(Test::MyStruct1), const Ice::Current&);
 
     virtual Test::MyClass1Ptr opMyClass1(ICE_IN(Test::MyClass1Ptr), const Ice::Current&);
-    
+
     virtual Test::StringS opStringLiterals(const Ice::Current&);
-    
+
     virtual Test::WStringS opWStringLiterals(const Ice::Current&);
+
+#ifdef ICE_CPP11_MAPPING
+    virtual OpMStruct1MarshaledResult opMStruct1(const Ice::Current&);
+
+    virtual OpMStruct2MarshaledResult opMStruct2(ICE_IN(Test::Structure), const Ice::Current&);
+
+    virtual OpMSeq1MarshaledResult opMSeq1(const Ice::Current&);
+
+    virtual OpMSeq2MarshaledResult opMSeq2(ICE_IN(Test::StringS), const Ice::Current&);
+
+    virtual OpMDict1MarshaledResult opMDict1(const Ice::Current&);
+
+    virtual OpMDict2MarshaledResult opMDict2(ICE_IN(Test::StringStringD), const Ice::Current&);
+#else
+    virtual Test::Structure opMStruct1(const Ice::Current&);
+
+    virtual Test::Structure opMStruct2(ICE_IN(Test::Structure), Test::Structure&, const Ice::Current&);
+
+    virtual Test::StringS opMSeq1(const Ice::Current&);
+
+    virtual Test::StringS opMSeq2(ICE_IN(Test::StringS), Test::StringS&, const Ice::Current&);
+
+    virtual Test::StringStringD opMDict1(const Ice::Current&);
+
+    virtual Test::StringStringD opMDict2(ICE_IN(Test::StringStringD), Test::StringStringD&, const Ice::Current&);
+#endif
 
 private:
 

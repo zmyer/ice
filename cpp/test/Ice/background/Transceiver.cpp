@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -59,11 +59,7 @@ Transceiver::initialize(IceInternal::Buffer& readBuffer, IceInternal::Buffer& wr
 }
 
 IceInternal::SocketOperation
-#ifdef ICE_CPP11_MAPPING
-Transceiver::closing(bool initiator, exception_ptr ex)
-#else
 Transceiver::closing(bool initiator, const Ice::LocalException& ex)
-#endif
 {
     return _transceiver->closing(initiator, ex);
 }

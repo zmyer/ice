@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -24,7 +24,7 @@
 #include <Ice/Properties.h>
 #include <Ice/DefaultsAndOverrides.h>
 #include <Ice/PropertyNames.h>
-#include <IceUtil/StringUtil.h>
+#include <Ice/StringUtil.h>
 
 using namespace std;
 using namespace Ice;
@@ -156,6 +156,7 @@ IceInternal::ReferenceFactory::create(const string& str, const string& propertyP
     // Parsing the identity may raise IdentityParseException.
     //
     Identity ident = Ice::stringToIdentity(idstr);
+
     if(ident.name.empty())
     {
         //
@@ -279,7 +280,7 @@ IceInternal::ReferenceFactory::create(const string& str, const string& propertyP
 
                 try
                 {
-                    facet = IceUtilInternal::unescapeString(argument, 0, argument.size());
+                    facet = unescapeString(argument, 0, argument.size(), "");
                 }
                 catch(const IceUtil::IllegalArgumentException& e)
                 {
@@ -288,7 +289,6 @@ IceInternal::ReferenceFactory::create(const string& str, const string& propertyP
                     throw ex;
                 }
 
-                facet = UTF8ToNative(facet, _instance->getStringConverter());
                 break;
             }
 
@@ -479,7 +479,7 @@ IceInternal::ReferenceFactory::create(const string& str, const string& propertyP
 
                 string es = s.substr(beg, end - beg);
                 EndpointIPtr endp = _instance->endpointFactoryManager()->create(es, false);
-                if(endp != 0)
+                if(endp != ICE_NULLPTR)
                 {
                     endpoints.push_back(endp);
                 }
@@ -554,7 +554,7 @@ IceInternal::ReferenceFactory::create(const string& str, const string& propertyP
 
             try
             {
-                adapter = IceUtilInternal::unescapeString(adapterstr, 0, adapterstr.size());
+                adapter = unescapeString(adapterstr, 0, adapterstr.size(), "");
             }
             catch(const IceUtil::IllegalArgumentException& e)
             {
@@ -568,8 +568,6 @@ IceInternal::ReferenceFactory::create(const string& str, const string& propertyP
                 ex.str = "empty adapter id in `" + s + "'";
                 throw ex;
             }
-
-            adapter = UTF8ToNative(adapter, _instance->getStringConverter());
 
             return create(ident, facet, mode, secure, protocol, encoding, endpoints, adapter, propertyPrefix);
             break;
@@ -859,11 +857,11 @@ IceInternal::ReferenceFactory::create(const Identity& ident,
             string type = properties->getProperty(property);
             if(type == "Random")
             {
-                endpointSelection = Random;
+                endpointSelection = ICE_ENUM(EndpointSelectionType, Random);
             }
             else if(type == "Ordered")
             {
-                endpointSelection = Ordered;
+                endpointSelection = ICE_ENUM(EndpointSelectionType, Ordered);
             }
             else
             {
@@ -934,4 +932,3 @@ IceInternal::ReferenceFactory::create(const Identity& ident,
                                  invocationTimeout,
                                  ctx);
 }
-

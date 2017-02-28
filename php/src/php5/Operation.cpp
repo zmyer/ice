@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -390,19 +390,19 @@ IcePHP::OperationI::convertParam(zval* p, int pos TSRMLS_DC)
 {
     assert(Z_TYPE_P(p) == IS_ARRAY);
     HashTable* arr = Z_ARRVAL_P(p);
-    assert(zend_hash_num_elements(arr) == 3);
 
     ParamInfoPtr param = new ParamInfo;
     zval** m;
 
     zend_hash_index_find(arr, 0, reinterpret_cast<void**>(&m));
     param->type = Wrapper<TypeInfoPtr>::value(*m TSRMLS_CC);
-    zend_hash_index_find(arr, 1, reinterpret_cast<void**>(&m));
-    assert(Z_TYPE_PP(m) == IS_BOOL);
-    param->optional = Z_BVAL_PP(m) ? true : false;
-    zend_hash_index_find(arr, 2, reinterpret_cast<void**>(&m));
-    assert(Z_TYPE_PP(m) == IS_LONG);
-    param->tag = Z_LVAL_PP(m);
+    param->optional = zend_hash_num_elements(arr) > 1;
+    if(param->optional)
+    {
+        zend_hash_index_find(arr, 1, reinterpret_cast<void**>(&m));
+        assert(Z_TYPE_PP(m) == IS_LONG);
+        param->tag = Z_LVAL_PP(m);
+    }
     param->pos = pos;
 
     return param;
@@ -460,7 +460,7 @@ IcePHP::TypedInvocation::TypedInvocation(const Ice::ObjectPrx& prx, const Commun
 }
 
 bool
-IcePHP::TypedInvocation::prepareRequest(int argc, zval** args, Ice::OutputStream* os, 
+IcePHP::TypedInvocation::prepareRequest(int argc, zval** args, Ice::OutputStream* os,
                                         pair<const Ice::Byte*, const Ice::Byte*>& params TSRMLS_DC)
 {
     //
@@ -500,7 +500,7 @@ IcePHP::TypedInvocation::prepareRequest(int argc, zval** args, Ice::OutputStream
             {
                 ParamInfoPtr info = *p;
                 zval* arg = args[info->pos];
-                if((!info->optional || !isUnset(arg TSRMLS_CC)) && !info->type->validate(arg TSRMLS_CC))
+                if((!info->optional || !isUnset(arg TSRMLS_CC)) && !info->type->validate(arg, false TSRMLS_CC))
                 {
                     invalidArgument("invalid value for argument %d in operation `%s'" TSRMLS_CC, info->pos + 1,
                                     _op->name.c_str());
@@ -769,7 +769,7 @@ IcePHP::SyncTypedInvocation::invoke(INTERNAL_FUNCTION_PARAMETERS)
         runtimeError("unable to get arguments" TSRMLS_CC);
         return;
     }
-    
+
     Ice::OutputStream os(_prx->ice_getCommunicator());
     pair<const Ice::Byte*, const Ice::Byte*> params;
     if(!prepareRequest(ZEND_NUM_ARGS(), *args, &os, params TSRMLS_CC))
@@ -875,11 +875,13 @@ ZEND_FUNCTION(IcePHP_defineOperation)
     }
 
     TypeInfoPtr type = Wrapper<TypeInfoPtr>::value(cls TSRMLS_CC);
-    ClassInfoPtr c = ClassInfoPtr::dynamicCast(type);
+    ProxyInfoPtr c = ProxyInfoPtr::dynamicCast(type);
     assert(c);
 
-    OperationIPtr op = new OperationI(name, static_cast<Ice::OperationMode>(mode),
-                                      static_cast<Ice::OperationMode>(sendMode), static_cast<Ice::FormatType>(format),
+    OperationIPtr op = new OperationI(name, 
+                                      static_cast<Ice::OperationMode>(mode),
+                                      static_cast<Ice::OperationMode>(sendMode), 
+                                      static_cast<Ice::FormatType>(format),
                                       inParams, outParams, returnType, exceptions TSRMLS_CC);
 
     c->addOperation(name, op);
@@ -888,17 +890,17 @@ ZEND_FUNCTION(IcePHP_defineOperation)
 ZEND_FUNCTION(IcePHP_Operation_call)
 {
     Ice::ObjectPrx proxy;
-    ClassInfoPtr cls;
+    ProxyInfoPtr info;
     CommunicatorInfoPtr comm;
 #ifndef NDEBUG
     bool b =
 #endif
-    fetchProxy(getThis(), proxy, cls, comm TSRMLS_CC);
+    fetchProxy(getThis(), proxy, info, comm TSRMLS_CC);
     assert(b);
     assert(proxy);
-    assert(cls);
+    assert(info);
 
-    OperationPtr op = cls->getOperation(get_active_function_name(TSRMLS_C));
+    OperationPtr op = info->getOperation(get_active_function_name(TSRMLS_C));
     assert(op); // handleGetMethod should have already verified the operation's existence.
     OperationIPtr opi = OperationIPtr::dynamicCast(op);
     assert(opi);

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -71,9 +71,20 @@ public class OnewaysAMI
         }
     }
 
-    internal static void onewaysAMI(Ice.Communicator communicator, Test.MyClassPrx proxy)
+    internal static void onewaysAMI(TestCommon.Application app, Test.MyClassPrx proxy)
     {
+        Ice.Communicator communicator = app.communicator();
         Test.MyClassPrx p = Test.MyClassPrxHelper.uncheckedCast(proxy.ice_oneway());
+
+        {
+            Callback cb = new Callback();
+            p.ice_pingAsync(progress:new Progress<bool>(
+                sentSynchronously =>
+                {
+                    cb.sent(sentSynchronously);
+                }));
+            cb.check();
+        }
 
         {
             Callback cb = new Callback();
@@ -99,7 +110,29 @@ public class OnewaysAMI
         {
             try
             {
+                p.ice_isAAsync("::Test::MyClass");
+                test(false);
+            }
+            catch(ArgumentException)
+            {
+            }
+        }
+
+        {
+            try
+            {
                 p.begin_ice_isA("::Test::MyClass");
+                test(false);
+            }
+            catch(ArgumentException)
+            {
+            }
+        }
+
+        {
+            try
+            {
+                p.ice_idAsync();
                 test(false);
             }
             catch(ArgumentException)
@@ -131,6 +164,16 @@ public class OnewaysAMI
 
         {
             Callback cb = new Callback();
+            p.opVoidAsync(progress:new Progress<bool>(
+                sentSynchronously =>
+                {
+                    cb.sent(sentSynchronously);
+                }));
+            cb.check();
+        }
+
+        {
+            Callback cb = new Callback();
             p.begin_opVoid().whenCompleted(cb.noException).whenSent(cb.sent);
             cb.check();
         }
@@ -152,6 +195,16 @@ public class OnewaysAMI
 
         {
             Callback cb = new Callback();
+            p.opIdempotentAsync(progress:new Progress<bool>(
+                sentSynchronously =>
+                {
+                    cb.sent(sentSynchronously);
+                }));
+            cb.check();
+        }
+
+        {
+            Callback cb = new Callback();
             p.begin_opIdempotent().whenCompleted(cb.noException).whenSent(cb.sent);
             cb.check();
         }
@@ -168,6 +221,16 @@ public class OnewaysAMI
                 {
                     cb.sent(sentSynchronously);
                 });
+            cb.check();
+        }
+
+        {
+            Callback cb = new Callback();
+            p.opNonmutatingAsync(progress:new Progress<bool>(
+                sentSynchronously =>
+                {
+                    cb.sent(sentSynchronously);
+                }));
             cb.check();
         }
 
@@ -195,7 +258,18 @@ public class OnewaysAMI
         {
             try
             {
-                p.begin_opByte((byte)0xff, (byte)0x0f);
+                p.opByteAsync(0xff, 0x0f);
+                test(false);
+            }
+            catch(ArgumentException)
+            {
+            }
+        }
+
+        {
+            try
+            {
+                p.begin_opByte(0xff, 0x0f);
                 test(false);
             }
             catch(ArgumentException)

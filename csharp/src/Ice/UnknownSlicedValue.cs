@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,7 @@ namespace Ice
     /// <summary>
     /// Unknown sliced value holds an instance of an unknown Slice class type.
     /// </summary>
-    public sealed class UnknownSlicedValue : ObjectImpl
+    public sealed class UnknownSlicedValue : Value
     {
         /// <summary>
         /// Represents an instance of a Slice class type having the given Slice type.
@@ -32,16 +32,16 @@ namespace Ice
             return _unknownTypeId;
         }
 
-        public override void write__(OutputStream os__)
+        public override void iceWrite(OutputStream ostr)
         {
-            os__.startValue(_slicedData);
-            os__.endValue();
+            ostr.startValue(_slicedData);
+            ostr.endValue();
         }
 
-        public override void read__(InputStream is__)
+        public override void iceRead(InputStream istr)
         {
-            is__.startValue();
-            _slicedData = is__.endValue(true);
+            istr.startValue();
+            _slicedData = istr.endValue(true);
         }
 
         private string _unknownTypeId;

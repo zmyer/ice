@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,24 +11,20 @@ package test.Ice.adapterDeactivation;
 
 public class Client extends test.Util.Application
 {
-    public int
-    run(String[] args)
+    public int run(String[] args)
     {
-        AllTests.allTests(this, getWriter());
+        AllTests.allTests(this);
         return 0;
     }
 
-    protected Ice.InitializationData getInitData(Ice.StringSeqHolder argsH)
+    protected com.zeroc.Ice.InitializationData getInitData(String[] args, java.util.List<String> rArgs)
     {
-        Ice.InitializationData initData = createInitializationData() ;
-        initData.properties = Ice.Util.createProperties(argsH);
+        com.zeroc.Ice.InitializationData initData = super.getInitData(args, rArgs);
         initData.properties.setProperty("Ice.Package.Test", "test.Ice.adapterDeactivation");
         return initData;
     }
 
-
-    public static void
-    main(String[] args)
+    public static void main(String[] args)
     {
         Client app = new Client();
         int result = app.main("Client", args);

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -88,6 +88,32 @@
     {
         [_cond unlock];
     }
+    return NO;
+}
+-(void) close:(TestAMICloseMode)mode current:(ICECurrent *)current
+{
+    [current.con close:(ICEConnectionClose)mode];
+}
+-(void) sleep:(ICEInt)delay current:(ICECurrent *)current
+{
+    [_cond lock];
+    @try
+    {
+        [_cond waitUntilDate:[NSDate dateWithTimeIntervalSinceNow:delay / 1000.0]];
+    }
+    @finally
+    {
+        [_cond unlock];
+    }
+}
+-(void) startDispatch:(ICECurrent*)current
+{
+}
+-(void) finishDispatch:(ICECurrent*)current
+{
+}
+-(BOOL) supportsAMD:(ICECurrent *)current
+{
     return NO;
 }
 -(BOOL) supportsFunctionalTests:(ICECurrent *)current

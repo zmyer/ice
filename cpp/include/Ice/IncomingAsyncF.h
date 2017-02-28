@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,24 +14,20 @@
 
 #include <Ice/Handle.h>
 
+namespace IceInternal
+{
+
+class IncomingAsync;
 #ifdef ICE_CPP11_MAPPING
-namespace IceInternal
-{
-
-class IncomingAsync;
-typedef std::shared_ptr<IncomingAsync> IncomingAsyncPtr;
-
-};
+using IncomingAsyncPtr = ::std::shared_ptr<IncomingAsync>;
 #else
-namespace IceInternal
-{
-
-class IncomingAsync;
 ICE_API IceUtil::Shared* upCast(IncomingAsync*);
 typedef IceInternal::Handle<IncomingAsync> IncomingAsyncPtr;
+#endif
 
 }
 
+#ifndef ICE_CPP11_MAPPING
 namespace Ice
 {
 

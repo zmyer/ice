@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,76 +17,76 @@ class TestAMDI : public Test::TestIntf
 public:
 
 #ifdef ICE_CPP11_MAPPING
-    virtual void requestFailedException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void requestFailedExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
     
-    virtual void unknownUserException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void unknownUserExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void unknownLocalException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void unknownLocalExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void unknownException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void unknownExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void userException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void userExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void localException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void localExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
     
-    virtual void stdException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void stdExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void cppException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void cppExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void unknownExceptionWithServantException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void unknownExceptionWithServantExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void impossibleException_async(
+    virtual void impossibleExceptionAsync(
         bool,
-        std::function<void (const std::string&)>,
-        std::function<void (std::exception_ptr)>,
+        std::function<void(const std::string&)>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void intfUserException_async(
+    virtual void intfUserExceptionAsync(
         bool,
-        std::function<void (const std::string&)>,
-        std::function<void (std::exception_ptr)>,
+        std::function<void(const std::string&)>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void asyncResponse_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void asyncResponseAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void asyncException_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void asyncExceptionAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 
-    virtual void shutdown_async(
-        std::function<void ()>,
-        std::function<void (std::exception_ptr)>,
+    virtual void shutdownAsync(
+        std::function<void()>,
+        std::function<void(std::exception_ptr)>,
         const Ice::Current&);
 #else
     virtual void requestFailedException_async(const Test::AMD_TestIntf_requestFailedExceptionPtr&, const Ice::Current&);

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -93,7 +93,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     HoldPrxPtr hold = ICE_CHECKED_CAST(HoldPrx, base);
     test(hold);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(hold, base));
+    test(Ice::targetEqualTo(hold, base));
 #else
     test(hold == base);
 #endif
@@ -101,7 +101,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(holdSerialized);
 
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(holdSerialized, baseSerialized));
+    test(Ice::targetEqualTo(holdSerialized, baseSerialized));
 #else
     test(holdSerialized == baseSerialized);
 #endif
@@ -138,7 +138,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             completed = make_shared<promise<void>>();
             auto sent = make_shared<promise<bool>>();
             auto expected = value;
-            hold->set_async(value + 1, IceUtilInternal::random(5),
+            hold->setAsync(value + 1, IceUtilInternal::random(5),
                 [cond, expected, completed](int value)
                 {
                     if(value != expected)
@@ -209,9 +209,9 @@ allTests(const Ice::CommunicatorPtr& communicator)
         while(value < 3000 && cond->value())
         {
             completed = make_shared<promise<void>>();
-			auto sent = make_shared<promise<bool>>();
+            auto sent = make_shared<promise<bool>>();
             auto expected = value;
-            holdSerialized->set_async(
+            holdSerialized->setAsync(
                 value + 1,
                 IceUtilInternal::random(1),
                 [cond, expected, completed](int value)
@@ -276,7 +276,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         {
             completed = make_shared<promise<void>>();
             // Create a new proxy for each request
-            holdSerialized->ice_oneway()->setOneway_async(value + 1, value,
+            holdSerialized->ice_oneway()->setOnewayAsync(value + 1, value,
                 nullptr,
                 [](exception_ptr)
                 {
@@ -290,7 +290,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             {
                 completed->get_future().get();
                 holdSerialized->ice_ping(); // Ensure everything's dispatched
-                holdSerialized->ice_getConnection()->close(false);
+                holdSerialized->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
             }
         }
         completed->get_future().get();
@@ -305,7 +305,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             {
                 result->waitForSent();
                 holdSerialized->ice_ping(); // Ensure everything's dispatched
-                holdSerialized->ice_getConnection()->close(false);
+                holdSerialized->ice_getConnection()->close(Ice::ICE_SCOPED_ENUM(ConnectionClose, GracefullyWithWait));
             }
         }
         result->waitForCompleted();

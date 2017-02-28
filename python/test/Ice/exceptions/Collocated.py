@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -25,7 +25,7 @@ def run(args, communicator):
     properties.setProperty("TestAdapter.Endpoints", "default -p 12010")
     adapter = communicator.createObjectAdapter("TestAdapter")
     object = TestI.ThrowerI()
-    adapter.add(object, communicator.stringToIdentity("thrower"))
+    adapter.add(object, Ice.stringToIdentity("thrower"))
     #adapter.activate() // Don't activate OA to ensure collocation is used.
 
     thrower = AllTests.allTests(communicator)
@@ -36,17 +36,10 @@ try:
     initData = Ice.InitializationData()
     initData.properties = Ice.createProperties(sys.argv)
     initData.properties.setProperty("Ice.MessageSizeMax", "10")
-    communicator = Ice.initialize(sys.argv, initData)
-    status = run(sys.argv, communicator)
+    with Ice.initialize(sys.argv, initData) as communicator:
+        status = run(sys.argv, communicator)
 except:
     traceback.print_exc()
     status = False
-
-if communicator:
-    try:
-        communicator.destroy()
-    except:
-        traceback.print_exc()
-        status = False
 
 sys.exit(not status)

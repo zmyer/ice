@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,7 +19,10 @@ namespace
 // A no-op Logger, used when testing the Logger Admin
 //
 
-class NullLogger : public Ice::Logger, public Ice::EnableSharedFromThis<NullLogger>
+class NullLogger : public Ice::Logger
+#ifdef ICE_CPP11_MAPPING
+                 , public std::enable_shared_from_this<NullLogger>
+#endif
 {
 public:
 
@@ -43,10 +46,10 @@ public:
     {
         return "NullLogger";
     }
-    
+
     virtual Ice::LoggerPtr cloneWithPrefix(const string&)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_THIS;
     }
 };
 
@@ -55,7 +58,12 @@ public:
 
 
 RemoteCommunicatorI::RemoteCommunicatorI(const Ice::CommunicatorPtr& communicator) :
-    _communicator(communicator), _called(false)
+    _communicator(communicator),
+#ifdef ICE_CPP11_MAPPING
+    _removeCallback(nullptr)
+#else
+    _hasCallback(false)
+#endif
 {
 }
 
@@ -70,21 +78,62 @@ RemoteCommunicatorI::getChanges(const Ice::Current&)
 {
     IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
 
-    //
-    // The client calls PropertiesAdmin::setProperties() and then invokes
-    // this operation. Since setProperties() is implemented using AMD, the
-    // client might receive its reply and then call getChanges() before our
-    // updated() method is called. We block here to ensure that updated()
-    // gets called before we return the most recent set of changes.
-    //
-    while(!_called)
+#ifdef ICE_CPP11_MAPPING
+    if(_removeCallback)
+#else
+    if(_hasCallback)
+#endif
     {
-        wait();
+       return _changes;
+    }
+    else
+    {
+        return Ice::PropertyDict();
+    }
+}
+
+void
+RemoteCommunicatorI::addUpdateCallback(const Ice::Current&)
+{
+    IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
+
+    Ice::ObjectPtr propFacet = _communicator->findAdminFacet("Properties");
+    if(propFacet)
+    {
+        Ice::NativePropertiesAdminPtr admin = ICE_DYNAMIC_CAST(Ice::NativePropertiesAdmin, propFacet);
+        assert(admin);
+#ifdef ICE_CPP11_MAPPING
+        _removeCallback =
+            admin->addUpdateCallback([this](const Ice::PropertyDict& changes) { updated(changes); });
+#else
+        admin->addUpdateCallback(this);
+        _hasCallback = true;
+#endif
+    }
+}
+
+void
+RemoteCommunicatorI::removeUpdateCallback(const Ice::Current&)
+{
+    IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
+
+    Ice::ObjectPtr propFacet = _communicator->findAdminFacet("Properties");
+    if(propFacet)
+    {
+        Ice::NativePropertiesAdminPtr admin = ICE_DYNAMIC_CAST(Ice::NativePropertiesAdmin, propFacet);
+        assert(admin);
+#ifdef ICE_CPP11_MAPPING
+        if(_removeCallback)
+        {
+            _removeCallback();
+            _removeCallback = nullptr;
+        }
+#else
+        admin->removeUpdateCallback(this);
+        _hasCallback = false;
+#endif
     }
 
-    _called = false;
-
-    return _changes;
 }
 
 void
@@ -135,10 +184,7 @@ void
 RemoteCommunicatorI::updated(const Ice::PropertyDict& changes)
 {
     IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
-
     _changes = changes;
-    _called = true;
-    notify();
 }
 
 Test::RemoteCommunicatorPrxPtr
@@ -174,13 +220,7 @@ RemoteCommunicatorFactoryI::createCommunicator(ICE_IN(Ice::PropertyDict) props, 
     // Set the callback on the admin facet.
     //
     RemoteCommunicatorIPtr servant = ICE_MAKE_SHARED(RemoteCommunicatorI, communicator);
-    Ice::ObjectPtr propFacet = communicator->findAdminFacet("Properties");
-    if(propFacet)
-    {
-        Ice::NativePropertiesAdminPtr admin = ICE_DYNAMIC_CAST(Ice::NativePropertiesAdmin, propFacet);
-        assert(admin);
-        admin->addUpdateCallback(servant);
-    }
+    servant->addUpdateCallback(Ice::noExplicitCurrent);
 
     Ice::ObjectPrxPtr proxy = current.adapter->addWithUUID(servant);
     return ICE_UNCHECKED_CAST(Test::RemoteCommunicatorPrx, proxy);

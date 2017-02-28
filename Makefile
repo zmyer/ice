@@ -1,6 +1,6 @@
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -39,12 +39,23 @@ $(eval $(call install-data-files,$(wildcard $(top_srcdir)/*LICENSE),$(top_srcdir
 	install-doc,"Installing documentation files"))
 
 #
-# Create a symlink for the slice directory
+# Create a symlink for the slice directory. We skip this step on macOS
 #
 ifneq ($(usr_dir_install),)
+ifeq ($(filter Darwin,$(os)),)
+
 install-slice:: $(DESTDIR)$(prefix)/share/slice
 
 $(DESTDIR)$(prefix)/share/slice:
 	$(Q)$(MKDIR) -p $(DESTDIR)$(prefix)/share
-	$(Q)ln -s Ice-$(version)/slice $(DESTDIR)$(prefix)/share/slice
+	$(Q)ln -s ice/slice $(DESTDIR)$(prefix)/share/slice
+endif
+endif
+
+#
+# Remove IceSDK directory on macOS
+#
+ifneq ($(filter Darwin,$(os)),)
+distclean::
+	$(Q)$(RM) -r $(top_srcdir)/IceSDK
 endif

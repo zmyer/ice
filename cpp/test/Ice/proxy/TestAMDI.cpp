@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,19 +19,19 @@ MyDerivedClassI::MyDerivedClassI()
 
 #ifdef ICE_CPP11_MAPPING
 void
-MyDerivedClassI::echo_async(
+MyDerivedClassI::echoAsync(
     shared_ptr<Ice::ObjectPrx> obj,
-    function<void (const shared_ptr<Ice::ObjectPrx>&)> response,
-    function<void (exception_ptr)>,
+    function<void(const shared_ptr<Ice::ObjectPrx>&)> response,
+    function<void(exception_ptr)>,
     const Ice::Current&)
 {
     response(obj);
 }
 
 void
-MyDerivedClassI::shutdown_async(
-    function<void ()> response,
-    function<void (exception_ptr)>,
+MyDerivedClassI::shutdownAsync(
+    function<void()> response,
+    function<void(exception_ptr)>,
     const Ice::Current& current)
 {
     current.adapter->getCommunicator()->shutdown();
@@ -39,9 +39,9 @@ MyDerivedClassI::shutdown_async(
 }
 
 void
-MyDerivedClassI::getContext_async(
-    function<void (const Ice::Context&)> response,
-    function<void (exception_ptr)>,
+MyDerivedClassI::getContextAsync(
+    function<void(const Ice::Context&)> response,
+    function<void(exception_ptr)>,
     const Ice::Current&)
 {
     response(_ctx);
@@ -50,7 +50,7 @@ bool
 MyDerivedClassI::ice_isA(string s, const Ice::Current& current) const
 {
     _ctx = current.ctx;
-    return Test::MyDerivedClassDisp::ice_isA(move(s), current);
+    return Test::MyDerivedClass::ice_isA(move(s), current);
 }
 #else
 void

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,7 +11,6 @@ namespace IceInternal
 {
 
     using System.Collections.Generic;
-    using System.Diagnostics;
     using System.Globalization;
     using System.Net;
     using System;
@@ -78,13 +77,6 @@ namespace IceInternal
             InfoI info = new InfoI(this);
             fillEndpointInfo(info);
             return info;
-        }
-
-        public override void streamWrite(Ice.OutputStream s)
-        {
-            s.startEncapsulation();
-            streamWriteImpl(s);
-            s.endEncapsulation();
         }
 
         public override short type()
@@ -249,17 +241,7 @@ namespace IceInternal
             return string.Compare(connectionId_, p.connectionId_, StringComparison.Ordinal);
         }
 
-        public string host()
-        {
-            return host_;
-        }
-
-        public int port()
-        {
-            return port_;
-        }
-
-        public virtual void streamWriteImpl(Ice.OutputStream s)
+        public override void streamWriteImpl(Ice.OutputStream s)
         {
             s.writeString(host_);
             s.writeInt(port_);
@@ -343,9 +325,9 @@ namespace IceInternal
 
                 try
                 {
-                    port_ = System.Int32.Parse(argument, CultureInfo.InvariantCulture);
+                    port_ = int.Parse(argument, CultureInfo.InvariantCulture);
                 }
-                catch(System.FormatException ex)
+                catch(FormatException ex)
                 {
                     Ice.EndpointParseException e = new Ice.EndpointParseException(ex);
                     e.str = "invalid port value `" + argument + "' in endpoint " + endpoint;

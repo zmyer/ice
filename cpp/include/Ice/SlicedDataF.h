@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -21,9 +21,9 @@ class SlicedData;
 class UnknownSlicedValue;
 
 #ifdef ICE_CPP11_MAPPING
-typedef ::std::shared_ptr<SliceInfo> SliceInfoPtr;
-typedef ::std::shared_ptr<SlicedData> SlicedDataPtr;
-typedef ::std::shared_ptr<UnknownSlicedValue> UnknownSlicedValuePtr;
+using SliceInfoPtr = ::std::shared_ptr<SliceInfo>;
+using SlicedDataPtr = ::std::shared_ptr<SlicedData>;
+using UnknownSlicedValuePtr = ::std::shared_ptr<UnknownSlicedValue>;
 #else
 ICE_API IceUtil::Shared* upCast(SliceInfo*);
 typedef IceInternal::Handle<SliceInfo> SliceInfoPtr;

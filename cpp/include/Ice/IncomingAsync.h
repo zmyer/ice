@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,9 +17,12 @@
 namespace Ice
 {
 
-class ICE_API AMDCallback : public virtual Ice::LocalObject
+class ICE_API AMDCallback : public Ice::LocalObject
 {
 public:
+
+    virtual ~AMDCallback();
+
 
     virtual void ice_exception(const ::std::exception&) = 0;
     virtual void ice_exception() = 0;
@@ -42,52 +45,66 @@ class ICE_API IncomingAsync : public IncomingBase,
     public virtual Ice::AMDCallback
 #endif
 {
-#ifdef ICE_CPP11_MAPPING
 public:
 
-    //
-    // The constructor is public but it shouldn't be used directly, use create() instead.
-    //
     IncomingAsync(Incoming&);
 
-    static IncomingAsyncPtr create(Incoming&); // Adopts the argument. It must not be used afterwards.
+#ifdef ICE_CPP11_MAPPING
+
+    static std::shared_ptr<IncomingAsync> create(Incoming&);
+
+    std::function<void()> response()
+    {
+        auto self = shared_from_this();
+        return [self]()
+        {
+            self->writeEmptyParams();
+            self->completed();
+        };
+    }
+
+    template<class T>
+    std::function<void(const T&)> response()
+    {
+        auto self = shared_from_this();
+        return [self](const T& marshaledResult)
+        {
+            self->setMarshaledResult(marshaledResult);
+            self->completed();
+        };
+    }
+
+    std::function<void(std::exception_ptr)> exception()
+    {
+        auto self = shared_from_this();
+        return [self](std::exception_ptr ex) { self->completed(ex); };
+    }
 
 #else
-
-protected:
-
-    IncomingAsync(Incoming&);
-#endif
-
-public:
-
-    void __deactivate(Incoming&);
 
     virtual void ice_exception(const ::std::exception&);
     virtual void ice_exception();
 
-    void __response();
-    void __exception(const std::exception&);
-    void __exception();
+#endif
 
-    bool __validateResponse(bool);
+    void kill(Incoming&);
+
+    void completed();
+
+#ifdef ICE_CPP11_MAPPING
+    void completed(std::exception_ptr);
+#endif
 
 private:
 
-    //
-    // We need a separate InstancePtr, because _is and _os only hold a
-    // Instance* for optimization.
-    //
-    const InstancePtr _instanceCopy;
+    void checkResponseSent();
+    bool _responseSent;
 
     //
     // We need a separate ConnectionIPtr, because IncomingBase only
     // holds a ConnectionI* for optimization.
     //
     const ResponseHandlerPtr _responseHandlerCopy;
-
-    const bool _retriable;
-    bool _active;
 };
 
 }
@@ -99,6 +116,8 @@ namespace Ice
 class ICE_API AMD_Object_ice_invoke : public virtual Ice::AMDCallback
 {
 public:
+
+    virtual ~AMD_Object_ice_invoke();
 
     virtual void ice_response(bool, const std::vector<Ice::Byte>&) = 0;
     virtual void ice_response(bool, const std::pair<const Ice::Byte*, const Ice::Byte*>&) = 0;

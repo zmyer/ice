@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -116,7 +116,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
     ref << "test";
     for(vector<int>::const_iterator p = ports.begin(); p != ports.end(); ++p)
     {
-        ref << ":default -p " << *p;
+        ref << ":" << getTestEndpoint(communicator, *p);
     }
     Ice::ObjectPrxPtr base = communicator->stringToProxy(ref.str());
     test(base);
@@ -126,7 +126,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
     TestIntfPrxPtr obj = ICE_CHECKED_CAST(TestIntfPrx, base);
     test(obj);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(obj, base));
+    test(Ice::targetEqualTo(obj, base));
 #else
     test(obj == base);
 #endif
@@ -156,7 +156,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
 #ifdef ICE_CPP11_MAPPING
             try
             {
-                int pid = obj->pid_async().get();
+                int pid = obj->pidAsync().get();
                 test(pid != oldPid);
                 cout << "ok" << endl;
                 oldPid = pid;
@@ -190,7 +190,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
                 cout << "shutting down server #" << i << " with AMI... " << flush;
                 try
                 {
-                    obj->shutdown_async().get();
+                    obj->shutdownAsync().get();
                 }
                 catch(const exception&)
                 {
@@ -231,7 +231,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
                 cout << "aborting server #" << i << " with AMI... " << flush;
                 try
                 {
-                    obj->abort_async().get();
+                    obj->abortAsync().get();
                     test(false);
                 }
                 catch(const exception&)
@@ -272,7 +272,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
                 cout << "aborting server #" << i << " and #" << i + 1 << " with idempotent AMI call... " << flush;
                 try
                 {
-                    obj->idempotentAbort_async().get();
+                    obj->idempotentAbortAsync().get();
                     test(false);
                 }
                 catch(const exception&)
@@ -282,7 +282,7 @@ allTests(const Ice::CommunicatorPtr& communicator, const vector<int>& ports)
 #else
                 cout << "aborting server #" << i << " and #" << i + 1 << " with idempotent AMI call... " << flush;
                 CallbackPtr cb = new Callback;
-                obj->begin_idempotentAbort(newCallback_TestIntf_idempotentAbort(cb, &Callback::response, 
+                obj->begin_idempotentAbort(newCallback_TestIntf_idempotentAbort(cb, &Callback::response,
                                                                                 &Callback::exceptAbortI));
                 cb->check();
                 cout << "ok" << endl;

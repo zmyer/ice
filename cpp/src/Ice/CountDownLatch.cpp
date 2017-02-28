@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,11 +15,11 @@ IceUtilInternal::CountDownLatch::CountDownLatch(int count) :
 {
     if(count < 0)
     {
-        throw IceUtil::Exception(__FILE__, __LINE__);
+        throw IceUtil::IllegalArgumentException(__FILE__, __LINE__, "count must be greather than 0");
     }
 
 #ifdef _WIN32
-#   ifndef ICE_OS_WINRT
+#   ifndef ICE_OS_UWP
     _event = CreateEvent(0, TRUE, FALSE, 0);
 #   else
     _event = CreateEventExW(0, 0,  CREATE_EVENT_MANUAL_RESET, SEMAPHORE_ALL_ACCESS);
@@ -34,12 +34,12 @@ IceUtilInternal::CountDownLatch::CountDownLatch(int count) :
     {
         throw IceUtil::ThreadSyscallException(__FILE__, __LINE__, rc);
     }
-    
+
     rc = pthread_cond_init(&_cond, 0);
     if(rc != 0)
     {
         throw IceUtil::ThreadSyscallException(__FILE__, __LINE__, rc);
-    }   
+    }
 #endif
 }
 
@@ -60,19 +60,19 @@ IceUtilInternal::CountDownLatch::~CountDownLatch()
 #endif
 }
 
-void 
+void
 IceUtilInternal::CountDownLatch::await() const
 {
 #ifdef _WIN32
     while(InterlockedExchangeAdd(&_count, 0) > 0)
     {
-#   ifndef ICE_OS_WINRT
+#   ifndef ICE_OS_UWP
         DWORD rc = WaitForSingleObject(_event, INFINITE);
 #   else
         DWORD rc = WaitForSingleObjectEx(_event, INFINITE, false);
 #   endif
         assert(rc == WAIT_OBJECT_0 || rc == WAIT_FAILED);
-        
+
         if(rc == WAIT_FAILED)
         {
             throw IceUtil::ThreadSyscallException(__FILE__, __LINE__, GetLastError());
@@ -90,11 +90,11 @@ IceUtilInternal::CountDownLatch::await() const
         }
     }
     unlock();
-    
+
 #endif
 }
 
-void 
+void
 IceUtilInternal::CountDownLatch::countDown()
 {
 #ifdef _WIN32
@@ -129,10 +129,10 @@ IceUtilInternal::CountDownLatch::countDown()
         }
     }
     unlock();
-    
+
 #else
     unlock();
-    
+
     if(broadcast)
     {
         int rc = pthread_cond_broadcast(&_cond);
@@ -146,7 +146,7 @@ IceUtilInternal::CountDownLatch::countDown()
 #endif
 }
 
-int 
+int
 IceUtilInternal::CountDownLatch::getCount() const
 {
 #ifdef _WIN32

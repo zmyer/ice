@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -47,7 +47,7 @@ internal class EndpointFactory : IceInternal.EndpointFactory
     {
     }
 
-    public IceInternal.EndpointFactory clone(IceInternal.ProtocolInstance instance)
+    public IceInternal.EndpointFactory clone(IceInternal.ProtocolInstance instance, IceInternal.EndpointFactory del)
     {
         return this;
     }

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,13 +13,14 @@
 #include <Ice/RequestHandler.h>
 #include <Ice/ReferenceF.h>
 #include <Ice/ProxyF.h>
-#include <Ice/VirtualShared.h>
 
 namespace IceInternal
 {
 
-class ConnectionRequestHandler : public RequestHandler,
-                                 public Ice::EnableSharedFromThis<ConnectionRequestHandler>
+class ConnectionRequestHandler : public RequestHandler
+#ifdef ICE_CPP11_MAPPING
+                               , public std::enable_shared_from_this<ConnectionRequestHandler>
+#endif
 {
 public:
 
@@ -27,10 +28,8 @@ public:
 
     virtual RequestHandlerPtr update(const RequestHandlerPtr&, const RequestHandlerPtr&);
 
-    virtual bool sendRequest(ProxyOutgoingBase*);
     virtual AsyncStatus sendAsyncRequest(const ProxyOutgoingAsyncBasePtr&);
 
-    virtual void requestCanceled(OutgoingBase*, const Ice::LocalException&);
     virtual void asyncRequestCanceled(const OutgoingAsyncBasePtr&, const Ice::LocalException&);
 
     virtual Ice::ConnectionIPtr getConnection();

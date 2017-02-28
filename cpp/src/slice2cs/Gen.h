@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -25,25 +25,29 @@ public:
 
 protected:
 
-    void writeMarshalUnmarshalParams(const ParamDeclList&, const OperationPtr&, bool);
+    void writeMarshalUnmarshalParams(const ParamDeclList&, const OperationPtr&, bool, bool = false,
+                                     bool = false, const std::string& = "");
     void writePostUnmarshalParams(const ParamDeclList&, const OperationPtr&);
-    void writeMarshalDataMember(const DataMemberPtr&, const std::string&);
-    void writeUnmarshalDataMember(const DataMemberPtr&, const std::string&, bool, int&);
+    void writeMarshalDataMember(const DataMemberPtr&, const std::string&, bool = false);
+    void writeUnmarshalDataMember(const DataMemberPtr&, const std::string&, bool, int&, bool = false);
 
     virtual void writeInheritedOperations(const ClassDefPtr&);
-    virtual void writeDispatchAndMarshalling(const ClassDefPtr&);
-    virtual std::vector<std::string> getParams(const OperationPtr&);
-    virtual std::vector<std::string> getParamsAsync(const OperationPtr&, bool);
-    virtual std::vector<std::string> getParamsAsyncCB(const OperationPtr&, bool, bool);
-    virtual std::vector<std::string> getArgs(const OperationPtr&);
-    virtual std::vector<std::string> getArgsAsync(const OperationPtr&, bool);
+    virtual void writeDispatch(const ClassDefPtr&);
+    virtual void writeMarshaling(const ClassDefPtr&);
+
+    static std::vector<std::string> getParams(const OperationPtr&);
+    static std::vector<std::string> getInParams(const OperationPtr&, bool = false);
+    static std::vector<std::string> getOutParams(const OperationPtr&, bool, bool);
+    static std::vector<std::string> getArgs(const OperationPtr&);
+    static std::vector<std::string> getInArgs(const OperationPtr&, bool = false);
+    static std::string getDispatchParams(const OperationPtr&, std::string&, std::vector<std::string>&, std::vector<std::string>&);
 
     void emitAttributes(const ContainedPtr&);
     void emitComVisibleAttribute();
     void emitGeneratedCodeAttribute();
     void emitPartialTypeAttributes();
 
-    std::string getParamAttributes(const ParamDeclPtr&);
+    static std::string getParamAttributes(const ParamDeclPtr&);
 
     std::string writeValue(const TypePtr&);
 
@@ -66,7 +70,9 @@ protected:
     enum ParamDir { InParam, OutParam };
     void writeDocCommentAMI(const OperationPtr&, ParamDir, const std::string&, const std::string& = "",
                             const std::string& = "", const std::string& = "");
-    void writeDocCommentAMD(const OperationPtr&, ParamDir, const std::string&);
+    void writeDocCommentTaskAsyncAMI(const OperationPtr&, const std::string&, const std::string& = "",
+                                     const std::string& = "", const std::string& = "");
+    void writeDocCommentAMD(const OperationPtr&, const std::string&);
     void writeDocCommentParam(const OperationPtr&, ParamDir, bool);
 
     ::IceUtilInternal::Output& _out;
@@ -80,11 +86,11 @@ public:
         const std::vector<std::string>&,
         const std::string&,
         bool,
+        bool,
         bool);
     ~Gen();
 
     void generate(const UnitPtr&);
-    void generateTie(const UnitPtr&);
     void generateImpl(const UnitPtr&);
     void generateImplTie(const UnitPtr&);
     void generateChecksums(const UnitPtr&);
@@ -94,8 +100,8 @@ private:
 
     IceUtilInternal::Output _out;
     IceUtilInternal::Output _impl;
-
     std::vector<std::string> _includePaths;
+    bool _tie;
 
     void printHeader();
 
@@ -159,6 +165,19 @@ private:
         virtual void visitOperation(const OperationPtr&);
     };
 
+    class ResultVisitor : public CsVisitor
+    {
+    public:
+
+        ResultVisitor(::IceUtilInternal::Output&);
+
+        virtual bool visitModuleStart(const ModulePtr&);
+        virtual void visitModuleEnd(const ModulePtr&);
+        virtual bool visitClassDefStart(const ClassDefPtr&);
+        virtual void visitClassDefEnd(const ClassDefPtr&);
+        virtual void visitOperation(const OperationPtr&);
+    };
+
     class ProxyVisitor : public CsVisitor
     {
     public:
@@ -181,9 +200,6 @@ private:
         virtual bool visitModuleStart(const ModulePtr&);
         virtual void visitModuleEnd(const ModulePtr&);
         virtual bool visitClassDefStart(const ClassDefPtr&);
-
-    private:
-        void writeOperations(const ClassDefPtr&, bool);
     };
 
     class HelperVisitor : public CsVisitor
@@ -204,31 +220,7 @@ private:
     {
     public:
 
-        DispatcherVisitor(::IceUtilInternal::Output&);
-
-        virtual bool visitModuleStart(const ModulePtr&);
-        virtual void visitModuleEnd(const ModulePtr&);
-        virtual bool visitClassDefStart(const ClassDefPtr&);
-    };
-
-    class AsyncVisitor : public CsVisitor
-    {
-    public:
-
-        AsyncVisitor(::IceUtilInternal::Output&);
-
-        virtual bool visitModuleStart(const ModulePtr&);
-        virtual void visitModuleEnd(const ModulePtr&);
-        virtual bool visitClassDefStart(const ClassDefPtr&);
-        virtual void visitClassDefEnd(const ClassDefPtr&);
-        virtual void visitOperation(const OperationPtr&);
-    };
-
-    class TieVisitor : public CsVisitor
-    {
-    public:
-
-        TieVisitor(::IceUtilInternal::Output&);
+        DispatcherVisitor(::IceUtilInternal::Output&, bool);
 
         virtual bool visitModuleStart(const ModulePtr&);
         virtual void visitModuleEnd(const ModulePtr&);
@@ -238,7 +230,9 @@ private:
     private:
 
         typedef std::set<std::string> NameSet;
-        void writeInheritedOperationsWithOpNames(const ClassDefPtr&, NameSet&);
+        void writeTieOperations(const ClassDefPtr&, NameSet* = 0);
+
+        bool _tie;
     };
 
     class BaseImplVisitor : public CsVisitor

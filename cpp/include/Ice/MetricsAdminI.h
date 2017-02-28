@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -47,7 +47,12 @@ namespace IceInternal
 class ICE_API MetricsMapI;
 ICE_DEFINE_PTR(MetricsMapIPtr, MetricsMapI);
 
-class ICE_API MetricsMapI : public Ice::EnableSharedFromThis<MetricsMapI>
+class ICE_API MetricsMapI :
+#ifdef ICE_CPP11_MAPPING
+        public std::enable_shared_from_this<MetricsMapI>
+#else
+        public virtual IceUtil::Shared
+#endif
 {
 public:
 
@@ -96,6 +101,8 @@ public:
     };
     ICE_DEFINE_PTR(RegExpPtr, RegExp);
 
+    virtual ~MetricsMapI();
+
     MetricsMapI(const std::string&, const Ice::PropertiesPtr&);
     MetricsMapI(const MetricsMapI&);
 
@@ -119,14 +126,14 @@ protected:
     const std::vector<RegExpPtr> _reject;
 };
 
-class ICE_API MetricsMapFactory :
-#ifdef ICE_CPP11_MAPPING
-    public virtual Ice::VirtualEnableSharedFromThisBase
-#else
-    public Ice::LocalObject
+class ICE_API MetricsMapFactory
+#ifndef ICE_CPP11_MAPPING
+    : public Ice::LocalObject
 #endif
 {
 public:
+
+    virtual ~MetricsMapFactory();
 
     MetricsMapFactory(IceMX::Updater*);
 
@@ -156,7 +163,7 @@ public:
 
     class EntryT :
 #ifdef ICE_CPP11_MAPPING
-        public virtual Ice::VirtualEnableSharedFromThisBase
+        public std::enable_shared_from_this<EntryT>
 #else
         public Ice::LocalObject
 #endif
@@ -222,7 +229,7 @@ public:
             if(--_object->current == 0)
             {
 #ifdef ICE_CPP11_MAPPING
-                _map->detached(std::dynamic_pointer_cast<EntryT>(shared_from_this()));
+                _map->detached(this->shared_from_this());
 #else
                 _map->detached(this);
 #endif
@@ -266,7 +273,7 @@ public:
             return metrics;
         }
 
-        bool 
+        bool
         isDetached() const
         {
             return _object->current == 0;
@@ -290,7 +297,7 @@ public:
 
     MetricsMapT(const std::string& mapPrefix,
                 const Ice::PropertiesPtr& properties,
-                const std::map<std::string, std::pair<SubMapMember, MetricsMapFactoryPtr> >& subMaps) : 
+                const std::map<std::string, std::pair<SubMapMember, MetricsMapFactoryPtr> >& subMaps) :
         MetricsMapI(mapPrefix, properties), _destroyed(false)
     {
         std::vector<std::string> subMapNames;
@@ -311,8 +318,8 @@ public:
                     continue; // This sub-map isn't configured.
                 }
             }
-            _subMaps.insert(std::make_pair(p->first, 
-                                           std::make_pair(p->second.first, 
+            _subMaps.insert(std::make_pair(p->first,
+                                           std::make_pair(p->second.first,
                                                           p->second.second->create(subMapPrefix, properties))));
         }
     }
@@ -321,7 +328,14 @@ public:
     {
     }
 
-    virtual void 
+#ifdef ICE_CPP11_MAPPING
+    std::shared_ptr<MetricsMapT> shared_from_this()
+    {
+        return std::static_pointer_cast<MetricsMapT>(MetricsMapI::shared_from_this());
+    }
+#endif
+
+    virtual void
     destroy()
     {
         Lock sync(*this);
@@ -334,7 +348,7 @@ public:
     getMetrics() const
     {
         IceMX::MetricsMap objects;
-        
+
         Lock sync(*this);
         for(typename std::map<std::string, EntryTPtr>::const_iterator p = _objects.begin(); p != _objects.end(); ++p)
         {
@@ -342,12 +356,12 @@ public:
         }
         return objects;
     }
-    
+
     virtual IceMX::MetricsFailuresSeq
     getFailures()
     {
         IceMX::MetricsFailuresSeq failures;
-        
+
         Lock sync(*this);
         for(typename std::map<std::string, EntryTPtr>::const_iterator p = _objects.begin(); p != _objects.end(); ++p)
         {
@@ -359,7 +373,7 @@ public:
         }
         return failures;
     }
-    
+
     virtual IceMX::MetricsFailures
     getFailures(const std::string& id)
     {
@@ -380,11 +394,7 @@ public:
             _subMaps.find(subMapName);
         if(p != _subMaps.end())
         {
-#ifdef ICE_CPP11_MAPPING
-            return std::pair<MetricsMapIPtr, SubMapMember>(p->second.second->clone()->shared_from_this(), p->second.first);
-#else
-            return std::pair<MetricsMapIPtr, SubMapMember>(p->second.second->clone(), p->second.first);
-#endif
+            return std::pair<MetricsMapIPtr, SubMapMember>(ICE_GET_SHARED_FROM_THIS(p->second.second->clone()), p->second.first);
         }
         return std::pair<MetricsMapIPtr, SubMapMember>(MetricsMapIPtr(ICE_NULLPTR), static_cast<SubMapMember>(0));
     }
@@ -402,7 +412,7 @@ public:
                 return ICE_NULLPTR;
             }
         }
-        
+
         for(std::vector<RegExpPtr>::const_iterator p = _reject.begin(); p != _reject.end(); ++p)
         {
             if((*p)->match(helper, true))
@@ -444,7 +454,7 @@ public:
 
         //
         // Lookup the metrics object.
-        // 
+        //
         Lock sync(*this);
         if(_destroyed)
         {
@@ -462,19 +472,20 @@ public:
         {
             TPtr t = ICE_MAKE_SHARED(T);
             t->id = key;
+
 #ifdef ICE_CPP11_MAPPING
             p = _objects.insert(typename std::map<std::string, EntryTPtr>::value_type(
-                                    key, std::make_shared<EntryT>(
-                                        std::dynamic_pointer_cast<MetricsMapT<MetricsType>>(shared_from_this()), t, _detachedQueue.end()))).first;
+                key, std::make_shared<EntryT>(shared_from_this(), t, _detachedQueue.end()))).first;
 #else
             p = _objects.insert(typename std::map<std::string, EntryTPtr>::value_type(
-                                    key, new EntryT(this, t, _detachedQueue.end()))).first;
+                key, new EntryT(this, t, _detachedQueue.end()))).first;
 #endif
+
         }
         p->second->attach(helper);
         return p->second;
     }
-    
+
 private:
 
     virtual MetricsMapIPtr clone() const
@@ -561,7 +572,7 @@ public:
     template<class SubMapMetricsType> void
     registerSubMap(const std::string& subMap, IceMX::MetricsMap MetricsType::* member)
     {
-        _subMaps[subMap] = std::pair<IceMX::MetricsMap MetricsType::*, 
+        _subMaps[subMap] = std::pair<IceMX::MetricsMap MetricsType::*,
                                      MetricsMapFactoryPtr>(member, ICE_MAKE_SHARED(MetricsMapFactoryT<SubMapMetricsType>, ICE_NULLPTR));
     }
 
@@ -573,12 +584,12 @@ private:
 class MetricsViewI : public IceUtil::Shared
 {
 public:
-    
+
     MetricsViewI(const std::string&);
 
     void destroy();
 
-    bool addOrUpdateMap(const Ice::PropertiesPtr&, const std::string&, const MetricsMapFactoryPtr&, 
+    bool addOrUpdateMap(const Ice::PropertiesPtr&, const std::string&, const MetricsMapFactoryPtr&,
                         const Ice::LoggerPtr&);
     bool removeMap(const std::string&);
 
@@ -597,7 +608,10 @@ private:
 };
 ICE_DEFINE_PTR(MetricsViewIPtr, MetricsViewI);
 
-class ICE_API MetricsAdminI : public IceMX::MetricsAdmin, public Ice::PropertiesAdminUpdateCallback,
+class ICE_API MetricsAdminI : public IceMX::MetricsAdmin,
+#ifndef ICE_CPP11_MAPPING
+                              public Ice::PropertiesAdminUpdateCallback,
+#endif
                               private IceUtil::Mutex
 {
 public:
@@ -656,7 +670,9 @@ public:
     void unregisterMap(const std::string&);
 
     virtual Ice::StringSeq getMetricsViewNames(Ice::StringSeq&, const ::Ice::Current&);
-    
+
+    void updated(const Ice::PropertyDict&);
+
 #ifdef ICE_CPP11_MAPPING
     virtual void enableMetricsView(std::string, const ::Ice::Current&);
     virtual void disableMetricsView(std::string, const ::Ice::Current&);
@@ -667,7 +683,7 @@ public:
     virtual void enableMetricsView(const std::string&, const ::Ice::Current&);
     virtual void disableMetricsView(const std::string&, const ::Ice::Current&);
     virtual IceMX::MetricsView getMetricsView(const std::string&, Ice::Long&, const ::Ice::Current&);
-    virtual IceMX::MetricsFailuresSeq getMapMetricsFailures(const std::string&, const std::string&, 
+    virtual IceMX::MetricsFailuresSeq getMapMetricsFailures(const std::string&, const std::string&,
                                                             const ::Ice::Current&);
     virtual IceMX::MetricsFailures getMetricsFailures(const std::string&, const std::string&, const std::string&,
                                                       const ::Ice::Current&);
@@ -679,8 +695,6 @@ public:
 private:
 
     MetricsViewIPtr getMetricsView(const std::string&);
-
-    void updated(const Ice::PropertyDict&);
 
     bool addOrUpdateMap(const std::string&, const MetricsMapFactoryPtr&);
     bool removeMap(const std::string&);

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,36 +22,39 @@
 namespace IceUtilInternal
 {
 
-class ICE_API APIException : public IceUtil::Exception
+class ICE_API APIException : public IceUtil::ExceptionHelper<APIException>
 {
 public:
 
     APIException(const char*, int, const ::std::string&);
-    virtual ~APIException() ICE_NOEXCEPT;
+#ifndef ICE_CPP11_COMPILER
+    virtual ~APIException() throw();
+#endif
     virtual ::std::string ice_id() const;
     virtual void ice_print(std::ostream&) const;
 #ifndef ICE_CPP11_MAPPING
     virtual APIException* ice_clone() const;
 #endif
-    virtual void ice_throw() const;
 
     ::std::string reason;
 };
 
 ICE_API ::std::ostream& operator<<(::std::ostream&, const APIException&);
 
-class ICE_API BadOptException : public IceUtil::Exception
+class ICE_API BadOptException : public IceUtil::ExceptionHelper<BadOptException>
 {
 public:
 
     BadOptException(const char*, int, const ::std::string&);
-    virtual ~BadOptException() ICE_NOEXCEPT;
+#ifndef ICE_CPP11_COMPILER
+    virtual ~BadOptException() throw();
+#endif
     virtual ::std::string ice_id() const;
     virtual void ice_print(std::ostream&) const;
+
 #ifndef ICE_CPP11_MAPPING
     virtual BadOptException* ice_clone() const;
 #endif
-    virtual void ice_throw() const;
 
     ::std::string reason;
 };

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,7 +13,7 @@ namespace IceInternal
     using System.Net;
     using System.Globalization;
 
-    sealed class TcpEndpointI : IPEndpointI, WSEndpointDelegate
+    sealed class TcpEndpointI : IPEndpointI
     {
         public TcpEndpointI(ProtocolInstance instance, string ho, int po, EndPoint sourceAddr, int ti, string conId,
                             bool co) :
@@ -62,43 +62,17 @@ namespace IceInternal
             private IPEndpointI _endpoint;
         }
 
+        public override void streamWriteImpl(Ice.OutputStream s)
+        {
+            base.streamWriteImpl(s);
+            s.writeInt(_timeout);
+            s.writeBool(_compress);
+        }
+
         public override Ice.EndpointInfo getInfo()
         {
             InfoI info = new InfoI(this);
             fillEndpointInfo(info);
-            return info;
-        }
-
-        private sealed class WSInfoI : Ice.WSEndpointInfo
-        {
-            public WSInfoI(IPEndpointI e)
-            {
-                _endpoint = e;
-            }
-
-            public override short type()
-            {
-                return _endpoint.type();
-            }
-
-            public override bool datagram()
-            {
-                return _endpoint.datagram();
-            }
-
-            public override bool secure()
-            {
-                return _endpoint.secure();
-            }
-
-            private IPEndpointI _endpoint;
-        }
-
-        public Ice.EndpointInfo getWSInfo(string resource)
-        {
-            WSInfoI info = new WSInfoI(this);
-            fillEndpointInfo(info);
-            info.resource = resource;
             return info;
         }
 
@@ -219,18 +193,11 @@ namespace IceInternal
             return base.CompareTo(p);
         }
 
-        public override void streamWriteImpl(Ice.OutputStream s)
-        {
-            base.streamWriteImpl(s);
-            s.writeInt(_timeout);
-            s.writeBool(_compress);
-        }
-
         public override void hashInit(ref int h)
         {
             base.hashInit(ref h);
-            IceInternal.HashUtil.hashAdd(ref h, _timeout);
-            IceInternal.HashUtil.hashAdd(ref h, _compress);
+            HashUtil.hashAdd(ref h, _timeout);
+            HashUtil.hashAdd(ref h, _compress);
         }
 
         public override void fillEndpointInfo(Ice.IPEndpointInfo info)
@@ -265,7 +232,7 @@ namespace IceInternal
                     {
                         try
                         {
-                            _timeout = System.Int32.Parse(argument, CultureInfo.InvariantCulture);
+                            _timeout = int.Parse(argument, CultureInfo.InvariantCulture);
                             if(_timeout < 1)
                             {
                                 Ice.EndpointParseException e = new Ice.EndpointParseException();
@@ -352,7 +319,7 @@ namespace IceInternal
             _instance = null;
         }
 
-        public EndpointFactory clone(ProtocolInstance instance)
+        public EndpointFactory clone(ProtocolInstance instance, EndpointFactory del)
         {
             return new TcpEndpointFactory(instance);
         }

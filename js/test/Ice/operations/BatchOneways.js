@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,9 +14,8 @@
 
     var run = function(communicator, prx, Test, bidir)
     {
-        var Promise = Ice.Promise;
         var bs1, bs2, batch, batch2, batch3;
-        var p = new Promise();
+        var p = new Ice.Promise();
         var test = function(b)
         {
             if(!b)
@@ -33,8 +32,7 @@
             }
         };
 
-        Promise.try(
-            function()
+        Ice.Promise.try(() =>
             {
                 var i;
                 bs1 = Ice.Buffer.createNative(new Array(10 * 1024));
@@ -44,14 +42,12 @@
                 }
                 return prx.opByteSOnewayCallCount();
             }
-        ).then(
-            function(count)
+        ).then(count =>
             {
                 batch = prx.ice_batchOneway();
                 return batch.ice_getConnection();
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 test(batch.ice_flushBatchRequests().isCompleted()); // Empty flush
                 test(batch.ice_flushBatchRequests().isSent()); // Empty flush
@@ -63,106 +59,47 @@
                     all[i] = batch.opByteSOneway(bs1);
                 }
 
-                return Promise.all(all).then(
-                    function()
+                return Ice.Promise.all(all).then(() =>
                     {
                         var wait = function(count)
                         {
                             if(count < 27) // 3 * 9 requests auto-flushed.
                             {
-                                return Promise.delay(10).then(
-                                    function()
-                                    {
-                                        return prx.opByteSOnewayCallCount();
-                                    }
-                                ).then(
-                                    function(n)
-                                    {
-                                        return wait(n + count);
-                                    }
-                                );
+                                return Ice.Promise.delay(10)
+                                              .then(() => prx.opByteSOnewayCallCount())
+                                              .then(n => wait(n + count));
                             }
                         };
                         return wait(0);
-                    }
-                );
+                    });
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 batch2 = prx.ice_batchOneway();
-                return Promise.all(batch.ice_ping(), batch2.ice_ping());
+                return Ice.Promise.all([batch.ice_ping(), batch2.ice_ping()]);
             }
-        ).then(
-            function(count)
+        ).then(count => batch.ice_flushBatchRequests()
+        ).then(() => prx.opByteSOnewayCallCount()
+        ).then(() => batch.ice_getConnection()
+        ).then(con => bidir ? undefined : con.close(Ice.ConnectionClose.GracefullyWithWait)
+        ).then(() => Ice.Promise.all([batch.ice_ping(), batch2.ice_ping()])
+        ).then(() =>
             {
-                return batch.ice_flushBatchRequests();
-            }
-        ).then(
-            function()
-            {
-                return prx.opByteSOnewayCallCount();
-            }
-        ).then(
-            function()
-            {
-                return batch.ice_getConnection();
-            }
-        ).then(
-            function(con)
-            {
-                if(!bidir)
-                {
-                    return con.close(false);
-                }
-            }
-        ).then(
-            function()
-            {
-                return Promise.all(batch.ice_ping(), batch2.ice_ping());
-            }
-        ).then(
-            function()
-            {
-                var identity = communicator.stringToIdentity("invalid");
+                var identity = Ice.stringToIdentity("invalid");
                 batch3 = batch.ice_identity(identity);
                 return batch3.ice_ping();
             }
-        ).then(
-            function()
-            {
-                return batch3.ice_flushBatchRequests();
-            }
-        ).then(
-            function()
-            {
-                // Make sure that a bogus batch request doesn't cause troubles to other ones.
-                return Promise.all(batch3.ice_ping(), batch.ice_ping());
-            }
-        ).then(
-            function()
-            {
-                return batch.ice_flushBatchRequests();
-            }
-        ).then(
-            function()
-            {
-                return prx.opByteSOnewayCallCount();
-            }
-        ).then(
-            function(count)
-            {
-                p.succeed();
-            },
-            function(ex)
-            {
-                p.fail(ex);
-            });
+        ).then(() => batch3.ice_flushBatchRequests()
+        // Make sure that a bogus batch request doesn't cause troubles to other ones.
+        ).then(() => Ice.Promise.all([batch3.ice_ping(), batch.ice_ping()])
+        ).then(() => batch.ice_flushBatchRequests()
+        ).then(() => prx.opByteSOnewayCallCount()
+        ).then(p.resolve, p.reject);
         return p;
     };
 
     exports.BatchOneways = { run: run };
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

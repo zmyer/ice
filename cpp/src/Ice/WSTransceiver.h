@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -24,38 +24,21 @@ namespace IceInternal
 class ConnectorI;
 class AcceptorI;
 
-//
-// Delegate interface implemented by TcpTransceiver or IceSSL::Transceiver or any transport that WS can
-// delegate to.
-//
-class ICE_API WSTransceiverDelegate : public virtual IceUtil::Shared
-{
-public:
-
-    virtual Ice::ConnectionInfoPtr getWSInfo(const Ice::HeaderDict&) const = 0;
-};
-
 class WSTransceiver : public Transceiver
 {
 public:
 
     virtual NativeInfoPtr getNativeInfo();
-#if defined(ICE_USE_IOCP)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
     virtual AsyncInfo* getAsyncInfo(SocketOperation);
-#elif defined(ICE_OS_WINRT)
-    virtual void setCompletedHandler(SocketOperationCompletedHandler^);
 #endif
 
     virtual SocketOperation initialize(Buffer&, Buffer&);
-#ifdef ICE_CPP11_MAPPING
-    virtual SocketOperation closing(bool, std::exception_ptr);
-#else
     virtual SocketOperation closing(bool, const Ice::LocalException&);
-#endif
     virtual void close();
     virtual SocketOperation write(Buffer&);
     virtual SocketOperation read(Buffer&);
-#if defined(ICE_USE_IOCP) || defined(ICE_OS_WINRT)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
     virtual bool startWrite(Buffer&);
     virtual void finishWrite(Buffer&);
     virtual void startRead(Buffer&);
@@ -70,7 +53,7 @@ public:
 
 private:
 
-    WSTransceiver(const ProtocolInstancePtr&, const TransceiverPtr&, const std::string&, int, const std::string&);
+    WSTransceiver(const ProtocolInstancePtr&, const TransceiverPtr&, const std::string&, const std::string&);
     WSTransceiver(const ProtocolInstancePtr&, const TransceiverPtr&);
     virtual ~WSTransceiver();
 
@@ -92,7 +75,6 @@ private:
     const ProtocolInstancePtr _instance;
     const TransceiverPtr _delegate;
     const std::string _host;
-    const int _port;
     const std::string _resource;
     const bool _incoming;
 

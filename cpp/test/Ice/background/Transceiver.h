@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,11 +20,7 @@ public:
 
     virtual IceInternal::NativeInfoPtr getNativeInfo();
 
-#ifdef ICE_CPP11_MAPPING
-    virtual IceInternal::SocketOperation closing(bool, std::exception_ptr);
-#else
     virtual IceInternal::SocketOperation closing(bool, const Ice::LocalException&);
-#endif
     virtual void close();
     virtual IceInternal::SocketOperation write(IceInternal::Buffer&);
     virtual IceInternal::SocketOperation read(IceInternal::Buffer&);

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -94,7 +94,7 @@ namespace IceMX
 
 template<class T, typename Y, typename Func> struct ApplyOnMember
 {
-    ApplyOnMember(Y T::*member, Func func) : func(func), member(member)
+    ApplyOnMember(Y T::*m, Func f) : func(f), member(m)
     {
     }
 
@@ -126,7 +126,7 @@ template<typename T> struct Increment
 
 template<typename T> struct Add
 {
-    Add(T value) : value(value) { }
+    Add(T v) : value(v) { }
 
     template<typename Y>
     void operator()(Y& v)

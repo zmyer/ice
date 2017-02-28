@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,33 +11,17 @@ package test.Ice.classLoader;
 
 import java.io.PrintWriter;
 
-import test.Ice.classLoader.Test.AbstractClass;
 import test.Ice.classLoader.Test.ConcreteClass;
 import test.Ice.classLoader.Test.E;
 import test.Ice.classLoader.Test.InitialPrx;
-import test.Ice.classLoader.Test.InitialPrxHelper;
 import test.Util.Application;
 
 public class AllTests
 {
-    private static class MyValueFactory implements Ice.ValueFactory
-    {
-        @Override
-        public Ice.Object create(String type)
-        {
-            if(type.equals("::Test::AbstractClass"))
-            {
-                return new AbstractClassI();
-            }
-
-            assert (false); // Should never be reached
-            return null;
-        }
-    }
-
     private static class MyClassLoader extends ClassLoader
     {
-        MyClassLoader(ClassLoader parent) {
+        MyClassLoader(ClassLoader parent)
+        {
             super(parent);
         }
 
@@ -59,11 +43,10 @@ public class AllTests
             return _names.contains(name);
         }
 
-        private java.util.List<String> _names = new java.util.LinkedList<String>();
+        private java.util.List<String> _names = new java.util.LinkedList<>();
     }
 
-    private static void
-    test(boolean b)
+    private static void test(boolean b)
     {
         if(!b)
         {
@@ -71,10 +54,9 @@ public class AllTests
         }
     }
 
-    public static void
-    allTests(Application app, boolean collocated)
+    public static void allTests(Application app, boolean collocated)
     {
-        Ice.Communicator communicator = app.communicator();
+        com.zeroc.Ice.Communicator communicator = app.communicator();
         PrintWriter out = app.getWriter();
 
         //
@@ -83,11 +65,11 @@ public class AllTests
         {
             out.print("testing package... ");
             out.flush();
-            Ice.InitializationData initData = app.createInitializationData();
+            com.zeroc.Ice.InitializationData initData = app.createInitializationData();
             initData.properties = communicator.getProperties()._clone();
             MyClassLoader classLoader = new MyClassLoader(initData.classLoader);
             initData.classLoader = classLoader;
-            Ice.Communicator ic = app.initialize(initData);
+            com.zeroc.Ice.Communicator ic = app.initialize(initData);
             test(classLoader.check("test.Ice.classLoader.Test._Marker"));
             ic.destroy();
             out.println("ok");
@@ -99,12 +81,12 @@ public class AllTests
         {
             out.print("testing plug-in... ");
             out.flush();
-            Ice.InitializationData initData = app.createInitializationData();
+            com.zeroc.Ice.InitializationData initData = app.createInitializationData();
             initData.properties = communicator.getProperties()._clone();
             initData.properties.setProperty("Ice.Plugin.Test", "test.Ice.classLoader.PluginFactoryI");
             MyClassLoader classLoader = new MyClassLoader(initData.classLoader);
             initData.classLoader = classLoader;
-            Ice.Communicator ic = app.initialize(initData);
+            com.zeroc.Ice.Communicator ic = app.initialize(initData);
             test(classLoader.check("test.Ice.classLoader.PluginFactoryI"));
             ic.destroy();
             out.println("ok");
@@ -117,13 +99,13 @@ public class AllTests
         {
             out.print("testing IceSSL certificate verifier and password callback... ");
             out.flush();
-            Ice.InitializationData initData = app.createInitializationData();
+            com.zeroc.Ice.InitializationData initData = app.createInitializationData();
             initData.properties = communicator.getProperties()._clone();
             initData.properties.setProperty("IceSSL.CertVerifier", "test.Ice.classLoader.CertificateVerifierI");
             initData.properties.setProperty("IceSSL.PasswordCallback", "test.Ice.classLoader.PasswordCallbackI");
             MyClassLoader classLoader = new MyClassLoader(initData.classLoader);
             initData.classLoader = classLoader;
-            Ice.Communicator ic = app.initialize(initData);
+            com.zeroc.Ice.Communicator ic = app.initialize(initData);
             test(classLoader.check("test.Ice.classLoader.CertificateVerifierI"));
             test(classLoader.check("test.Ice.classLoader.PasswordCallbackI"));
             ic.destroy();
@@ -134,17 +116,17 @@ public class AllTests
         // Marshaling tests.
         //
         {
-            Ice.InitializationData initData = app.createInitializationData();
+            com.zeroc.Ice.InitializationData initData = app.createInitializationData();
             initData.properties = communicator.getProperties()._clone();
             MyClassLoader classLoader = new MyClassLoader(initData.classLoader);
             initData.classLoader = classLoader;
-            Ice.Communicator ic = app.initialize(initData);
+            com.zeroc.Ice.Communicator ic = app.initialize(initData);
 
-            String ref = "initial:default -p 12010";
-            Ice.ObjectPrx base = ic.stringToProxy(ref);
+            String ref = "initial:" + app.getTestEndpoint(0);
+            com.zeroc.Ice.ObjectPrx base = ic.stringToProxy(ref);
             test(base != null);
 
-            InitialPrx initial = InitialPrxHelper.checkedCast(base);
+            InitialPrx initial = InitialPrx.checkedCast(base);
             test(initial != null);
 
             //
@@ -158,36 +140,6 @@ public class AllTests
                 test(classLoader.check("Test.ConcreteClass"));
                 test(classLoader.check("test.Ice.classLoader.Test.ConcreteClass"));
                 classLoader.reset();
-                out.println("ok");
-            }
-
-            //
-            // Verify that the class loader is invoked when a factory is not installed, and is
-            // not invoked when a factory is installed.
-            //
-            {
-                out.print("testing abstract class... ");
-                out.flush();
-
-                try
-                {
-                    initial.getAbstractClass();
-                }
-                catch(Ice.NoValueFactoryException ex)
-                {
-                    // Expected.
-                }
-                test(classLoader.check("Test.AbstractClass"));
-                test(classLoader.check("test.Ice.classLoader.Test.AbstractClass"));
-                classLoader.reset();
-
-                ic.getValueFactoryManager().add(new MyValueFactory(), "::Test::AbstractClass");
-                AbstractClass ac = initial.getAbstractClass();
-                test(ac != null);
-                test(!classLoader.check("Test.AbstractClass"));
-                test(!classLoader.check("test.Ice.classLoader.Test.AbstractClass"));
-                classLoader.reset();
-
                 out.println("ok");
             }
 

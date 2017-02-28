@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,7 +18,7 @@ namespace Ice
 
 class ConnectionI;
 #ifdef ICE_CPP11_MAPPING // C++11 mapping
-typedef ::std::shared_ptr<ConnectionI> ConnectionIPtr;
+using ConnectionIPtr = ::std::shared_ptr<ConnectionI>;
 #else // C++98 mapping
 ICE_API Ice::LocalObject* upCast(Ice::ConnectionI*);
 typedef IceInternal::Handle<ConnectionI> ConnectionIPtr;

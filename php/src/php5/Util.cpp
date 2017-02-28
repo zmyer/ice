@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -8,7 +8,7 @@
 // **********************************************************************
 
 #include <Util.h>
-#include <IceUtil/UUID.h>
+#include <Ice/UUID.h>
 #include <Slice/PHPUtil.h>
 #include <algorithm>
 #include <ctype.h>
@@ -618,6 +618,10 @@ convertLocalException(const Ice::LocalException& ex, zval* zex TSRMLS_DC)
     {
         setStringMember(zex, "reason", e.reason TSRMLS_CC);
     }
+    catch(const Ice::ConnectionManuallyClosedException& e)
+    {
+        add_property_bool(zex, "graceful", e.graceful ? 1 : 0);
+    }
     catch(const Ice::LocalException&)
     {
         //
@@ -924,7 +928,7 @@ ZEND_FUNCTION(Ice_generateUUID)
         WRONG_PARAM_COUNT;
     }
 
-    string uuid = IceUtil::generateUUID();
+    string uuid = Ice::generateUUID();
     RETURN_STRINGL(STRCAST(uuid.c_str()), static_cast<int>(uuid.size()), 1);
 }
 

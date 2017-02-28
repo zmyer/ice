@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -70,7 +70,7 @@ namespace IceInternal
                 {
                     writeName(name, output);
                     Ice.ObjectPrxHelperBase proxy = (Ice.ObjectPrxHelperBase)val;
-                    output.print(proxy.reference__().ToString());
+                    output.print(proxy.iceReference().ToString());
                 }
                 else if(val is Ice.Object)
                 {

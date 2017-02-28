@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -50,12 +50,6 @@ const IceUtil::Int64 Int16Min = -Int16Max - 1;
 const IceUtil::Int64 ByteMax = 0xff;
 const IceUtil::Int64 ByteMin = 0x00;
 
-enum FeatureProfile
-{
-    Ice,
-    IceE
-};
-
 enum NodeType
 {
     Dummy,
@@ -70,6 +64,13 @@ enum FormatType
     DefaultFormat,    // No preference was specified.
     CompactFormat,    // Minimal format.
     SlicedFormat      // Full format.
+};
+
+enum WarningCategory
+{
+    All,
+    Deprecated,
+    InvalidMetaData
 };
 
 class GrammarBase;
@@ -240,12 +241,22 @@ public:
     std::string findMetaData(const std::string&) const;
     StringList getMetaData() const;
 
+    //
+    // Emit warning unless filtered out by [["suppress-warning"]]
+    //
+    void warning(WarningCategory, const std::string&, int, const std::string&) const;
+    void warning(WarningCategory, const std::string&, const std::string&, const std::string&) const;
+
 private:
+
+    bool suppressWarning(WarningCategory) const;
+    void initSuppressedWarnings();
 
     int _includeLevel;
     StringList _metaData;
     std::string _filename;
     bool _seenDefinition;
+    std::set<WarningCategory> _suppressedWarnings;
 };
 typedef ::IceUtil::Handle<DefinitionContext> DefinitionContextPtr;
 
@@ -390,7 +401,6 @@ public:
 
     bool operator<(const Contained&) const;
     bool operator==(const Contained&) const;
-    bool operator!=(const Contained&) const;
 
 protected:
 
@@ -441,6 +451,8 @@ public:
     SequenceList sequences() const;
     DictionaryList dictionaries() const;
     EnumList enums() const;
+    EnumeratorList enumerators() const;
+    EnumeratorList enumerators(const std::string&) const;
     ConstList consts() const;
     ContainedList contents() const;
     bool hasNonLocalClassDecls() const;
@@ -448,6 +460,8 @@ public:
     bool hasLocalClassDefsWithAsync() const;
     bool hasNonLocalSequences() const;
     bool hasNonLocalExceptions() const;
+    bool hasStructs() const;
+    bool hasExceptions() const;
     bool hasDictionaries() const;
     bool hasOnlyDictionaries(DictionaryList&) const;
     bool hasClassDecls() const;
@@ -480,8 +494,8 @@ protected:
     void checkIdentifier(const std::string&) const;
     bool checkInterfaceAndLocal(const std::string&, bool, bool, bool, bool, bool);
     bool checkGlobalMetaData(const StringList&, const StringList&);
-    bool validateConstant(const std::string&, const TypePtr&, const SyntaxTreeBasePtr&, const std::string&, bool);
-    EnumeratorPtr validateEnumerator(const std::string&);
+    bool validateConstant(const std::string&, const TypePtr&, SyntaxTreeBasePtr&, const std::string&, bool);
+    void validateEnumerator(const std::string&);
 
     ContainedList _contents;
     std::map<std::string, ContainedPtr, CICompare> _introducedMap;
@@ -593,8 +607,13 @@ public:
     int returnTag() const;
     Mode mode() const;
     Mode sendMode() const;
+    bool hasMarshaledResult() const;
     ParamDeclPtr createParamDecl(const std::string&, const TypePtr&, bool, bool, int);
     ParamDeclList parameters() const;
+    ParamDeclList inParameters() const;
+    void inParameters(ParamDeclList&, ParamDeclList&) const;
+    ParamDeclList outParameters() const;
+    void outParameters(ParamDeclList&, ParamDeclList&) const;
     ExceptionList throws() const;
     void setExceptionList(const ExceptionList&);
     virtual ContainedType containedType() const;
@@ -602,6 +621,7 @@ public:
     bool sendsClasses(bool) const;
     bool returnsClasses(bool) const;
     bool returnsData() const;
+    bool returnsMultipleValues() const;
     bool sendsOptionals() const;
     int attributes() const;
     FormatType format() const;
@@ -658,6 +678,7 @@ public:
     bool hasOperations() const;
     bool hasDefaultValues() const;
     bool inheritsMetaData(const std::string&) const;
+    bool hasBaseDataMembers() const;
     virtual ContainedType containedType() const;
     virtual bool uses(const ContainedPtr&) const;
     virtual std::string kindOf() const;
@@ -699,7 +720,7 @@ public:
 
 protected:
 
-    ClassDeclPtr __class;
+    ClassDeclPtr _classDecl;
 };
 
 // ----------------------------------------------------------------------
@@ -728,6 +749,7 @@ public:
     bool usesClasses(bool) const;
     bool hasDefaultValues() const;
     bool inheritsMetaData(const std::string&) const;
+    bool hasBaseDataMembers() const;
     virtual std::string kindOf() const;
     virtual void visit(ParserVisitor*, bool);
 
@@ -835,13 +857,11 @@ protected:
 // Enum
 // ----------------------------------------------------------------------
 
-class Enum : public virtual Constructed
+class Enum : public virtual Container, public virtual Constructed
 {
 public:
 
     virtual void destroy();
-    EnumeratorList getEnumerators();
-    void setEnumerators(const EnumeratorList&);
     bool explicitValue() const;
     int minValue() const;
     int maxValue() const;
@@ -857,12 +877,15 @@ public:
 protected:
 
     Enum(const ContainerPtr&, const std::string&, bool);
-    friend class Container;
+    int newEnumerator(const EnumeratorPtr&);
 
-    EnumeratorList _enumerators;
+    friend class Container;
+    friend class Enumerator;
+
     bool _explicitValue;
     IceUtil::Int64 _minValue;
     IceUtil::Int64 _maxValue;
+    int _lastValue;
 };
 
 // ----------------------------------------------------------------------
@@ -886,9 +909,7 @@ protected:
     Enumerator(const ContainerPtr&, const std::string&);
     Enumerator(const ContainerPtr&, const std::string&, int);
     friend class Container;
-    friend class Enum;
 
-    EnumPtr _type;
     bool _explicitValue;
     int _value;
 };
@@ -1016,11 +1037,8 @@ public:
 
     void setSeenDefinition();
 
-    void error(const char*); // Not const, because error count is increased.
-    void error(const std::string&); // Ditto.
-
-    void warning(const char*) const;
-    void warning(const std::string&) const;
+    void error(const std::string&); // Not const because error count is increased
+    void warning(WarningCategory, const std::string&) const;
 
     ContainerPtr currentContainer() const;
     void pushContainer(const ContainerPtr&);
@@ -1044,8 +1062,6 @@ public:
     bool usesNonLocals() const;
     bool usesConsts() const;
 
-    FeatureProfile profile() const;
-
     //
     // Returns the path names of the files included directly by the top-level file.
     //
@@ -1056,7 +1072,7 @@ public:
     //
     StringList allFiles() const;
 
-    int parse(const std::string&, FILE*, bool, FeatureProfile profile = Ice);
+    int parse(const std::string&, FILE*, bool);
 
     virtual void destroy();
     virtual void visit(ParserVisitor*, bool);
@@ -1070,6 +1086,7 @@ private:
 
     Unit(bool, bool, bool, bool, const StringList&);
     static void eraseWhiteSpace(::std::string&);
+    bool checkUndefinedTypes();
 
     bool _ignRedefs;
     bool _all;
@@ -1087,7 +1104,6 @@ private:
     std::stack<ContainerPtr> _containerStack;
     std::map<Builtin::Kind, BuiltinPtr> _builtins;
     std::map<std::string, ContainedList> _contentMap;
-    FeatureProfile _featureProfile;
     std::map<std::string, DefinitionContextPtr> _definitionContextMap;
     std::map<int, std::string> _typeIds;
     std::map< std::string, std::set<std::string> > _fileTopLevelModules;

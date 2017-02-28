@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -25,6 +25,7 @@
 #include <Ice/LocalException.h>
 #include <Ice/Functional.h>
 #include <Ice/OutgoingAsync.h>
+#include <Ice/CommunicatorI.h>
 #include <IceUtil/Random.h>
 #include <iterator>
 
@@ -32,8 +33,8 @@
 namespace IceInternal
 {
 
-bool registerForBackgroundNotification(IceInternal::IncomingConnectionFactory*);
-void unregisterForBackgroundNotification(IceInternal::IncomingConnectionFactory*);
+bool registerForBackgroundNotification(const IceInternal::IncomingConnectionFactoryPtr&);
+void unregisterForBackgroundNotification(const IceInternal::IncomingConnectionFactoryPtr&);
 
 }
 #endif
@@ -126,6 +127,25 @@ find(const multimap<K,::IceInternal::Handle<V> >& m,
 }
 #endif
 
+class StartAcceptor : public IceUtil::TimerTask
+{
+public:
+
+    StartAcceptor(const IncomingConnectionFactoryPtr& factory) : _factory(factory)
+    {
+    }
+
+    void
+    runTimerTask()
+    {
+        _factory->startAcceptor();
+    }
+
+private:
+
+    IncomingConnectionFactoryPtr _factory;
+};
+
 }
 
 bool
@@ -204,7 +224,8 @@ IceInternal::OutgoingConnectionFactory::waitUntilFinished()
 }
 
 void
-IceInternal::OutgoingConnectionFactory::create(const vector<EndpointIPtr>& endpts, bool hasMore,
+IceInternal::OutgoingConnectionFactory::create(const vector<EndpointIPtr>& endpts,
+                                               bool hasMore,
                                                Ice::EndpointSelectionType selType,
                                                const CreateConnectionCallbackPtr& callback)
 {
@@ -316,7 +337,8 @@ IceInternal::OutgoingConnectionFactory::removeAdapter(const ObjectAdapterPtr& ad
 }
 
 void
-IceInternal::OutgoingConnectionFactory::flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr& outAsync)
+IceInternal::OutgoingConnectionFactory::flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr& outAsync,
+                                                                Ice::CompressBatch compress)
 {
     list<ConnectionIPtr> c;
 
@@ -336,7 +358,7 @@ IceInternal::OutgoingConnectionFactory::flushAsyncBatchRequests(const Communicat
     {
         try
         {
-            outAsync->flushConnection(*p);
+            outAsync->flushConnection(*p, compress);
         }
         catch(const LocalException&)
         {
@@ -867,7 +889,7 @@ IceInternal::OutgoingConnectionFactory::ConnectCallback::connectionStartComplete
     }
 
     connection->activate();
-    _factory->finishGetConnection(_connectors, *_iter, connection, shared_from_this());
+    _factory->finishGetConnection(_connectors, *_iter, connection, ICE_SHARED_FROM_THIS);
 }
 
 void
@@ -979,7 +1001,7 @@ IceInternal::OutgoingConnectionFactory::ConnectCallback::getConnection()
         // connection.
         //
         bool compress;
-        Ice::ConnectionIPtr connection = _factory->getConnection(_connectors, shared_from_this(), compress);
+        Ice::ConnectionIPtr connection = _factory->getConnection(_connectors, ICE_SHARED_FROM_THIS, compress);
         if(!connection)
         {
             //
@@ -1093,7 +1115,7 @@ IceInternal::OutgoingConnectionFactory::ConnectCallback::removeConnectors(const 
 void
 IceInternal::OutgoingConnectionFactory::ConnectCallback::removeFromPending()
 {
-    _factory->removeFromPending(shared_from_this(), _connectors);
+    _factory->removeFromPending(ICE_SHARED_FROM_THIS, _connectors);
 }
 
 bool
@@ -1257,7 +1279,8 @@ IceInternal::IncomingConnectionFactory::connections() const
 }
 
 void
-IceInternal::IncomingConnectionFactory::flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr& outAsync)
+IceInternal::IncomingConnectionFactory::flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr& outAsync,
+                                                                Ice::CompressBatch compress)
 {
     list<ConnectionIPtr> c = connections(); // connections() is synchronized, so no need to synchronize here.
 
@@ -1265,7 +1288,7 @@ IceInternal::IncomingConnectionFactory::flushAsyncBatchRequests(const Communicat
     {
         try
         {
-            outAsync->flushConnection(*p);
+            outAsync->flushConnection(*p, compress);
         }
         catch(const LocalException&)
         {
@@ -1274,7 +1297,7 @@ IceInternal::IncomingConnectionFactory::flushAsyncBatchRequests(const Communicat
     }
 }
 
-#if defined(ICE_USE_IOCP) || defined(ICE_OS_WINRT)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 bool
 IceInternal::IncomingConnectionFactory::startAsync(SocketOperation)
 {
@@ -1290,11 +1313,8 @@ IceInternal::IncomingConnectionFactory::startAsync(SocketOperation)
     }
     catch(const Ice::LocalException& ex)
     {
-        {
-            Error out(_instance->initializationData().logger);
-            out << "can't accept connections:\n" << ex << '\n' << _acceptor->toString();
-        }
-        abort();
+        ICE_SET_EXCEPTION_FROM_CLONE(_acceptorException, ex.ice_clone());
+        _acceptor->getNativeInfo()->completed(SocketOperationRead);
     }
     return true;
 }
@@ -1305,13 +1325,22 @@ IceInternal::IncomingConnectionFactory::finishAsync(SocketOperation)
     assert(_acceptor);
     try
     {
+        if(_acceptorException)
+        {
+            _acceptorException->ice_throw();
+        }
         _acceptor->finishAccept();
     }
     catch(const LocalException& ex)
     {
+        _acceptorException.reset(ICE_NULLPTR);
+
         Error out(_instance->initializationData().logger);
         out << "couldn't accept connection:\n" << ex << '\n' << _acceptor->toString();
-        return false;
+        if(_adapter->getThreadPool()->finish(ICE_SHARED_FROM_THIS, true))
+        {
+            closeAcceptor();
+        }
     }
     return _state < StateClosed;
 }
@@ -1353,7 +1382,7 @@ IceInternal::IncomingConnectionFactory::message(ThreadPoolCurrent& current)
             _connections.erase(*p);
         }
 
-        if(!_acceptor)
+        if(!_acceptorStarted)
         {
             return;
         }
@@ -1376,11 +1405,13 @@ IceInternal::IncomingConnectionFactory::message(ThreadPoolCurrent& current)
         {
             if(noMoreFds(ex.error))
             {
+                Error out(_instance->initializationData().logger);
+                out << "can't accept more connections:\n" << ex << '\n' << _acceptor->toString();
+
+                if(_adapter->getThreadPool()->finish(ICE_SHARED_FROM_THIS, true))
                 {
-                    Error out(_instance->initializationData().logger);
-                    out << "fatal error: can't accept more connections:\n" << ex << '\n' << _acceptor->toString();
+                    closeAcceptor();
                 }
-                abort();
             }
 
             // Ignore socket exceptions.
@@ -1427,41 +1458,34 @@ IceInternal::IncomingConnectionFactory::message(ThreadPoolCurrent& current)
     }
 
     assert(connection);
-    connection->start(shared_from_this());
+
+    connection->start(ICE_SHARED_FROM_THIS);
 }
 
 void
 IceInternal::IncomingConnectionFactory::finished(ThreadPoolCurrent&, bool close)
 {
     IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
-
-#if TARGET_OS_IPHONE != 0
     if(_state < StateClosed)
     {
-        //
-        // Finished has been called by stopAcceptor if the state isn't
-        // closed.
-        //
         if(_acceptorStarted && close)
         {
-            _acceptorStarted = false;
             closeAcceptor();
         }
         return;
     }
-#endif
 
     assert(_state == StateClosed);
     setState(StateFinished);
 
-    if(close)
+    if(_acceptorStarted && close)
     {
         closeAcceptor();
     }
 
 #if TARGET_OS_IPHONE != 0
     sync.release();
-    unregisterForBackgroundNotification(this);
+    unregisterForBackgroundNotification(ICE_SHARED_FROM_THIS);
 #endif
 }
 
@@ -1541,13 +1565,14 @@ IceInternal::IncomingConnectionFactory::IncomingConnectionFactory(const Instance
     _instance(instance),
     _monitor(new FactoryACMMonitor(instance, dynamic_cast<ObjectAdapterI*>(adapter.get())->getACM())),
     _endpoint(endpoint),
+    _acceptorStarted(false),
+    _acceptorStopped(false),
     _adapter(adapter),
     _warn(_instance->initializationData().properties->getPropertyAsInt("Ice.Warn.Connections") > 0),
     _state(StateHolding)
 {
 }
 
-#if TARGET_OS_IPHONE != 0
 void
 IceInternal::IncomingConnectionFactory::startAcceptor()
 {
@@ -1557,18 +1582,17 @@ IceInternal::IncomingConnectionFactory::startAcceptor()
         return;
     }
 
+    _acceptorStopped = false;
+
     try
     {
         createAcceptor();
-        _acceptorStarted = true;
     }
     catch(const Ice::Exception& ex)
     {
-        if(_warn)
-        {
-            Warning out(_instance->initializationData().logger);
-            out << "unable to create acceptor:\n" << ex;
-        }
+        Error out(_instance->initializationData().logger);
+        out << "acceptor creation failed:\n" << ex << '\n' << _acceptor->toString();
+        _instance->timer()->schedule(ICE_MAKE_SHARED(StartAcceptor, ICE_SHARED_FROM_THIS), IceUtil::Time::seconds(1));
     }
 }
 
@@ -1581,13 +1605,13 @@ IceInternal::IncomingConnectionFactory::stopAcceptor()
         return;
     }
 
-    if(_adapter->getThreadPool()->finish(this, true))
+    _acceptorStopped = true;
+
+    if(_adapter->getThreadPool()->finish(ICE_SHARED_FROM_THIS, true))
     {
-        _acceptorStarted = false;
         closeAcceptor();
     }
 }
-#endif
 
 void
 IceInternal::IncomingConnectionFactory::initialize()
@@ -1624,8 +1648,7 @@ IceInternal::IncomingConnectionFactory::initialize()
             // The notification center will call back on the factory to
             // start the acceptor if necessary.
             //
-            _acceptorStarted = false;
-            registerForBackgroundNotification(this);
+            registerForBackgroundNotification(ICE_SHARED_FROM_THIS);
 #else
             createAcceptor();
 #endif
@@ -1681,7 +1704,7 @@ IceInternal::IncomingConnectionFactory::setState(State state)
                     Trace out(_instance->initializationData().logger, _instance->traceLevels()->networkCat);
                     out << "accepting " << _endpoint->protocol() << " connections at " << _acceptor->toString();
                 }
-                _adapter->getThreadPool()->_register(shared_from_this(), SocketOperationRead);
+                _adapter->getThreadPool()->_register(ICE_SHARED_FROM_THIS, SocketOperationRead);
             }
             for_each(_connections.begin(), _connections.end(), Ice::voidMemFun(&ConnectionI::activate));
             break;
@@ -1700,7 +1723,7 @@ IceInternal::IncomingConnectionFactory::setState(State state)
                     Trace out(_instance->initializationData().logger, _instance->traceLevels()->networkCat);
                     out << "holding " << _endpoint->protocol() << " connections at " << _acceptor->toString();
                 }
-                _adapter->getThreadPool()->unregister(shared_from_this(), SocketOperationRead);
+                _adapter->getThreadPool()->unregister(ICE_SHARED_FROM_THIS, SocketOperationRead);
             }
             for_each(_connections.begin(), _connections.end(), Ice::voidMemFun(&ConnectionI::hold));
             break;
@@ -1708,7 +1731,7 @@ IceInternal::IncomingConnectionFactory::setState(State state)
 
         case StateClosed:
         {
-            if(_acceptor)
+            if(_acceptorStarted)
             {
                 //
                 // If possible, close the acceptor now to prevent new connections from
@@ -1717,7 +1740,7 @@ IceInternal::IncomingConnectionFactory::setState(State state)
                 // the finish() call. Not all selector implementations do support this
                 // however.
                 //
-                if(_adapter->getThreadPool()->finish(shared_from_this(), true))
+                if(_adapter->getThreadPool()->finish(ICE_SHARED_FROM_THIS, true))
                 {
                     closeAcceptor();
                 }
@@ -1748,6 +1771,7 @@ IceInternal::IncomingConnectionFactory::createAcceptor()
 {
     try
     {
+        assert(!_acceptorStarted);
         _acceptor = _endpoint->acceptor(_adapter->getName());
         assert(_acceptor);
         if(_instance->traceLevels()->network >= 2)
@@ -1763,18 +1787,19 @@ IceInternal::IncomingConnectionFactory::createAcceptor()
             out << "listening for " << _endpoint->protocol() << " connections\n" << _acceptor->toDetailedString();
         }
 
-        _adapter->getThreadPool()->initialize(shared_from_this());
+        _adapter->getThreadPool()->initialize(ICE_SHARED_FROM_THIS);
         if(_state == StateActive)
         {
-            _adapter->getThreadPool()->_register(shared_from_this(), SocketOperationRead);
+            _adapter->getThreadPool()->_register(ICE_SHARED_FROM_THIS, SocketOperationRead);
         }
+
+        _acceptorStarted = true;
     }
     catch(const Ice::Exception&)
     {
         if(_acceptor)
         {
             _acceptor->close();
-            _acceptor = 0;
         }
         throw;
     }
@@ -1791,14 +1816,16 @@ IceInternal::IncomingConnectionFactory::closeAcceptor()
         out << "stopping to accept " << _endpoint->protocol() << " connections at " << _acceptor->toString();
     }
 
+    _acceptorStarted = false;
     _acceptor->close();
 
-#if TARGET_OS_IPHONE != 0
     //
-    // Only clear the acceptor on iOS where it can be destroyed/re-created during the lifetime of the incoming
-    // connection factory. On other platforms, we keep it set. This is in particular import for IOCP/WinRT where
-    // finishAsync can be called after the acceptor is closed.
+    // If the acceptor hasn't been explicitly stopped (which is the case if the acceptor got closed
+    // because of an unexpected error), try to restart the acceptor in 5 seconds.
     //
-    _acceptor = 0;
-#endif
+    if(!_acceptorStopped && (_state == StateHolding || _state == StateActive))
+    {
+        _instance->timer()->schedule(ICE_MAKE_SHARED(StartAcceptor, ICE_SHARED_FROM_THIS), IceUtil::Time::seconds(1));
+    }
 }
+

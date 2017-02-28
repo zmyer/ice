@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,12 +10,12 @@
 #ifndef ICE_GC_OBJECT_H
 #define ICE_GC_OBJECT_H
 
+#ifndef ICE_CPP11_MAPPING
+
 #include <Ice/Object.h>
 
 #include <IceUtil/MutexPtrLock.h>
 #include <IceUtil/Mutex.h>
-
-#ifndef ICE_CPP11_MAPPING
 
 namespace IceInternal
 {
@@ -55,16 +55,16 @@ public:
     //
     // Override Object methods
     //
-    virtual bool __gcVisit(GCVisitor&);
+    virtual bool _iceGcVisit(GCVisitor&);
     virtual void ice_collectable(bool);
 
     //
     // This method is implemented by Slice classes to visit class
     // members.
     //
-    virtual void __gcVisitMembers(IceInternal::GCVisitor&) = 0;
+    virtual void _iceGcVisitMembers(IceInternal::GCVisitor&) = 0;
 
-    int __getRefUnsafe()
+    int _iceGetRefUnsafe()
     {
         return _ref;
     }

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,8 +20,8 @@ class CancellationHandler;
 class RequestHandler;
 
 #ifdef ICE_CPP11_MAPPING
-typedef ::std::shared_ptr<CancellationHandler> CancellationHandlerPtr;
-typedef ::std::shared_ptr<RequestHandler> RequestHandlerPtr;
+using CancellationHandlerPtr = ::std::shared_ptr<CancellationHandler>;
+using RequestHandlerPtr = ::std::shared_ptr<RequestHandler>;
 #else
 ICE_API IceUtil::Shared* upCast(CancellationHandler*);
 typedef IceInternal::Handle<CancellationHandler> CancellationHandlerPtr;

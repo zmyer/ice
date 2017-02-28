@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,18 +11,18 @@
 {
     var Ice = require("ice").Ice;
     var Test = require("Test").Test;
-    var Promise = Ice.Promise;
     var ArrayUtil = Ice.ArrayUtil;
 
     var allTests = function(out, communicator)
     {
-        var PreservedI = Ice.Class(Test.Preserved,
+        class PreservedI extends Test.Preserved
         {
-            __init__: function()
+            constructor()
             {
+                super();
                 ++PreservedI.counter;
             }
-        });
+        }
 
         function PreservedFactoryI(id)
         {
@@ -33,7 +33,7 @@
             return null;
         }
 
-        var p = new Promise();
+        var p = new Ice.Promise();
         var test = function(b)
         {
             if(!b)
@@ -44,7 +44,7 @@
                 }
                 catch(err)
                 {
-                    p.fail(err);
+                    p.reject(err);
                     throw err;
                 }
             }
@@ -52,8 +52,7 @@
 
         var failCB = function(){ test(false); };
         var ref, base, prx;
-        Promise.try(
-            function()
+        Ice.Promise.try(() =>
             {
                 out.write("testing stringToProxy... ");
                 ref = "Test:default -p 12010 -t 10000";
@@ -64,8 +63,7 @@
                 out.write("testing checked cast... ");
                 return Test.TestIntfPrx.checkedCast(base);
             }
-        ).then(
-            function(obj)
+        ).then(obj =>
             {
                 prx = obj;
                 test(prx !== null);
@@ -74,8 +72,7 @@
                 out.write("base as Object... ");
                 return prx.SBaseAsObject();
             }
-        ).then(
-            function(sb)
+        ).then(sb =>
             {
                 test(sb !== null);
                 test(sb.ice_id() == "::Test::SBase");
@@ -84,16 +81,14 @@
                 out.write("base as base... ");
                 return prx.SBaseAsSBase();
             }
-        ).then(
-            function(sb)
+        ).then(sb =>
             {
                 test(sb.sb == "SBase.sb");
                 out.writeLine("ok");
                 out.write("base with known derived as base... ");
                 return prx.SBSKnownDerivedAsSBase();
             }
-        ).then(
-            function(sb)
+        ).then(sb =>
             {
                 test(sb !== null);
                 test(sb.sb == "SBSKnownDerived.sb");
@@ -102,71 +97,60 @@
                 out.write("base with known derived as known derived... ");
                 return prx.SBSKnownDerivedAsSBSKnownDerived();
             }
-        ).then(
-            function(sb)
+        ).then(sb =>
             {
                 test(sb.sbskd == "SBSKnownDerived.sbskd");
                 out.writeLine("ok");
                 out.write("base with unknown derived as base... ");
                 return prx.SBSUnknownDerivedAsSBase();
             }
-        ).then(
-            function(sb)
+        ).then(sb =>
             {
                 test(sb.sb == "SBSUnknownDerived.sb");
-                var p = new Promise();
+                var p = new Ice.Promise();
                 if(prx.ice_getEncodingVersion().equals(Ice.Encoding_1_0))
                 {
                     return prx.SBSUnknownDerivedAsSBaseCompact().then(
-                        function(sb)
-                        {
-                            test(sb.sb == "SBSUnknownDerived.sb");
-                        },
-                        function(ex)
-                        {
-                            test(ex instanceof Ice.OperationNotExistException);
-                        });
+                        sb => test(sb.sb == "SBSUnknownDerived.sb"),
+                        ex => test(ex instanceof Ice.OperationNotExistException));
                 }
                 else
                 {
                     return prx.SBSUnknownDerivedAsSBaseCompact().then(
                         failCB,
-                        function(ex)
+                        ex =>
                         {
                             test(ex instanceof Ice.OperationNotExistException ||
                                  ex instanceof Ice.NoValueFactoryException);
                         });
                 }
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 out.writeLine("ok");
                 out.write("unknown with Object as Object... ");
                 return prx.SUnknownAsObject();
             }
         ).then(
-            function(obj)
+            obj =>
             {
                 test(!prx.ice_getEncodingVersion().equals(Ice.Encoding_1_0));
                 test(obj instanceof Ice.UnknownSlicedValue);
                 test(obj.getUnknownTypeId() == "::Test::SUnknown");
                 return prx.checkSUnknown(obj);
             },
-            function(ex)
+            ex =>
             {
                 test(ex instanceof Ice.NoValueFactoryException);
                 test(prx.ice_getEncodingVersion().equals(Ice.Encoding_1_0));
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 out.writeLine("ok");
                 out.write("one-element cycle... ");
                 return prx.oneElementCycle();
             }
-        ).then(
-            function(b)
+        ).then(b =>
             {
                 test(b !== null);
                 test(b.ice_id() == "::Test::B");
@@ -176,8 +160,7 @@
                 out.write("two-element cycle... ");
                 return prx.twoElementCycle();
             }
-        ).then(
-            function(b1)
+        ).then(b1 =>
             {
                 test(b1 !== null);
                 test(b1.ice_id() == "::Test::B");
@@ -193,8 +176,7 @@
                 out.write("known derived pointer slicing as derived... ");
                 return prx.D1AsD1();
             }
-        ).then(
-            function(d1)
+        ).then(d1 =>
             {
                 test(d1 !== null);
                 test(d1.ice_id() == "::Test::D1");
@@ -212,8 +194,7 @@
                 out.write("unknown derived pointer slicing as base... ");
                 return prx.D2AsB();
             }
-        ).then(
-            function(b2)
+        ).then(b2 =>
             {
                 test(b2 !== null);
                 test(b2.ice_id() == "::Test::B");
@@ -233,9 +214,9 @@
                 out.write("param ptr slicing with known first... ");
                 return prx.paramTest1();
             }
-        ).then(
-            function(b1, b2)
+        ).then(r =>
             {
+                var [b1, b2] = r;
                 test(b1 !== null);
                 test(b1.ice_id() == "::Test::D1");
                 test(b1.sb == "D1.sb");
@@ -252,9 +233,9 @@
                 out.write("param ptr slicing with unknown first... ");
                 return prx.paramTest2();
             }
-        ).then(
-            function(b2, b1)
+        ).then(r =>
             {
+                var [b2, b1] = r;
                 test(b1 !== null);
                 test(b1.ice_id() == "::Test::D1");
                 test(b1.sb == "D1.sb");
@@ -271,18 +252,18 @@
                 out.write("return value identity with known first... ");
                 return prx.returnTest1();
             }
-        ).then(
-            function(r, p1, p2)
+        ).then(r =>
             {
-                test(r === p1);
+                var [ret, p1, p2] = r;
+                test(ret === p1);
                 out.writeLine("ok");
                 out.write("return value identity with unknown first... ");
                 return prx.returnTest2();
             }
-        ).then(
-            function(r, p1, p2)
+        ).then(r =>
             {
-                test(r == p1);
+                var [ret, p1, p2] = r;
+                test(ret == p1);
                 out.writeLine("ok");
                 out.write("return value identity for input params known first... ");
 
@@ -297,8 +278,7 @@
                 d1.pb = d3;
                 d1.pd1 = d3;
 
-                return prx.returnTest3(d1, d3).then(
-                    function(b1)
+                return prx.returnTest3(d1, d3).then(b1 =>
                     {
                         test(b1 !== null);
                         test(b1.sb == "D1.sb");
@@ -321,8 +301,7 @@
                         test(b2 !== d3);
                     });
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 out.writeLine("ok");
                 out.write("return value identity for input params unknown first... ");
@@ -338,8 +317,7 @@
                 d1.pb = d3;
                 d1.pd1 = d3;
 
-                return prx.returnTest3(d3, d1).then(
-                    function(b1)
+                return prx.returnTest3(d3, d1).then(b1 =>
                     {
                         test(b1 !== null);
                         test(b1.sb == "D3.sb");
@@ -362,16 +340,15 @@
                         test(b2 !== d3);
                     });
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 out.writeLine("ok");
                 out.write("remainder unmarshaling (3 instances)... ");
                 return prx.paramTest3();
             }
-        ).then(
-            function(ret, p1, p2)
+        ).then(r =>
             {
+                var [ret, p1, p2] = r;
                 test(p1 !== null);
                 test(p1.sb == "D2.sb (p1 1)");
                 test(p1.pb === null);
@@ -391,9 +368,9 @@
                 out.write("remainder unmarshaling (4 instances)... ");
                 return prx.paramTest4();
             }
-        ).then(
-            function(ret, b)
+        ).then(r =>
             {
+                var [ret, b] = r;
                 test(b !== null);
                 test(b.sb == "D4.sb (1)");
                 test(b.pb === null);
@@ -423,8 +400,7 @@
 
                 return prx.returnTest3(d3, b2);
             }
-        ).then(
-            function(ret)
+        ).then(ret =>
             {
                 test(ret !== null);
                 test(ret.ice_id() == "::Test::B");
@@ -453,8 +429,7 @@
 
                 return prx.returnTest3(d3, d12);
             }
-        ).then(
-            function(ret)
+        ).then(ret =>
             {
                 test(ret !== null);
                 test(ret.ice_id() == "::Test::B");
@@ -512,8 +487,7 @@
 
                 return prx.sequenceTest(ss1, ss2);
             }
-        ).then(
-            function(ss)
+        ).then(ss =>
             {
                 test(ss.c1 !== null);
                 var ss1b = ss.c1.s[0];
@@ -557,9 +531,9 @@
                 }
                 return prx.dictionaryTest(bin);
             }
-        ).then(
-            function(ret, boutH)
+        ).then(r =>
             {
+                var [ret, boutH] = r;
                 var i, b, s;
                 test(boutH.size === 10);
                 for(i = 0; i < 10; ++i)
@@ -592,7 +566,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(ex instanceof Test.BaseException);
                 test(ex.ice_name() == "Test::BaseException");
@@ -606,7 +580,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(ex instanceof Test.DerivedException);
                 test(ex.ice_name() == "Test::DerivedException");
@@ -627,7 +601,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(ex instanceof Test.DerivedException);
                 test(ex.ice_name() == "Test::DerivedException");
@@ -648,7 +622,7 @@
             }
         ).then(
             failCB,
-            function(ex)
+            ex =>
             {
                 test(ex instanceof Test.BaseException);
                 test(ex.ice_name() == "Test::BaseException");
@@ -661,8 +635,7 @@
                 out.write("forward-declared class... ");
                 return prx.useForward();
             }
-        ).then(
-            function(f)
+        ).then(f =>
             {
                 test(f !== null);
                 out.writeLine("ok");
@@ -688,8 +661,7 @@
 
                 return prx.exchangePBase(pd);
             }
-        ).then(
-            function(r)
+        ).then(r =>
             {
                 var p2 = r;
                 test(p2.pi === 3);
@@ -705,8 +677,7 @@
 
                 return prx.exchangePBase(pu);
             }
-        ).then(
-            function(r)
+        ).then(r =>
             {
                 test(!(r instanceof Test.PCUnknown));
                 test(r.pi == 3);
@@ -721,8 +692,7 @@
 
                 return prx.exchangePBase(pcd);
             }
-        ).then(
-            function(r)
+        ).then(r =>
             {
                 if(prx.ice_getEncodingVersion().equals(Ice.Encoding_1_0))
                 {
@@ -745,8 +715,7 @@
 
                 return prx.exchangePBase(pcd);
             }
-        ).then(
-            function(r)
+        ).then(r =>
             {
                 var p2;
 
@@ -786,8 +755,7 @@
 
                 return prx.exchangePBase(pcd);
             }
-        ).then(
-            function(r)
+        ).then(r =>
             {
                 if(prx.ice_getEncodingVersion().equals(Ice.Encoding_1_0))
                 {
@@ -817,41 +785,32 @@
                 //
                 return prx.PBSUnknownAsPreserved();
             }
-        ).then(
-            function(p)
+        ).then(p =>
             {
-                return prx.checkPBSUnknown(p).then(
-                    function(r)
+                return prx.checkPBSUnknown(p).then(r =>
                     {
                         if(!prx.ice_getEncodingVersion().equals(Ice.Encoding_1_0))
                         {
                             return prx.ice_encodingVersion(Ice.Encoding_1_0).checkPBSUnknown(p);
                         }
-                    }
-                );
+                    });
             }
-        ).then(
-            function()
+        ).then(() =>
             {
                 out.writeLine("ok");
                 return prx.shutdown();
             }
-        ).then(
-            function()
-            {
-                p.succeed();
-            });
+        ).then(p.resolve, p.reject);
         return p;
     };
 
     var run = function(out, id)
     {
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 var c = Ice.initialize(id);
-                return allTests(out, c).finally(
-                    function()
+                return allTests(out, c).finally(() =>
                     {
                         if(c)
                         {
@@ -861,9 +820,9 @@
             });
     };
 
-    exports.__test__ = run;
-    exports.__runServer__ = true;
+    exports._test = run;
+    exports._runServer = true;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

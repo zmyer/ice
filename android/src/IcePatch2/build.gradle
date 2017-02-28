@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,7 +9,8 @@
 
 apply plugin: 'java'
 apply from: "$rootProject.projectDir/../java/gradle/ice.gradle"
-apply from: "$rootProject.projectDir/../java/src/IcePatch2/build.gradle"
+slice.compat = true
+apply from: "$rootProject.projectDir/../java-compat/src/IcePatch2/build.gradle"
 
 sourceCompatibility = iceSourceCompatibility
 targetCompatibility = iceTargetCompatibility
@@ -17,7 +18,7 @@ targetCompatibility = iceTargetCompatibility
 sourceSets {
     main {
         java {
-            srcDir "$rootProject.projectDir/../java/src/IcePatch2/src/main/java"
+            srcDir "$rootProject.projectDir/../java-compat/src/IcePatch2/src/main/java"
         }
     }
 }

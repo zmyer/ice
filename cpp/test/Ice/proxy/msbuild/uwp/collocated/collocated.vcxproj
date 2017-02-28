@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.3.7.0-alpha4\build\native\zeroc.ice.uwp.props" Condition="Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.3.7.0-alpha4\build\native\zeroc.ice.uwp.props') and '$(UseBinDist)' == 'yes'" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM">
       <Configuration>Debug</Configuration>
@@ -33,11 +34,12 @@
     <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformMinVersion>10.0.10240.0</WindowsTargetPlatformMinVersion>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <IceBuilderCppProps Condition="!Exists('$(IceBuilderCppProps)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Cpp.props', SearchOption.AllDirectories))</IceBuilderCppProps>
-    <IceBuilderCppTargets Condition="!Exists('$(IceBuilderCppTargets)')">$([System.IO.Directory]::GetFiles('$(LocalAppData)\Microsoft\VisualStudio\$(VisualStudioVersion)\Extensions', 'IceBuilder.Cpp.targets', SearchOption.AllDirectories))</IceBuilderCppTargets>
+    <IceBuilderInstallDir>$([MSBuild]::GetRegistryValue('HKEY_CURRENT_USER\SOFTWARE\ZeroC\IceBuilder', 'InstallDir.$(VisualStudioVersion)'))</IceBuilderInstallDir>
+    <IceBuilderCppProps>$(IceBuilderInstallDir)\Resources\IceBuilder.Cpp.props</IceBuilderCppProps>
+    <IceBuilderCppTargets>$(IceBuilderInstallDir)\Resources\IceBuilder.Cpp.targets</IceBuilderCppTargets>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -76,6 +78,9 @@
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
+    <Import Project="..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.arm.3.7.0-alpha4\build\native\zeroc.ice.uwp.arm.targets" Condition="Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.arm.3.7.0-alpha4\build\native\zeroc.ice.uwp.arm.targets') and '$(UseBinDist)' == 'yes'" />
+    <Import Project="..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x64.3.7.0-alpha4\build\native\zeroc.ice.uwp.x64.targets" Condition="Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x64.3.7.0-alpha4\build\native\zeroc.ice.uwp.x64.targets') and '$(UseBinDist)' == 'yes'" />
+    <Import Project="..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x86.3.7.0-alpha4\build\native\zeroc.ice.uwp.x86.targets" Condition="Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x86.3.7.0-alpha4\build\native\zeroc.ice.uwp.x86.targets') and '$(UseBinDist)' == 'yes'" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -239,6 +244,25 @@
   <ItemGroup>
     <IceBuilder Include="..\..\..\Test.ice" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$(IceBuilderCppTargets)" Condition="Exists('$(IceBuilderCppTargets)')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild" Condition="'$(UseBinDist)' == 'yes'">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.arm.3.7.0-alpha4\build\native\zeroc.ice.uwp.arm.targets') and '$(UseBinDist)' == 'yes'" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.arm.3.7.0-alpha4\build\native\zeroc.ice.uwp.arm.targets'))" />
+    <Error Condition="!Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x64.3.7.0-alpha4\build\native\zeroc.ice.uwp.x64.targets') and '$(UseBinDist)' == 'yes'" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x64.3.7.0-alpha4\build\native\zeroc.ice.uwp.x64.targets'))" />
+    <Error Condition="!Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x86.3.7.0-alpha4\build\native\zeroc.ice.uwp.x86.targets') and '$(UseBinDist)' == 'yes'" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.x86.3.7.0-alpha4\build\native\zeroc.ice.uwp.x86.targets'))" />
+    <Error Condition="!Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.3.7.0-alpha4\build\native\zeroc.ice.uwp.props') and '$(UseBinDist)' == 'yes'" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.3.7.0-alpha4\build\native\zeroc.ice.uwp.props'))" />
+    <Error Condition="!Exists('..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.3.7.0-alpha4\build\native\zeroc.ice.uwp.props') and '$(UseBinDist)' == 'yes'" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\..\..\..\msbuild\packages\zeroc.ice.uwp.3.7.0-alpha4\build\native\zeroc.ice.uwp.props'))" />
+  </Target>
+  <Target Name="EnsureIceBuilderImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project requires the Ice Builder for Visual Studio extension. Use "Tools &amp;gt; Extensions and Updates" to install it. For more information, see https://visualstudiogallery.msdn.microsoft.com/1a64e701-63f2-4740-8004-290e6c682ce0.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(IceBuilderCppProps)')" Text="$(ErrorText)" />
+  </Target>
 </Project>

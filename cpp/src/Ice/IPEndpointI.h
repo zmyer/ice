@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -20,7 +20,7 @@
 #include <Ice/ProtocolInstanceF.h>
 #include <Ice/ObserverHelper.h>
 
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
 #   include <deque>
 #endif
 
@@ -43,15 +43,19 @@ private:
     const EndpointIPtr _endpoint;
 };
 
-class ICE_API IPEndpointI : public EndpointI, public Ice::EnableSharedFromThis<IPEndpointI>
+class ICE_API IPEndpointI : public EndpointI
+#ifdef ICE_CPP11_MAPPING
+                          , public std::enable_shared_from_this<IPEndpointI>
+#endif
 {
 public:
+
+    virtual void streamWriteImpl(Ice::OutputStream*) const;
 
     virtual Ice::EndpointInfoPtr getInfo() const;
     virtual Ice::Short type() const;
     virtual const std::string& protocol() const;
     virtual bool secure() const;
-    virtual void streamWrite(Ice::OutputStream*) const;
 
     virtual const std::string& connectionId() const;
     virtual EndpointIPtr connectionId(const ::std::string&) const;
@@ -71,10 +75,7 @@ public:
 #endif
 
     virtual std::vector<ConnectorPtr> connectors(const std::vector<Address>&, const NetworkProxyPtr&) const;
-    const std::string& host() const;
-    int port() const;
 
-    virtual void streamWriteImpl(Ice::OutputStream*) const;
     virtual void hashInit(Ice::Int&) const;
     virtual void fillEndpointInfo(Ice::IPEndpointInfo*) const;
 
@@ -107,7 +108,7 @@ private:
     mutable Ice::Int _hashValue;
 };
 
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
 class ICE_API EndpointHostResolver : public IceUtil::Thread, public IceUtil::Monitor<IceUtil::Mutex>
 #else
 class ICE_API EndpointHostResolver : public IceUtil::Shared
@@ -126,7 +127,7 @@ public:
 
 private:
 
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
     struct ResolveEntry
     {
         std::string host;

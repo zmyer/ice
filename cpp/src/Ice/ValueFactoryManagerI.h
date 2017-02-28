@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,7 +11,6 @@
 #define ICE_VALUE_FACTORY_MANAGER_I_H
 
 #include <Ice/ValueFactory.h>
-#include <Ice/VirtualShared.h>
 #include <IceUtil/Mutex.h>
 
 namespace IceInternal
@@ -20,8 +19,7 @@ namespace IceInternal
 class ValueFactoryManagerI;
 ICE_DEFINE_PTR(ValueFactoryManagerIPtr, ValueFactoryManagerI);
 
-class ValueFactoryManagerI : public Ice::EnableSharedFromThis<ValueFactoryManagerI>,
-                             public Ice::ValueFactoryManager,
+class ValueFactoryManagerI : public Ice::ValueFactoryManager,
                              public IceUtil::Mutex
 {
 public:

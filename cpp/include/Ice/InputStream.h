@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,6 @@
 #ifndef ICE_INPUT_STREAM_H
 #define ICE_INPUT_STREAM_H
 
-#include <IceUtil/StringConverter.h>
 #include <Ice/CommunicatorF.h>
 #include <Ice/InstanceF.h>
 #include <Ice/Object.h>
@@ -42,7 +41,7 @@ patchHandle(void* addr, const ValuePtr& v)
     }
 #else
     IceInternal::Handle<T>* p = static_cast<IceInternal::Handle<T>*>(addr);
-    __patch(*p, v); // Generated __patch method, necessary for forward declarations.
+    _icePatchObjectPtr(*p, v); // Generated _icePatchObjectPtr function, necessary for forward declarations.
 #endif
 }
 
@@ -97,6 +96,14 @@ public:
         {
             clear(); // Not inlined.
         }
+
+#ifdef ICE_CPP11_MAPPING
+
+        for(auto d: _deleters)
+        {
+            d();
+        }
+#endif
     }
 
     //
@@ -113,14 +120,12 @@ public:
     //
     IceInternal::Instance* instance() const { return _instance; } // Inlined for performance reasons.
 
-    void setStringConverters(const IceUtil::StringConverterPtr&, const IceUtil::WstringConverterPtr&);
-
     void setValueFactoryManager(const ValueFactoryManagerPtr&);
 
     void setLogger(const LoggerPtr&);
 
 #ifdef ICE_CPP11_MAPPING
-    void setCompactIdResolver(std::function<std::string (int)>);
+    void setCompactIdResolver(std::function<std::string(int)>);
 #else
     void setCompactIdResolver(const CompactIdResolverPtr&);
 #endif
@@ -261,6 +266,8 @@ public:
         }
         Ice::EncodingVersion encoding;
         read(encoding);
+        IceInternal::checkSupportedEncoding(encoding); // Make sure the encoding is supported
+
         if(encoding == Ice::Encoding_1_0)
         {
             if(sz != static_cast<Ice::Int>(sizeof(Ice::Int)) + 2)
@@ -375,7 +382,11 @@ public:
                                              StreamableTraits<T>::helper,
                                              StreamableTraits<T>::fixedLength>::optionalFormat))
         {
+#ifdef ICE_CPP11_MAPPING
+            v.emplace();
+#else
             v.__setIsSet();
+#endif
             StreamOptionalHelper<T,
                                  StreamableTraits<T>::helper,
                                  StreamableTraits<T>::fixedLength>::read(this, *v);
@@ -385,6 +396,52 @@ public:
             v = IceUtil::None;
         }
     }
+
+#ifdef ICE_CPP11_MAPPING
+
+    template<typename T> void read(std::pair<const T*, const T*>& v)
+    {
+        auto holder = new std::vector<T>;
+        _deleters.push_back([holder] { delete holder; });
+        read(*holder);
+        if(holder->size() > 0)
+        {
+            v.first = holder->data();
+            v.second = holder->data() + holder->size();
+        }
+        else
+        {
+            v.first = 0;
+            v.second = 0;
+        }
+    }
+
+    template<typename T> void readAll(T& v)
+    {
+        read(v);
+    }
+
+    template<typename T, typename... Te> void readAll(T& v, Te&... ve)
+    {
+        read(v);
+        readAll(ve...);
+    }
+
+    template<typename T>
+    void readAll(std::initializer_list<int> tags, IceUtil::Optional<T>& v)
+    {
+        read(*(tags.begin() + tags.size() - 1), v);
+    }
+
+    template<typename T, typename... Te>
+    void readAll(std::initializer_list<int> tags, IceUtil::Optional<T>& v, IceUtil::Optional<Te>&... ve)
+    {
+        size_t index = tags.size() - sizeof...(ve) - 1;
+        read(*(tags.begin() + index), v);
+        readAll(tags, ve...);
+    }
+
+#endif
 
     // Read type and tag for optionals
     bool readOptional(Int tag, OptionalFormat expectedFormat)
@@ -412,12 +469,14 @@ public:
     void read(std::vector<Byte>&);
     void read(std::pair<const Byte*, const Byte*>&);
 
+#ifndef ICE_CPP11_MAPPING
     // This method is useful for generic stream helpers
     void read(std::pair<const Byte*, const Byte*>& p, ::IceUtil::ScopedArray<Byte>& result)
     {
         result.reset();
         read(p);
     }
+#endif
 
     // Bool
     void read(bool& v)
@@ -429,12 +488,21 @@ public:
         v = (0 != *i++);
     }
     void read(std::vector<bool>&);
+
+#ifdef ICE_CPP11_MAPPING
+    void read(std::pair<const bool*, const bool*>&);
+#else
     void read(std::pair<const bool*, const bool*>&, ::IceUtil::ScopedArray<bool>&);
+#endif
 
     // Short
     void read(Short&);
     void read(std::vector<Short>&);
+#ifdef ICE_CPP11_MAPPING
+    void read(std::pair<const short*, const short*>&);
+#else
     void read(std::pair<const Short*, const Short*>&, ::IceUtil::ScopedArray<Short>&);
+#endif
 
     // Int
     void read(Int& v) // Inlined for performance reasons.
@@ -461,102 +529,52 @@ public:
     }
 
     void read(std::vector<Int>&);
+#ifdef ICE_CPP11_MAPPING
+    void read(std::pair<const int*, const int*>&);
+#else
     void read(std::pair<const Int*, const Int*>&, ::IceUtil::ScopedArray<Int>&);
+#endif
 
     // Long
 
     void read(Long&);
     void read(std::vector<Long>&);
+#ifdef ICE_CPP11_MAPPING
+    void read(std::pair<const long long*, const long long*>&);
+#else
     void read(std::pair<const Long*, const Long*>&, ::IceUtil::ScopedArray<Long>&);
+#endif
 
     // Float
     void read(Float&);
     void read(std::vector<Float>&);
+#ifdef ICE_CPP11_MAPPING
+    void read(std::pair<const float*, const float*>&);
+#else
     void read(std::pair<const Float*, const Float*>&, ::IceUtil::ScopedArray<Float>&);
+#endif
 
     // Double
     void read(Double&);
     void read(std::vector<Double>&);
+#ifdef ICE_CPP11_MAPPING
+    void read(std::pair<const double*, const double*>&);
+#else
     void read(std::pair<const Double*, const Double*>&, ::IceUtil::ScopedArray<Double>&);
+#endif
 
     // String
-    void read(std::string& v, bool convert = true)
-    {
-        Int sz = readSize();
-        if(sz > 0)
-        {
-            if(b.end() - i < sz)
-            {
-                throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
-            }
-            if(convert && _stringConverter)
-            {
-                readConverted(v, sz);
-            }
-            else
-            {
-                std::string(reinterpret_cast<const char*>(&*i), reinterpret_cast<const char*>(&*i) + sz).swap(v);
-            }
-            i += sz;
-        }
-        else
-        {
-            v.clear();
-        }
-    }
+    void read(std::string& v, bool convert = true);
 
+#ifdef ICE_CPP11_MAPPING
+    void read(const char*& vdata, size_t& vsize, bool convert = true);
+#else
     // For custom strings, convert = false
-    void read(const char*& vdata, size_t& vsize)
-    {
-        Int sz = readSize();
-        if(sz > 0)
-        {
-            if(b.end() - i < sz)
-            {
-                throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
-            }
-
-            vdata = reinterpret_cast<const char*>(&*i);
-            vsize = static_cast<size_t>(sz);
-            i += sz;
-        }
-        else
-        {
-            vdata = 0;
-            vsize = 0;
-        }
-    }
+    void read(const char*& vdata, size_t& vsize);
 
     // For custom strings, convert = true
-    void read(const char*& vdata, size_t& vsize, std::string& holder)
-    {
-        if(!_stringConverter)
-        {
-            holder.clear();
-            read(vdata, vsize);
-        }
-        else
-        {
-            Int sz = readSize();
-            if(sz > 0)
-            {
-                if(b.end() - i < sz)
-                {
-                    throwUnmarshalOutOfBoundsException(__FILE__, __LINE__);
-                }
-
-                readConverted(holder, sz);
-                vdata = holder.data();
-                vsize = holder.size();
-            }
-            else
-            {
-                holder.clear();
-                vdata = 0;
-                vsize = 0;
-            }
-        }
-    }
+    void read(const char*& vdata, size_t& vsize, std::string& holder);
+#endif
 
     void read(std::vector<std::string>&, bool = true);
 
@@ -578,14 +596,14 @@ public:
         else
         {
             v = ::IceInternal::createProxy<T>();
-            v->__copyFrom(proxy);
+            v->_copyFrom(proxy);
         }
     }
 #else
     void read(ObjectPrx&);
     template<typename T> void read(IceInternal::ProxyHandle<T>& v)
     {
-        __read(this, v); // Generated __read method, necessary for forward declarations.
+        _readProxy(this, v); // Generated _readProxy method, necessary for forward declarations.
     }
 #endif
 
@@ -613,7 +631,7 @@ public:
     Int readEnum(Int);
 
     // Exception
-    void throwException(const Ice::UserExceptionFactoryPtr& = 0);
+    void throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY) = ICE_NULLPTR);
 
     // Read/write/skip optionals
     void skipOptional(OptionalFormat);
@@ -662,7 +680,7 @@ private:
     //
     // String
     //
-    void readConverted(std::string&, Int);
+    bool readConverted(std::string&, Int);
 
     //
     // We can't throw these exception from inline functions from within
@@ -687,16 +705,10 @@ private:
     LoggerPtr logger() const;
 
 #ifdef ICE_CPP11_MAPPING
-    std::function<std::string (int)> compactIdResolver() const;
+    std::function<std::string(int)> compactIdResolver() const;
 #else
     CompactIdResolverPtr compactIdResolver() const;
 #endif
-
-    //
-    // Optimization. The instance may not be deleted while a
-    // stack-allocated stream still holds it.
-    //
-    IceInternal::Instance* _instance;
 
     typedef std::vector<ValuePtr> ValueList;
 
@@ -704,10 +716,10 @@ private:
     {
     public:
 
-        virtual ~EncapsDecoder() { }
+        virtual ~EncapsDecoder();
 
         virtual void read(PatchFunc, void*) = 0;
-        virtual void throwException(const Ice::UserExceptionFactoryPtr&) = 0;
+        virtual void throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY)) = 0;
 
         virtual void startInstance(SliceType) = 0;
         virtual SlicedDataPtr endInstance(bool) = 0;
@@ -775,7 +787,7 @@ private:
         }
 
         virtual void read(PatchFunc, void*);
-        virtual void throwException(const Ice::UserExceptionFactoryPtr&);
+        virtual void throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY));
 
         virtual void startInstance(SliceType);
         virtual SlicedDataPtr endInstance(bool);
@@ -808,7 +820,7 @@ private:
         }
 
         virtual void read(PatchFunc, void*);
-        virtual void throwException(const Ice::UserExceptionFactoryPtr&);
+        virtual void throwException(ICE_IN(ICE_USER_EXCEPTION_FACTORY));
 
         virtual void startInstance(SliceType);
         virtual SlicedDataPtr endInstance(bool);
@@ -919,6 +931,13 @@ private:
         Encaps* previous;
     };
 
+
+    //
+    // Optimization. The instance may not be deleted while a
+    // stack-allocated stream still holds it.
+    //
+    IceInternal::Instance* _instance;
+
     //
     // The encoding version to use when there's no encapsulation to
     // read from. This is for example used to read message headers.
@@ -944,15 +963,18 @@ private:
     int _startSeq;
     int _minSeqSize;
 
-    IceUtil::StringConverterPtr _stringConverter;
-    IceUtil::WstringConverterPtr _wstringConverter;
     ValueFactoryManagerPtr _valueFactoryManager;
     LoggerPtr _logger;
 #ifdef ICE_CPP11_MAPPING
-    std::function<std::string (int)> _compactIdResolver;
+    std::function<std::string(int)> _compactIdResolver;
 #else
     CompactIdResolverPtr _compactIdResolver;
 #endif
+
+#ifdef ICE_CPP11_MAPPING
+    std::vector<std::function<void()>> _deleters;
+#endif
+
 };
 
 } // End namespace Ice

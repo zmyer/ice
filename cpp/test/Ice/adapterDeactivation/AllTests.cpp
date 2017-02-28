@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -27,40 +27,43 @@ allTests(const CommunicatorPtr& communicator)
     TestIntfPrxPtr obj = ICE_CHECKED_CAST(TestIntfPrx, base);
     test(obj);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(obj, base));
+    test(Ice::targetEqualTo(obj, base));
 #else
     test(obj == base);
 #endif
     cout << "ok" << endl;
+#ifdef ICE_OS_UWP
+    bool uwp = true;
+#else
+    bool uwp = false;
+#endif
 
     {
-        string host = communicator->getProperties()->getPropertyAsIntWithDefault("Ice.IPv6", 0) == 0 ?
-            "127.0.0.1" : "\"0:0:0:0:0:0:0:1\"";
-        cout << "creating/destroying/recreating object adapter... " << flush;
-        ObjectAdapterPtr adapter =
-            communicator->createObjectAdapterWithEndpoints("TransientTestAdapter", "default -h " + host);
-        try
+        if(!uwp || (communicator->getProperties()->getProperty("Ice.Default.Protocol") != "ssl" &&
+                      communicator->getProperties()->getProperty("Ice.Default.Protocol") != "wss"))
         {
-            communicator->createObjectAdapterWithEndpoints("TransientTestAdapter", "default -h " + host);
-            test(false);
-        }
-        catch(const AlreadyRegisteredException&)
-        {
-        }
-        adapter->destroy();
+            cout << "creating/destroying/recreating object adapter... " << flush;
+            ObjectAdapterPtr adpt = communicator->createObjectAdapterWithEndpoints("TransientTestAdapter", "default");
+            try
+            {
+                communicator->createObjectAdapterWithEndpoints("TransientTestAdapter", "default");
+                test(false);
+            }
+            catch(const AlreadyRegisteredException&)
+            {
+            }
+            adpt->destroy();
 
-        //
-        // Use a different port than the first adapter to avoid an "address already in use" error.
-        //
-        adapter = communicator->createObjectAdapterWithEndpoints("TransientTestAdapter", "default -h " + host);
-        adapter->destroy();
-        cout << "ok" << endl;
+            adpt = communicator->createObjectAdapterWithEndpoints("TransientTestAdapter", "default");
+            adpt->destroy();
+            cout << "ok" << endl;
+        }
     }
 
     cout << "creating/activating/deactivating object adapter in one operation... " << flush;
     obj->transient();
 #ifdef ICE_CPP11_MAPPING
-    obj->transient_async().get();
+    obj->transientAsync().get();
 #else
     obj->end_transient(obj->begin_transient());
 #endif
@@ -74,7 +77,7 @@ allTests(const CommunicatorPtr& communicator)
             initData.properties = communicator->getProperties()->clone();
             Ice::CommunicatorHolder comm = Ice::initialize(initData);
 #ifdef ICE_CPP11_MAPPING
-            comm->stringToProxy("test:" + getTestEndpoint(communicator, 0))->ice_ping_async();
+            comm->stringToProxy("test:" + getTestEndpoint(communicator, 0))->ice_pingAsync();
 #else
             comm->stringToProxy("test:" + getTestEndpoint(communicator, 0))->begin_ice_ping();
 #endif
@@ -89,6 +92,9 @@ allTests(const CommunicatorPtr& communicator)
     cout << "testing whether server is gone... " << flush;
     try
     {
+#ifdef _WIN32
+        obj = obj->ice_timeout(100); // Workaround to speed up testing
+#endif
         obj->ice_ping();
         test(false);
     }

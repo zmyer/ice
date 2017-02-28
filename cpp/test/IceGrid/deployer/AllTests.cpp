@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -68,7 +68,7 @@ public:
     bool
     operator()(const Ice::ObjectPrx& p1, const string& id) const
     {
-        return p1->ice_getIdentity() == _communicator->stringToIdentity(id);
+        return p1->ice_getIdentity() == Ice::stringToIdentity(id);
     }
 
 private:
@@ -388,7 +388,7 @@ allTests(const Ice::CommunicatorPtr& comm)
 
     AdminSessionPrx session = registry->createAdminSession("foo", "bar");
 
-    session->ice_getConnection()->setACM(registry->getACMTimeout(), IceUtil::None, Ice::HeartbeatAlways);
+    session->ice_getConnection()->setACM(registry->getACMTimeout(), IceUtil::None, Ice::ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
 
     AdminPrx admin = session->getAdmin();
     test(admin);
@@ -414,6 +414,7 @@ allTests(const Ice::CommunicatorPtr& comm)
     test(find(adapterIds.begin(), adapterIds.end(), "IceBox2Service2Adapter") != adapterIds.end());
     test(find(adapterIds.begin(), adapterIds.end(), "SimpleIceBox.SimpleService.SimpleService") != adapterIds.end());
     test(find(adapterIds.begin(), adapterIds.end(), "ReplicatedAdapter") != adapterIds.end());
+    test(find(adapterIds.begin(), adapterIds.end(), "ReplicatedAdapter 2") != adapterIds.end());
     cout << "ok" << endl;
 
     cout << "testing object registration... " << flush;

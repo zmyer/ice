@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,6 +17,93 @@
 #include <Ice/ObjectF.h>
 #include <Ice/ValueF.h>
 
+namespace Ice
+{
+
+class OutputStream;
+class InputStream;
+
+typedef IceUtil::Exception Exception;
+
+//
+// Base class for all Ice run-time exceptions
+//
+class ICE_API LocalException : public IceUtil::Exception
+{
+public:
+
+    LocalException(const char*, int);
+
+#ifdef ICE_CPP11_COMPILER
+    LocalException(const LocalException&) = default;
+    virtual ~LocalException();
+#else
+    virtual ~LocalException() throw();
+#endif
+
+#ifdef ICE_CPP11_MAPPING
+    std::unique_ptr<LocalException> ice_clone() const;
+#else
+    virtual LocalException* ice_clone() const = 0;
+#endif
+
+    static const std::string& ice_staticId();
+};
+
+
+//
+// Base class for all Ice user exceptions
+//
+class ICE_API UserException : public IceUtil::Exception
+{
+public:
+
+    virtual void _write(::Ice::OutputStream*) const;
+    virtual void _read(::Ice::InputStream*);
+
+    virtual bool _usesClasses() const;
+
+#ifdef ICE_CPP11_MAPPING
+    std::unique_ptr<UserException> ice_clone() const;
+#else
+    virtual UserException* ice_clone() const = 0;
+#endif
+
+    static const std::string& ice_staticId();
+
+protected:
+
+    virtual void _writeImpl(::Ice::OutputStream*) const {}
+    virtual void _readImpl(::Ice::InputStream*) {}
+};
+
+
+//
+// Base class for all Ice system exceptions
+//
+class ICE_API SystemException : public IceUtil::Exception
+{
+public:
+
+    SystemException(const char*, int);
+#ifdef ICE_CPP11_COMPILER
+    SystemException(const SystemException&) = default;
+    virtual ~SystemException();
+#else
+    virtual ~SystemException() throw();
+#endif
+
+#ifdef ICE_CPP11_MAPPING
+    std::unique_ptr<SystemException> ice_clone() const;
+#else
+    virtual SystemException* ice_clone() const = 0;
+#endif
+
+    static const std::string& ice_staticId();
+};
+
+}
+
 namespace IceInternal
 {
 
@@ -28,88 +115,6 @@ ICE_API void throwMemoryLimitException(const char*, int, size_t, size_t);
 ICE_API void throwMarshalException(const char*, int, const std::string&);
 
 }
-
-}
-
-namespace Ice
-{
-
-class OutputStream;
-class InputStream;
-
-typedef IceUtil::Exception Exception;
-
-class ICE_API LocalException : public IceUtil::Exception
-{
-public:
-
-    LocalException(const char*, int);
-    virtual ~LocalException() ICE_NOEXCEPT;
-
-    virtual std::string ice_id() const = 0;
-#ifndef ICE_CPP11_MAPPING
-    virtual LocalException* ice_clone() const = 0;
-#endif
-    virtual void ice_throw() const = 0;
-};
-
-class ICE_API UserException : public IceUtil::Exception
-{
-public:
-
-    virtual std::string ice_id() const = 0;
-#ifndef ICE_CPP11_MAPPING
-    virtual UserException* ice_clone() const = 0;
-#endif
-    virtual void ice_throw() const = 0;
-
-    virtual void __write(::Ice::OutputStream*) const;
-    virtual void __read(::Ice::InputStream*);
-
-    virtual bool __usesClasses() const;
-
-protected:
-
-    virtual void __writeImpl(::Ice::OutputStream*) const = 0;
-    virtual void __readImpl(::Ice::InputStream*) = 0;
-};
-
-typedef ::IceInternal::Handle<UserException> UserExceptionPtr;
-
-class ICE_API SystemException : public IceUtil::Exception
-{
-public:
-
-    SystemException(const char*, int);
-    virtual ~SystemException() ICE_NOEXCEPT;
-    virtual std::string ice_id() const = 0;
-#ifndef ICE_CPP11_MAPPING
-    virtual SystemException* ice_clone() const = 0;
-#endif
-    virtual void ice_throw() const = 0;
-};
-
-typedef ::IceInternal::Handle<SystemException> SystemExceptionPtr;
-
-#if defined(__SUNPRO_CC)
-//
-// COMPILERFIX: With Sun CC the presence of the overloaded operator
-// in ProxyHandle.h
-//
-//   template<class OStream, class Y>
-//   OStream& operator<<(OStream& os, ::IceInternal::ProxyHandle<Y> p)
-//
-// prevents the compiler from using the overloaded operator for
-// Exception in IceUtil/Exception.h
-//
-//   std::ostream& operator<<(std::ostream&, const Exception&);
-//
-// thus causing a compile error and making these overloads necessary.
-//
-ICE_API std::ostream& operator<<(std::ostream&, const LocalException&);
-ICE_API std::ostream& operator<<(std::ostream&, const UserException&);
-ICE_API std::ostream& operator<<(std::ostream&, const SystemException&);
-#endif
 
 }
 

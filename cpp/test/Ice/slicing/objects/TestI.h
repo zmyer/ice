@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -57,8 +57,8 @@ public:
     virtual void checkPBSUnknown(ICE_IN(::Test::PreservedPtr), const ::Ice::Current&);
 
 #ifdef ICE_CPP11_MAPPING
-    virtual void PBSUnknownAsPreservedWithGraph_async(std::function<void (const std::shared_ptr<Test::Preserved>&)>,
-                                                      std::function<void (std::exception_ptr)>,
+    virtual void PBSUnknownAsPreservedWithGraphAsync(std::function<void(const std::shared_ptr<Test::Preserved>&)>,
+                                                      std::function<void(std::exception_ptr)>,
                                                       const ::Ice::Current&);
 #else
     virtual void PBSUnknownAsPreservedWithGraph_async(const ::Test::AMD_TestIntf_PBSUnknownAsPreservedWithGraphPtr&,
@@ -67,8 +67,8 @@ public:
     virtual void checkPBSUnknownWithGraph(ICE_IN(::Test::PreservedPtr), const ::Ice::Current&);
 
 #ifdef ICE_CPP11_MAPPING
-    virtual void PBSUnknown2AsPreservedWithGraph_async(std::function<void (const std::shared_ptr<Test::Preserved>&)>,
-                                                       std::function<void (std::exception_ptr)>,
+    virtual void PBSUnknown2AsPreservedWithGraphAsync(std::function<void(const std::shared_ptr<Test::Preserved>&)>,
+                                                       std::function<void(std::exception_ptr)>,
                                                        const ::Ice::Current&);
 #else
     virtual void PBSUnknown2AsPreservedWithGraph_async(const ::Test::AMD_TestIntf_PBSUnknown2AsPreservedWithGraphPtr&,
@@ -83,8 +83,8 @@ public:
     virtual void throwDerivedAsDerived(const ::Ice::Current&);
     virtual void throwUnknownDerivedAsBase(const ::Ice::Current&);
 #ifdef ICE_CPP11_MAPPING
-    virtual void throwPreservedException_async(std::function<void ()>,
-                                               std::function<void (std::exception_ptr)>,
+    virtual void throwPreservedExceptionAsync(std::function<void()>,
+                                               std::function<void(std::exception_ptr)>,
                                                const ::Ice::Current&);
 #else
     virtual void throwPreservedException_async(const ::Test::AMD_TestIntf_throwPreservedExceptionPtr&,

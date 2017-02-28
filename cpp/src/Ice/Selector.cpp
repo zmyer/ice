@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,15 +22,20 @@
 using namespace std;
 using namespace IceInternal;
 
-#ifdef ICE_OS_WINRT
-//using namespace Windows::Foundation;
+#if defined(ICE_USE_KQUEUE)
+namespace
+{
+struct timespec zeroTimeout = { 0, 0 };
+}
+#endif
+
+#if defined(ICE_OS_UWP)
 using namespace Windows::Storage::Streams;
 using namespace Windows::Networking;
 using namespace Windows::Networking::Sockets;
-
 #endif
 
-#if defined(ICE_USE_IOCP) || defined(ICE_OS_WINRT)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 
 Selector::Selector(const InstancePtr& instance) : _instance(instance)
 {
@@ -44,8 +49,8 @@ Selector::~Selector()
 void
 Selector::setup(int sizeIO)
 {
-    _handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, sizeIO);
-    if(_handle == NULL)
+    _handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, ICE_NULLPTR, 0, sizeIO);
+    if(_handle == ICE_NULLPTR)
     {
         Ice::SocketException ex(__FILE__, __LINE__);
         ex.error = GetLastError();
@@ -71,7 +76,7 @@ Selector::initialize(EventHandler* handler)
     }
 #ifdef ICE_USE_IOCP
     HANDLE socket = reinterpret_cast<HANDLE>(handler->getNativeInfo()->fd());
-    if(CreateIoCompletionPort(socket, _handle, reinterpret_cast<ULONG_PTR>(handler), 0) == NULL)
+    if(CreateIoCompletionPort(socket, _handle, reinterpret_cast<ULONG_PTR>(handler), 0) == ICE_NULLPTR)
     {
         Ice::SocketException ex(__FILE__, __LINE__);
         ex.error = GetLastError();
@@ -79,11 +84,7 @@ Selector::initialize(EventHandler* handler)
     }
     handler->getNativeInfo()->initialize(_handle, reinterpret_cast<ULONG_PTR>(handler));
 #else
-#   ifdef ICE_CPP11_MAPPING
-    EventHandlerPtr h = dynamic_pointer_cast<EventHandler>(handler->shared_from_this());
-#   else
-    EventHandlerPtr h = handler;
-#   endif
+    EventHandlerPtr h = ICE_GET_SHARED_FROM_THIS(handler);
     handler->getNativeInfo()->setCompletedHandler(
         ref new SocketOperationCompletedHandler(
             [=](int operation)
@@ -162,12 +163,10 @@ Selector::getNextHandler(SocketOperation& status, int timeout)
             }
             else
             {
-                {
-                    Ice::SocketException ex(__FILE__, __LINE__, err);
-                    Ice::Error out(_instance->initializationData().logger);
-                    out << "fatal error: couldn't dequeue packet from completion port:\n" << ex;
-                }
-                abort();
+                Ice::SocketException ex(__FILE__, __LINE__, err);
+                Ice::Error out(_instance->initializationData().logger);
+                out << "couldn't dequeue packet from completion port:\n" << ex;
+                IceUtil::ThreadControl::sleep(IceUtil::Time::seconds(5)); // Sleep 5s to avoid looping
             }
         }
         AsyncInfo* info = static_cast<AsyncInfo*>(ol);
@@ -234,7 +233,7 @@ Selector::completed(EventHandler* handler, SocketOperation op)
     }
 #else
     IceUtil::Monitor<IceUtil::Mutex>::Lock lock(_monitor);
-    _events.push_back(SelectEvent(std::dynamic_pointer_cast<EventHandler>(handler->shared_from_this()), op));
+    _events.push_back(SelectEvent(handler->shared_from_this(), op));
     _monitor.notify();
 #endif
 }
@@ -354,7 +353,20 @@ Selector::update(EventHandler* handler, SocketOperation remove, SocketOperation 
     NativeInfoPtr nativeInfo = handler->getNativeInfo();
     if(!nativeInfo || nativeInfo->fd() == INVALID_SOCKET)
     {
-        return;
+        if(!nativeInfo->newFd()) // If no new FD is set, nothing to do.
+        {
+            return;
+        }
+
+        // If a new FD is set, we update the selector to add operations for the FD, there's
+        // nothing to remove from the selector because the FD wasn't previously set.
+        assert(!handler->_disabled);
+        previous = SocketOperationNone;
+        remove = SocketOperationNone;
+        if(!add)
+        {
+            return;
+        }
     }
 
 #if defined(ICE_USE_EPOLL)
@@ -550,10 +562,10 @@ Selector::finish(EventHandler* handler, bool closeNow)
 #elif !defined(ICE_USE_EPOLL)
     if(!_changes.empty())
     {
-	return false;
+        return false;
     }
-#endif    
-    
+#endif
+
     return closeNow;
 }
 
@@ -728,12 +740,8 @@ Selector::finishSelect(vector<pair<EventHandler*, SocketOperation> >& handlers)
             continue; // Interrupted
         }
 
-#ifdef ICE_CPP11_MAPPING
-        map<EventHandlerPtr, SocketOperation>::iterator q = _readyHandlers.find(
-            dynamic_pointer_cast<EventHandler>(p.first->shared_from_this()));
-#else
-        map<EventHandlerPtr, SocketOperation>::iterator q = _readyHandlers.find(p.first);
-#endif
+        map<EventHandlerPtr, SocketOperation>::iterator q = _readyHandlers.find(ICE_GET_SHARED_FROM_THIS(p.first));
+
         if(q != _readyHandlers.end()) // Handler will be added by the loop below
         {
             q->second = p.second; // We just remember which operations are ready here.
@@ -822,12 +830,10 @@ Selector::select(int timeout)
                 continue;
             }
 
-            {
-                Ice::SocketException ex(__FILE__, __LINE__, IceInternal::getSocketErrno());
-                Ice::Error out(_instance->initializationData().logger);
-                out << "fatal error: selector failed:\n" << ex;
-            }
-            abort();
+            Ice::SocketException ex(__FILE__, __LINE__, IceInternal::getSocketErrno());
+            Ice::Error out(_instance->initializationData().logger);
+            out << "selector failed:\n" << ex;
+            IceUtil::ThreadControl::sleep(IceUtil::Time::seconds(5)); // Sleep 5s to avoid looping
         }
         break;
     }
@@ -843,22 +849,12 @@ Selector::checkReady(EventHandler* handler)
 {
     if(handler->_ready & ~handler->_disabled & handler->_registered)
     {
-#ifdef ICE_CPP11_MAPPING
-        _readyHandlers.insert(make_pair(dynamic_pointer_cast<EventHandler>(handler->shared_from_this()), 
-                                        SocketOperationNone));
-#else
-        _readyHandlers.insert(make_pair(handler, SocketOperationNone));
-#endif
+        _readyHandlers.insert(make_pair(ICE_GET_SHARED_FROM_THIS(handler), SocketOperationNone));
         wakeup();
     }
     else
     {
-#ifdef ICE_CPP11_MAPPING
-        map<EventHandlerPtr, SocketOperation>::iterator p = 
-            _readyHandlers.find(dynamic_pointer_cast<EventHandler>(handler->shared_from_this()));
-#else
-        map<EventHandlerPtr, SocketOperation>::iterator p = _readyHandlers.find(handler);
-#endif
+        map<EventHandlerPtr, SocketOperation>::iterator p = _readyHandlers.find(ICE_GET_SHARED_FROM_THIS(handler));
         if(p != _readyHandlers.end())
         {
             _readyHandlers.erase(p);
@@ -870,11 +866,26 @@ void
 Selector::updateSelector()
 {
 #if defined(ICE_USE_KQUEUE)
-    int rs = kevent(_queueFd, &_changes[0], _changes.size(), 0, 0, 0);
+    int rs = kevent(_queueFd, &_changes[0], _changes.size(), &_changes[0], _changes.size(), &zeroTimeout);
     if(rs < 0)
     {
         Ice::Error out(_instance->initializationData().logger);
         out << "error while updating selector:\n" << IceUtilInternal::errorToString(IceInternal::getSocketErrno());
+    }
+    else
+    {
+        for(int i = 0; i < rs; ++i)
+        {
+            //
+            // Check for errors, we ignore EINPROGRESS that started showing up with macOS Sierra
+            // and which occurs when another thread removes the FD from the kqueue (see ICE-7419).
+            //
+            if(_changes[i].flags & EV_ERROR && _changes[i].data != EINPROGRESS)
+            {
+                Ice::Error out(_instance->initializationData().logger);
+                out << "error while updating selector:\n" << IceUtilInternal::errorToString(_changes[i].data);
+            }
+        }
     }
     _changes.clear();
 #elif !defined(ICE_USE_EPOLL)
@@ -1038,14 +1049,12 @@ toCFCallbacks(SocketOperation op)
 
 }
 
-EventHandlerWrapper::EventHandlerWrapper(const EventHandlerPtr& handler, Selector& selector) :
-    _handler(handler),
+EventHandlerWrapper::EventHandlerWrapper(EventHandler* handler, Selector& selector) :
+    _handler(ICE_GET_SHARED_FROM_THIS(handler)),
     _streamNativeInfo(StreamNativeInfoPtr::dynamicCast(handler->getNativeInfo())),
     _selector(selector),
     _ready(SocketOperationNone),
-    _finish(false),
-    _socket(0),
-    _source(0)
+    _finish(false)
 {
     if(_streamNativeInfo)
     {
@@ -1055,28 +1064,23 @@ EventHandlerWrapper::EventHandlerWrapper(const EventHandlerPtr& handler, Selecto
     {
         SOCKET fd = handler->getNativeInfo()->fd();
         CFSocketContext ctx = { 0, this, 0, 0, 0 };
-        _socket = CFSocketCreateWithNative(kCFAllocatorDefault,
-                                           fd,
-                                           kCFSocketReadCallBack |
-                                           kCFSocketWriteCallBack |
-                                           kCFSocketConnectCallBack,
-                                           eventHandlerSocketCallback,
-                                           &ctx);
+        _socket.reset(CFSocketCreateWithNative(kCFAllocatorDefault,
+                                               fd,
+                                               kCFSocketReadCallBack |
+                                               kCFSocketWriteCallBack |
+                                               kCFSocketConnectCallBack,
+                                               eventHandlerSocketCallback,
+                                               &ctx));
 
         // Disable automatic re-enabling of callbacks and closing of the native socket.
-        CFSocketSetSocketFlags(_socket, 0);
-        CFSocketDisableCallBacks(_socket, kCFSocketReadCallBack | kCFSocketWriteCallBack | kCFSocketConnectCallBack);
-        _source = CFSocketCreateRunLoopSource(kCFAllocatorDefault, _socket, 0);
+        CFSocketSetSocketFlags(_socket.get(), 0);
+        CFSocketDisableCallBacks(_socket.get(), kCFSocketReadCallBack | kCFSocketWriteCallBack | kCFSocketConnectCallBack);
+        _source.reset(CFSocketCreateRunLoopSource(kCFAllocatorDefault, _socket.get(), 0));
     }
 }
 
 EventHandlerWrapper::~EventHandlerWrapper()
 {
-    if(_socket)
-    {
-        CFRelease(_socket);
-        CFRelease(_source);
-    }
 }
 
 void
@@ -1087,24 +1091,24 @@ EventHandlerWrapper::updateRunLoop()
 
     if(_socket)
     {
-        CFSocketDisableCallBacks(_socket, kCFSocketReadCallBack | kCFSocketWriteCallBack | kCFSocketConnectCallBack);
+        CFSocketDisableCallBacks(_socket.get(), kCFSocketReadCallBack | kCFSocketWriteCallBack | kCFSocketConnectCallBack);
         if(op)
         {
-            CFSocketEnableCallBacks(_socket, toCFCallbacks(op));
+            CFSocketEnableCallBacks(_socket.get(), toCFCallbacks(op));
         }
 
-        if(op && !CFRunLoopContainsSource(CFRunLoopGetCurrent(), _source, kCFRunLoopDefaultMode))
+        if(op && !CFRunLoopContainsSource(CFRunLoopGetCurrent(), _source.get(), kCFRunLoopDefaultMode))
         {
-            CFRunLoopAddSource(CFRunLoopGetCurrent(), _source, kCFRunLoopDefaultMode);
+            CFRunLoopAddSource(CFRunLoopGetCurrent(), _source.get(), kCFRunLoopDefaultMode);
         }
-        else if(!op && CFRunLoopContainsSource(CFRunLoopGetCurrent(), _source, kCFRunLoopDefaultMode))
+        else if(!op && CFRunLoopContainsSource(CFRunLoopGetCurrent(), _source.get(), kCFRunLoopDefaultMode))
         {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), _source, kCFRunLoopDefaultMode);
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), _source.get(), kCFRunLoopDefaultMode);
         }
 
         if(_finish)
         {
-            CFSocketInvalidate(_socket);
+            CFSocketInvalidate(_socket.get());
         }
     }
     else
@@ -1224,7 +1228,7 @@ Selector::Selector(const InstancePtr& instance) : _instance(instance), _destroye
     memset(&ctx, 0, sizeof(CFRunLoopSourceContext));
     ctx.info = this;
     ctx.perform = selectorInterrupt;
-    _source = CFRunLoopSourceCreate(0, 0, &ctx);
+    _source.reset(CFRunLoopSourceCreate(0, 0, &ctx));
     _runLoop = 0;
 
     _thread = new SelectorHelperThread(*this);
@@ -1252,12 +1256,12 @@ Selector::destroy()
         // streams/sockets are closed.
         //
         _destroyed = true;
-        CFRunLoopSourceSignal(_source);
+        CFRunLoopSourceSignal(_source.get());
         CFRunLoopWakeUp(_runLoop);
 
         while(!_changes.empty())
         {
-            CFRunLoopSourceSignal(_source);
+            CFRunLoopSourceSignal(_source.get());
             CFRunLoopWakeUp(_runLoop);
 
             wait();
@@ -1268,7 +1272,7 @@ Selector::destroy()
     _thread = 0;
 
     Lock sync(*this);
-    CFRelease(_source);
+    _source.reset(0);
 
     //assert(_wrappers.empty());
     _readyHandlers.clear();
@@ -1407,7 +1411,7 @@ Selector::select(int timeout)
     {
         while(!_changes.empty())
         {
-            CFRunLoopSourceSignal(_source);
+            CFRunLoopSourceSignal(_source.get());
             CFRunLoopWakeUp(_runLoop);
 
             wait();
@@ -1463,9 +1467,9 @@ Selector::run()
         notify();
     }
 
-    CFRunLoopAddSource(CFRunLoopGetCurrent(), _source, kCFRunLoopDefaultMode);
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), _source.get(), kCFRunLoopDefaultMode);
     CFRunLoopRun();
-    CFRunLoopRemoveSource(CFRunLoopGetCurrent(), _source, kCFRunLoopDefaultMode);
+    CFRunLoopRemoveSource(CFRunLoopGetCurrent(), _source.get(), kCFRunLoopDefaultMode);
 }
 
 void

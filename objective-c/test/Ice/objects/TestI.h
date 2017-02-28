@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,19 +11,16 @@
 
 @interface TestObjectsBI : TestObjectsB<TestObjectsB>
 {
-    BOOL _postUnmarshalInvoked;
 }
 @end
 
 @interface TestObjectsCI : TestObjectsC<TestObjectsC>
 {
-    BOOL _postUnmarshalInvoked;
 }
 @end
 
 @interface TestObjectsDI : TestObjectsD<TestObjectsD>
 {
-    BOOL _postUnmarshalInvoked;
 }
 @end
 
@@ -76,4 +73,9 @@
 @end
 
 @interface UnexpectedObjectExceptionTestI : ICEBlobject<ICEBlobject>
+@end
+
+@interface TestObjectsTestIntfI : TestObjectsTestIntf<TestObjectsTestIntf>
+-(TestObjectsBase*) opDerived:(ICECurrent *)current;
+-(void) throwDerived:(ICECurrent *)current;
 @end

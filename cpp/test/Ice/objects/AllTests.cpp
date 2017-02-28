@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,7 +9,7 @@
 
 #include <Ice/Ice.h>
 #include <TestCommon.h>
-#include <Test.h>
+#include <TestI.h>
 
 #ifdef _MSC_VER
 // For 'Ice::Communicator::addObjectFactory()' deprecation
@@ -74,7 +74,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     InitialPrxPtr initial = ICE_CHECKED_CAST(InitialPrx, base);
     test(initial);
 #ifdef ICE_CPP11_MAPPING
-    test(Ice::targetEquals(initial, base));
+    test(Ice::targetEqualTo(initial, base));
 #else
     test(initial == base);
 #endif
@@ -92,9 +92,21 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(ba2->theS.str == "hello");
     test(ba2->str == "hi");
 
+#ifdef ICE_CPP11_MAPPING
+    test(*ba1 < *ba2);
+    test(*ba2 > *ba1);
+    test(*ba1 != *ba2);
+#endif
+
     *ba1 = *ba2;
     test(ba1->theS.str == "hello");
     test(ba1->str == "hi");
+
+#ifdef ICE_CPP11_MAPPING
+    test(*ba1 == *ba2);
+    test(*ba1 >= *ba2);
+    test(*ba1 <= *ba2);
+#endif
 
     BasePtr bp1 = ICE_MAKE_SHARED(Base);
     *bp1 = *ba2;
@@ -168,17 +180,16 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(ICE_DYNAMIC_CAST(C, ICE_DYNAMIC_CAST(B, b1->theA)->theC));
     test(ICE_DYNAMIC_CAST(C, ICE_DYNAMIC_CAST(B, b1->theA)->theC)->theB == b1->theA);
 
+    test(b1->preMarshalInvoked);
+    test(b1->postUnmarshalInvoked);
+    test(b1->theA->preMarshalInvoked);
+    test(b1->theA->postUnmarshalInvoked);
 #ifdef ICE_CPP11_MAPPING
-    test(b1->preMarshalInvoked);
-    test(b1->theA->preMarshalInvoked);
     test(dynamic_pointer_cast<B>(b1->theA)->theC->preMarshalInvoked);
+    test(dynamic_pointer_cast<B>(b1->theA)->theC->postUnmarshalInvoked);
 #else
-    test(b1->preMarshalInvoked);
-    test(b1->postUnmarshalInvoked());
-    test(b1->theA->preMarshalInvoked);
-    test(b1->theA->postUnmarshalInvoked());
     test(BPtr::dynamicCast(b1->theA)->theC->preMarshalInvoked);
-    test(BPtr::dynamicCast(b1->theA)->theC->postUnmarshalInvoked());
+    test(BPtr::dynamicCast(b1->theA)->theC->postUnmarshalInvoked);
 #endif
     // More tests possible for b2 and d, but I think this is already sufficient.
     test(b2->theA == b2);
@@ -211,11 +222,6 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(d->theA == dynamic_pointer_cast<A>(b1));
     test(d->theB == dynamic_pointer_cast<B>(b2));
     test(d->theC == nullptr);
-
-    test(d->preMarshalInvoked);
-    test(d->theA->preMarshalInvoked);
-    test(d->theB->preMarshalInvoked);
-    test(d->theB->theC->preMarshalInvoked);
 #else
     test(b1 != b2);
     test(b1 != c);
@@ -233,26 +239,25 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(d->theA == b1);
     test(d->theB == b2);
     test(d->theC == ICE_NULLPTR);
-
-    test(d->preMarshalInvoked);
-    test(d->postUnmarshalInvoked());
-    test(d->theA->preMarshalInvoked);
-    test(d->theA->postUnmarshalInvoked());
-    test(d->theB->preMarshalInvoked);
-    test(d->theB->postUnmarshalInvoked());
-    test(d->theB->theC->preMarshalInvoked);
-    test(d->theB->theC->postUnmarshalInvoked());
 #endif
+    test(d->preMarshalInvoked);
+    test(d->postUnmarshalInvoked);
+    test(d->theA->preMarshalInvoked);
+    test(d->theA->postUnmarshalInvoked);
+    test(d->theB->preMarshalInvoked);
+    test(d->theB->postUnmarshalInvoked);
+    test(d->theB->theC->preMarshalInvoked);
+    test(d->theB->theC->postUnmarshalInvoked);
     cout << "ok" << endl;
 
     cout << "testing protected members... " << flush;
 
-    EPtr e = initial->getE();
-    FPtr f = initial->getF();
+    EIPtr e = ICE_DYNAMIC_CAST(EI, initial->getE());
+    FIPtr f = ICE_DYNAMIC_CAST(FI, initial->getF());
 #ifndef ICE_CPP11_MAPPING
     test(e->checkValues());
     test(f->checkValues());
-    test(f->e2->checkValues());
+    test(ICE_DYNAMIC_CAST(EI, f->e2)->checkValues());
 #endif
     cout << "ok" << endl;
 
@@ -326,6 +331,17 @@ allTests(const Ice::CommunicatorPtr& communicator)
     catch(const Ice::OperationNotExistException&)
     {
     }
+    cout << "ok" << endl;
+
+    cout << "testing marshaled results..." << flush;
+    b1 = initial->getMB();
+    test(b1 && b1->theB == b1);
+#ifdef ICE_CPP11_MAPPING
+    b1 = initial->getAMDMBAsync().get();
+#else
+    b1 = initial->end_getAMDMB(initial->begin_getAMDMB());
+#endif
+    test(b1 && b1->theB == b1);
     cout << "ok" << endl;
 
     cout << "testing UnexpectedObjectException... " << flush;

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,13 +9,17 @@
 
 #pragma once
 
-[["cpp:header-ext:h", "objc:header-dir:objc", "js:ice-build"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICEGRID_API", "objc:header-dir:objc", "objc:dll-export:ICEGRID_API", "js:ice-build"]]
 [["cpp:include:IceGrid/Config.h"]]
 
 #include <IceGrid/Exception.ice>
 #include <IceGrid/Session.ice>
 #include <IceGrid/Admin.ice>
 #include <Ice/Locator.ice>
+
+#ifndef __SLICE2JAVA_COMPAT__
+[["java:package:com.zeroc"]]
+#endif
 
 ["objc:prefix:ICEGRID"]
 module IceGrid
@@ -135,9 +139,6 @@ interface Registry
      *
      * Create a client session.
      *
-     * @see Session
-     * @see Glacier2.PermissionsVerifier
-     *
      * @return A proxy for the newly created session.
      *
      * @param userId The user id.
@@ -155,9 +156,6 @@ interface Registry
     /**
      *
      * Create an administrative session.
-     *
-     * @see Session
-     * @see Glacier2.PermissionsVerifier
      *
      * @return A proxy for the newly created session.
      *
@@ -177,9 +175,6 @@ interface Registry
      *
      * Create a client session from a secure connection.
      *
-     * @see Session
-     * @see Glacier2.SSLPermissionsVerifier
-     *
      * @return A proxy for the newly created session.
      *
      * @throws PermissionDeniedException Raised if the password for
@@ -193,9 +188,6 @@ interface Registry
     /**
      *
      * Create an administrative session from a secure connection.
-     *
-     * @see Session
-     * @see Glacier2.SSLPermissionsVerifier
      *
      * @return A proxy for the newly created session.
      *
@@ -268,4 +260,3 @@ interface Locator extends Ice::Locator
 };
 
 };
-

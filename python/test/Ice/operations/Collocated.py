@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # **********************************************************************
 #
-# Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+# Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 #
 # This copy of Ice is licensed to you under the terms described in the
 # ICE_LICENSE file included in this distribution.
@@ -22,7 +22,7 @@ import Test, TestI, AllTests
 def run(args, communicator):
     communicator.getProperties().setProperty("TestAdapter.Endpoints", "default -p 12010")
     adapter = communicator.createObjectAdapter("TestAdapter")
-    prx = adapter.add(TestI.MyDerivedClassI(), communicator.stringToIdentity("test"))
+    prx = adapter.add(TestI.MyDerivedClassI(), Ice.stringToIdentity("test"))
     #adapter.activate() // Don't activate OA to ensure collocation is used.
 
     if prx.ice_getConnection():
@@ -38,17 +38,10 @@ try:
 
     initData.properties.setProperty("Ice.BatchAutoFlushSize", "100")
 
-    communicator = Ice.initialize(sys.argv, initData)
-    status = run(sys.argv, communicator)
+    with Ice.initialize(sys.argv, initData) as communicator:
+        status = run(sys.argv, communicator)
 except:
     traceback.print_exc()
     status = False
-
-if communicator:
-    try:
-        communicator.destroy()
-    except:
-        traceback.print_exc()
-        status = False
 
 sys.exit(not status)

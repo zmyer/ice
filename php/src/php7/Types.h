@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -145,7 +145,7 @@ public:
 
     virtual std::string getId() const = 0;
 
-    virtual bool validate(zval*) = 0;
+    virtual bool validate(zval*, bool) = 0; // Validate type data. Bool enables excpetion throwing.
 
     virtual bool variableLength() const = 0;
     virtual int wireSize() const = 0;
@@ -184,7 +184,7 @@ public:
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -223,7 +223,7 @@ public:
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -269,7 +269,7 @@ public:
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -309,7 +309,7 @@ public:
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -349,7 +349,7 @@ public:
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -414,11 +414,11 @@ public:
 
     ClassInfo(const std::string&);
 
-    void define(const std::string&, Ice::Int, bool, bool, zval*, zval*, zval*);
+    void define(const std::string&, Ice::Int, bool, bool, zval*, zval*);
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -438,39 +438,37 @@ public:
 
     bool isA(const std::string&) const;
 
-    void addOperation(const std::string&, const OperationPtr&);
-    OperationPtr getOperation(const std::string&) const;
-
     const std::string id;
     const std::string name; // PHP class name
     const Ice::Int compactId;
-    const bool isAbstract;
     const bool preserve;
+    const bool interface;
     const ClassInfoPtr base;
-    const ClassInfoList interfaces;
     const DataMemberList members;
     const DataMemberList optionalMembers;
     const zend_class_entry* zce;
     bool defined;
-
-    typedef std::map<std::string, OperationPtr> OperationMap;
-    OperationMap operations;
 };
 
 //
 // Proxy information.
 //
+
+class ProxyInfo;
+typedef IceUtil::Handle<ProxyInfo> ProxyInfoPtr;
+typedef std::vector<ProxyInfoPtr> ProxyInfoList;
+
 class ProxyInfo : public TypeInfo
 {
 public:
 
     ProxyInfo(const std::string&);
 
-    void define(const ClassInfoPtr&);
+    void define(zval*, zval*);
 
     virtual std::string getId() const;
 
-    virtual bool validate(zval*);
+    virtual bool validate(zval*, bool);
 
     virtual bool variableLength() const;
     virtual int wireSize() const;
@@ -483,12 +481,18 @@ public:
     virtual void print(zval*, IceUtilInternal::Output&, PrintObjectHistory*);
 
     virtual void destroy();
+    bool isA(const std::string&) const;
+
+    void addOperation(const std::string&, const OperationPtr&);
+    OperationPtr getOperation(const std::string&) const;
 
     const std::string id;
-    const ClassInfoPtr cls;
+    const ProxyInfoPtr base;
+    const ProxyInfoList interfaces;
     bool defined;
+    typedef std::map<std::string, OperationPtr> OperationMap;
+    OperationMap operations;
 };
-typedef IceUtil::Handle<ProxyInfo> ProxyInfoPtr;
 
 //
 // Exception information.
@@ -516,6 +520,7 @@ public:
 
 ClassInfoPtr getClassInfoById(const std::string&);
 ClassInfoPtr getClassInfoByName(const std::string&);
+ProxyInfoPtr getProxyInfo(const std::string&);
 ExceptionInfoPtr getExceptionInfo(const std::string&);
 
 bool isUnset(zval*);
@@ -537,8 +542,8 @@ public:
 
     virtual void ice_preMarshal();
 
-    virtual void __write(Ice::OutputStream*) const;
-    virtual void __read(Ice::InputStream*);
+    virtual void _iceWrite(Ice::OutputStream*) const;
+    virtual void _iceRead(Ice::InputStream*);
 
 private:
 
@@ -547,6 +552,7 @@ private:
     zval _object;
     ObjectMap* _map;
     ClassInfoPtr _info;
+    ClassInfoPtr _formal;
 };
 
 //
@@ -561,8 +567,8 @@ public:
 
     virtual void ice_postUnmarshal();
 
-    virtual void __write(Ice::OutputStream*) const;
-    virtual void __read(Ice::InputStream*);
+    virtual void _iceWrite(Ice::OutputStream*) const;
+    virtual void _iceRead(Ice::InputStream*);
 
     virtual ClassInfoPtr getInfo() const;
 
@@ -592,9 +598,9 @@ public:
     virtual ExceptionReader* ice_clone() const;
     virtual void ice_throw() const;
 
-    virtual void __write(Ice::OutputStream*) const;
-    virtual void __read(Ice::InputStream*);
-    virtual bool __usesClasses() const;
+    virtual void _write(Ice::OutputStream*) const;
+    virtual void _read(Ice::InputStream*);
+    virtual bool _usesClasses() const;
 
     ExceptionInfoPtr getInfo() const;
 
@@ -602,13 +608,10 @@ public:
 
     Ice::SlicedDataPtr getSlicedData() const;
 
-    using Ice::UserException::__read;
-    using Ice::UserException::__write;
-
 protected:
 
-    virtual void __writeImpl(Ice::OutputStream*) const {}
-    virtual void __readImpl(Ice::InputStream*) {}
+    virtual void _writeImpl(Ice::OutputStream*) const {}
+    virtual void _readImpl(Ice::InputStream*) {}
 
 private:
 

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,12 +19,13 @@
 
 #include <set>
 #include <climits>
+#include <fstream>
 
 #if defined(_WIN32)
 #   include <pdhmsg.h> // For PDH_MORE_DATA
 #else
 #   include <sys/utsname.h>
-#   if defined(__APPLE__) || defined(__FreeBSD__)
+#   if defined(__APPLE__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
 #      include <sys/sysctl.h>
 #   elif defined(__sun)
 #      include <sys/loadavg.h>
@@ -222,7 +223,7 @@ PlatformInfo::PlatformInfo(const string& prefix,
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
     _nProcessorThreads = sysInfo.dwNumberOfProcessors;
-#elif defined(__FreeBSD__)
+#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
     static int ncpu[2] = { CTL_HW, HW_NCPU };
     size_t sz = sizeof(_nProcessorThreads);
     if(sysctl(ncpu, 2, &_nProcessorThreads, &sz, 0, 0) == -1)
@@ -250,6 +251,13 @@ PlatformInfo::PlatformInfo(const string& prefix,
     osInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 
 //
+// GetVersionEx will return the Windows 8 OS version value (6.2) for applications
+// not manifested for Windows 8.1 or Windows 10. We read the OS version info from 
+// a system file resource and if that fail we just return whatever GetVersionEx
+// returns.
+//
+
+//
 // GetVersionEx deprecated in Windows 8.1
 //
 #  if defined(_MSC_VER) && _MSC_VER >= 1800
@@ -259,10 +267,44 @@ PlatformInfo::PlatformInfo(const string& prefix,
 #  if defined(_MSC_VER) && _MSC_VER >= 1800
 #    pragma warning (default : 4996)
 #  endif
+
+
+    DWORD major = osInfo.dwMajorVersion;
+    DWORD minor = osInfo.dwMinorVersion;
+    DWORD build = osInfo.dwBuildNumber;
+
+    HMODULE handle = GetModuleHandleW(L"kernel32.dll");
+    if(handle)
+    {
+        wchar_t path[MAX_PATH];
+        if(GetModuleFileNameW(handle, path, MAX_PATH))
+        {
+            DWORD size = GetFileVersionInfoSizeW(path, 0);
+            if(size)
+            {
+                vector<unsigned char> buffer;
+                buffer.resize(size) ;
+
+                if(GetFileVersionInfoW(path, 0, size, &buffer[0]))
+                {
+                    VS_FIXEDFILEINFO* ffi;
+                    unsigned int ffiLen;
+                    if(VerQueryValueW(&buffer[0], L"", (LPVOID*)&ffi, &ffiLen))
+                    {
+                        major = HIWORD(ffi->dwProductVersionMS);
+                        minor = LOWORD(ffi->dwProductVersionMS);
+                        build = HIWORD(ffi->dwProductVersionLS);
+                    }
+                }
+            }
+        }
+    }
+
     ostringstream os;
-    os << osInfo.dwMajorVersion << "." << osInfo.dwMinorVersion;
+    os << major << "." << minor;
     _release = os.str();
-    _version = osInfo.szCSDVersion;
+    os << "." << build;
+    _version = os.str();
 
     switch(sysInfo.wProcessorArchitecture)
     {
@@ -300,7 +342,7 @@ PlatformInfo::PlatformInfo(const string& prefix,
 #if defined(_WIN32)
         _nProcessorSockets = getSocketCount(_traceLevels->logger);
 #elif defined(__linux)
-        IceUtilInternal::ifstream is(string("/proc/cpuinfo"));
+        ifstream is("/proc/cpuinfo");
         set<string> ids;
         
         int nprocessor = 0;
@@ -450,7 +492,7 @@ PlatformInfo::getLoadInfo()
     info.avg1 = static_cast<float>(_last1Total) / _usages1.size() / 100.0f;
     info.avg5 = static_cast<float>(_last5Total) / _usages5.size() / 100.0f;
     info.avg15 = static_cast<float>(_last15Total) / _usages15.size() / 100.0f;
-#elif defined(__sun) || defined(__linux) || defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__sun) || defined(__linux) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
     //
     // We use the load average divided by the number of
     // processors to figure out if the machine is busy or

@@ -1,25 +1,28 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
 
-sourceCompatibility = iceSourceCompatibility
-targetCompatibility = iceTargetCompatibility
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
-def macosx = System.properties['os.name'] == "Mac OS X"
+project.ext.displayName = "IceGridGUI Compat"
+project.ext.description = ""
+
+project.ext.macosx = System.properties['os.name'] == "Mac OS X"
 
 // Check for JavaFX support
-def javafxJar = searchFile([{System.env['JFXRT_HOME']}, { System.env['JAVA_HOME']}, {System.properties['java.home']}],
+project.ext.javafxJar = searchFile([{System.env['JFXRT_HOME']}, { System.env['JAVA_HOME']}, {System.properties['java.home']}],
                            ['jfxrt.jar', 'lib/jfxrt.jar', 'lib/ext/jfxrt.jar', 'jre/lib/jfxrt.jar',
                             'jre/lib/ext/jfxrt.jar'])
 
-def hasJavaFx = javafxJar != null
+project.ext.hasJavaFx = javafxJar != null
 
-if (hasJavaFx) {
+if (project.ext.hasJavaFx) {
     apply plugin: 'application'
     apply from: 'javafx.gradle'
 } else {
@@ -43,70 +46,44 @@ dependencies {
       compile project(':icestorm')
       compile project(':glacier2')
       compile project(':icegrid')
-      compile 'com.jgoodies:jgoodies-common:1.8.0'
-      compile 'com.jgoodies:jgoodies-looks:2.6.0'
-      compile 'com.jgoodies:jgoodies-forms:1.8.0'
+      compile "com.jgoodies:jgoodies-looks:${jgoodiesLooksVersion}"
+      compile "com.jgoodies:jgoodies-forms:${jgoodiesFormsVersion}"
       bundleapp 'com.oracle:appbundler:1.0'
 }
 
-def tmpJarName = "IceGridGUITEMP.jar"
-def jarName = "icegridgui.jar"
+project.ext.tmpJarName = "IceGridGUITEMP.jar"
+project.ext.jarName = "icegridgui.jar"
+project.ext.env = System.getenv()
+project.ext.keystore = env['JARSIGNER_KEYSTORE']
+project.ext.keystore_password = env['JARSIGNER_KEYSTORE_PASSWORD']
 
 jar {
     archiveName = tmpJarName
     if (!hasJavaFx) {
         manifest {
-            attributes 'Main-Class': "IceGridGUI.Main"
+            attributes 'Main-Class': "com.zeroc.IceGridGUI.Main"
         }
     }
 }
 
-buildscript {
-    repositories {
-        maven {
-            url "https://${iceMavenRepo}/nexus/content/repositories/thirdparty"
-        }
-    }
-    dependencies {
-        classpath group: 'net.sourceforge', name: 'proguard', version: '5.0'
-    }
-}
-
-def libJars = []
+project.ext.libJars = []
 ['rt.jar', 'jsse.jar', 'i386/default/jclSC170/vm.jar', 'amd64/default/jclSC170/vm.jar', 'ibmcertpathfw.jar', 'math.jar'].each {
     def jfile = searchFile([{System.env['JAVA_HOME']}, {System.properties['java.home']}],
                            ["${it}", "lib/${it}", "jre/lib/${it}"])
     if (jfile) {
-      libJars << jfile
+      project.ext.libJars << jfile
     }
 }
 
 if (hasJavaFx) {
-    libJars << javafxJar
+    project.ext.libJars << javafxJar
 }
 
-task proguardJar(type: proguard.gradle.ProGuardTask, dependsOn: jar) {
-    injars configurations.compile.resolve(), filter: '!META-INF/**'
-    injars "${projectDir}/build/libs/${tmpJarName}"
-    outjars "${libDir}/${jarName}"
-    libraryjars libJars
-    configuration 'icegridgui.pro'
+if(icegridguiProguard.toBoolean()){
+    apply from: "proguard-jar.gradle"
+}else{
+    apply from: "plain-jar.gradle"
 }
-task updateManifest(dependsOn: proguardJar) << {
-    if (hasJavaFx) {
-        ant.jar(update: true, destfile: "${libDir}/${jarName}") {
-            delegate.manifest {
-                attribute(name: 'Main-Class', value: 'IceGridGUI.MainProxy')
-                attribute(name: 'Built-By', value: 'Zeroc, Inc.')
-                attribute(name: 'Class-Path', value: '../resources/')
-            }
-        }
-    }
-}
-
-def env = System.getenv()
-def keystore = env['JARSIGNER_KEYSTORE']
-def keystore_password = env['JARSIGNER_KEYSTORE_PASSWORD']
 
 task signjar(dependsOn: updateManifest) << {
     if(keystore != null && keystore.length() > 0) {
@@ -120,7 +97,7 @@ assemble.dependsOn(signjar)
 
 if(macosx)
 {
-    def appName = "IceGrid Admin"
+    def appName = "IceGrid GUI"
     task bundleapp(dependsOn: updateManifest) << {
         ant.taskdef(name: 'bundleapp',
                     classname: 'com.oracle.appbundler.AppBundlerTask',
@@ -133,7 +110,7 @@ if(macosx)
                       icon: "${projectDir}/src/main/resources/icons/icegrid.icns",
                       shortversion: "${project.version}",
                       applicationCategory: "public.app-category.utilities",
-                      mainclassname: "IceGridGUI/MainProxy",
+                      mainclassname: "com.zeroc.IceGridGUI/MainProxy",
                       copyright: "Copyright © 2005-2016 ZeroC, Inc. All rights reserved.") {
             classpath(file: "${libDir}/${jarName}") {
             }
@@ -143,7 +120,7 @@ if(macosx)
             }
             option(value: "-Dcom.apple.macos.useScreenMenuBar=true") {
             }
-            option(value: "-Xdock:name=IceGrid Admin") {
+            option(value: "-Xdock:name=IceGrid GUI") {
             }
             option(value: "-Dcom.apple.mrj.application.apple.menu.about.name=${appName}") {
             }
@@ -159,15 +136,9 @@ if(macosx)
 
 clean {
     delete("${libDir}/${jarName}")
-    delete("${libDir}/IceGrid Admin.app")
+    delete("${libDir}/IceGrid GUI.app")
 }
 
-task copyJars(type: Copy, dependsOn: updateManifest) {
-    from new File("${libDir}/${jarName}")
-    into "${DESTDIR}${jarDir}"
-}
-
-task install(dependsOn: copyJars)
 if(macosx) {
     install.dependsOn(copyBundle)
 }

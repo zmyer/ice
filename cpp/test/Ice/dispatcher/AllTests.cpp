@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -18,7 +18,10 @@ using namespace std;
 namespace
 {
 
-class Callback : public ICE_SHARED
+class Callback
+#ifndef ICE_CPP11_MAPPING
+    : public IceUtil::Shared
+#endif
 {
 public:
 
@@ -130,7 +133,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 
         CallbackPtr cb = ICE_MAKE_SHARED(Callback);
 #ifdef ICE_CPP11_MAPPING
-        p->op_async(
+        p->opAsync(
             [cb]()
             {
                 cb->response();
@@ -149,7 +152,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         cb->check();
 
         auto i = p->ice_adapterId("dummy");
-        i->op_async(
+        i->opAsync(
             [cb]()
             {
                 cb->response();
@@ -172,7 +175,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             // Expect InvocationTimeoutException.
             //
             auto to = p->ice_invocationTimeout(250);
-            to->sleep_async(500,
+            to->sleepAsync(500,
                 [cb]()
                 {
                     cb->responseEx();
@@ -206,7 +209,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
             auto fs = s->get_future();
             auto c = make_shared<promise<void>>();
 
-            p->opWithPayload_async(seq,
+            p->opWithPayloadAsync(seq,
                 [=]()
                 {
                     c->set_value();

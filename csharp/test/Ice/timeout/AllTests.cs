@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,7 @@
 using System.Diagnostics;
 using System.Threading;
 
-public class AllTests : TestCommon.TestApp
+public class AllTests : TestCommon.AllTests
 {
     private class Callback
     {
@@ -45,9 +45,10 @@ public class AllTests : TestCommon.TestApp
         private bool _called;
     }
 
-    public static Test.TimeoutPrx allTests(Ice.Communicator communicator)
+    public static Test.TimeoutPrx allTests(TestCommon.Application app)
     {
-        string sref = "timeout:default -p 12010";
+        Ice.Communicator communicator = app.communicator();
+        string sref = "timeout:" + app.getTestEndpoint(0);
         Ice.ObjectPrx obj = communicator.stringToProxy(sref);
         test(obj != null);
 
@@ -247,7 +248,7 @@ public class AllTests : TestCommon.TestApp
             Test.TimeoutPrx to = Test.TimeoutPrxHelper.checkedCast(obj.ice_timeout(100));
             Ice.Connection connection = to.ice_getConnection();
             timeout.holdAdapter(500);
-            connection.close(false);
+            connection.close(Ice.ConnectionClose.GracefullyWithWait);
             try
             {
                 connection.getInfo(); // getInfo() doesn't throw in the closing state.
@@ -262,9 +263,10 @@ public class AllTests : TestCommon.TestApp
                 connection.getInfo();
                 test(false);
             }
-            catch(Ice.CloseConnectionException)
+            catch(Ice.ConnectionManuallyClosedException ex)
             {
                 // Expected.
+                test(ex.graceful);
             }
             timeout.op(); // Ensure adapter is active.
         }
@@ -372,10 +374,10 @@ public class AllTests : TestCommon.TestApp
             initData.properties.setProperty("Ice.Override.CloseTimeout", "100");
             Ice.Communicator comm = Ice.Util.initialize(initData);
             comm.stringToProxy(sref).ice_getConnection();
-            timeout.holdAdapter(500);
+            timeout.holdAdapter(800);
             long begin = System.DateTime.Now.Ticks;
             comm.destroy();
-            test(((long)new System.TimeSpan(System.DateTime.Now.Ticks - begin).TotalMilliseconds - begin) < 400);
+            test(((long)new System.TimeSpan(System.DateTime.Now.Ticks - begin).TotalMilliseconds - begin) < 700);
         }
         WriteLine("ok");
 
@@ -391,7 +393,7 @@ public class AllTests : TestCommon.TestApp
             proxy = (Test.TimeoutPrx)proxy.ice_invocationTimeout(100);
             try
             {
-                proxy.sleep(300);
+                proxy.sleep(500);
                 test(false);
             }
             catch(Ice.InvocationTimeoutException)
@@ -400,11 +402,21 @@ public class AllTests : TestCommon.TestApp
 
             try
             {
-                proxy.end_sleep(proxy.begin_sleep(300));
+                proxy.end_sleep(proxy.begin_sleep(500));
                 test(false);
             }
             catch(Ice.InvocationTimeoutException)
             {
+            }
+
+            try
+            {
+                ((Test.TimeoutPrx)proxy.ice_invocationTimeout(-2)).ice_ping();
+                ((Test.TimeoutPrx)proxy.ice_invocationTimeout(-2)).begin_ice_ping().waitForCompleted();
+            }
+            catch(Ice.Exception)
+            {
+                test(false);
             }
 
             Test.TimeoutPrx batchTimeout = (Test.TimeoutPrx)proxy.ice_batchOneway();

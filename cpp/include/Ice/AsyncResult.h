@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -27,6 +27,8 @@ class ICE_API AsyncResult : private IceUtil::noncopyable, public Ice::LocalObjec
 {
 public:
 
+    virtual ~AsyncResult();
+
     virtual void cancel() = 0;
 
     virtual Int getHash() const = 0;
@@ -49,20 +51,30 @@ public:
 
     virtual const std::string& getOperation() const = 0;
 
-    virtual bool __wait() = 0;
-    virtual Ice::InputStream* __startReadParams() = 0;
-    virtual void __endReadParams() = 0;
-    virtual void __readEmptyParams() = 0;
-    virtual void __readParamEncaps(const ::Ice::Byte*&, ::Ice::Int&) = 0;
-    virtual void __throwUserException() = 0;
+    virtual bool waitForResponse() = 0;
+    virtual Ice::InputStream* startReadParams() = 0;
+    virtual void endReadParams() = 0;
+    virtual void readEmptyParams() = 0;
+    virtual void readParamEncaps(const ::Ice::Byte*&, ::Ice::Int&) = 0;
+    virtual void throwUserException() = 0;
 
-    static void __check(const AsyncResultPtr&, const ::IceProxy::Ice::Object*, const ::std::string&);
-    static void __check(const AsyncResultPtr&, const Connection*, const ::std::string&);
-    static void __check(const AsyncResultPtr&, const Communicator*, const ::std::string&);
+    static void check(const AsyncResultPtr&, const ::IceProxy::Ice::Object*, const ::std::string&);
+    static void check(const AsyncResultPtr&, const Connection*, const ::std::string&);
+    static void check(const AsyncResultPtr&, const Communicator*, const ::std::string&);
+
+    class Callback : public IceUtil::Shared
+    {
+    public:
+
+        virtual void run() = 0;
+    };
+    typedef IceUtil::Handle<Callback> CallbackPtr;
+
+    virtual void scheduleCallback(const CallbackPtr&) = 0;
 
 protected:
 
-    static void __check(const AsyncResultPtr&, const ::std::string&);
+    static void check(const AsyncResultPtr&, const ::std::string&);
 };
 
 }

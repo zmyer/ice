@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,7 +22,7 @@
 #include <Ice/PropertiesF.h>
 #include <Ice/Version.h>
 
-#include <IceUtil/UniquePtr.h>
+#include <Ice/UniquePtr.h>
 
 namespace IceInternal
 {
@@ -45,8 +45,15 @@ private:
 
     const bool _background;
 
-    std::map<Ice::LocatorPrxPtr, LocatorInfoPtr> _table;
-    std::map<Ice::LocatorPrxPtr, LocatorInfoPtr>::iterator _tableHint;
+#ifdef ICE_CPP11_MAPPING
+    using LocatorInfoTable = std::map<std::shared_ptr<Ice::LocatorPrx>,
+                                      LocatorInfoPtr,
+                                      Ice::TargetCompare<std::shared_ptr<Ice::LocatorPrx>, std::less>>;
+#else
+    typedef std::map<Ice::LocatorPrx, LocatorInfoPtr> LocatorInfoTable;
+#endif
+    LocatorInfoTable _table;
+    LocatorInfoTable::iterator _tableHint;
 
     std::map<std::pair<Ice::Identity, Ice::EncodingVersion>, LocatorTablePtr> _locatorTables;
 };
@@ -110,7 +117,6 @@ public:
     public:
 
         void addCallback(const ReferencePtr&, const ReferencePtr&, int, const GetEndpointsCallbackPtr&);
-        std::vector<EndpointIPtr> getEndpoints(const ReferencePtr&, const ReferencePtr&, int, bool&);
 
         void response(const Ice::ObjectPrxPtr&);
         void exception(const Ice::Exception&);
@@ -132,11 +138,7 @@ public:
         bool _sent;
         bool _response;
         Ice::ObjectPrxPtr _proxy;
-#ifdef ICE_CPP11_MAPPING
-        std::exception_ptr _exception;
-#else
-        IceUtil::UniquePtr<Ice::Exception> _exception;
-#endif
+        IceInternal::UniquePtr<Ice::Exception> _exception;
     };
     typedef IceUtil::Handle<Request> RequestPtr;
 
@@ -145,7 +147,6 @@ public:
     void destroy();
 
     bool operator==(const LocatorInfo&) const;
-    bool operator!=(const LocatorInfo&) const;
     bool operator<(const LocatorInfo&) const;
 
     const Ice::LocatorPrxPtr& getLocator() const
@@ -157,17 +158,11 @@ public:
     }
     Ice::LocatorRegistryPrxPtr getLocatorRegistry();
 
-    std::vector<EndpointIPtr> getEndpoints(const ReferencePtr& ref, int ttl, bool& cached)
+    void getEndpoints(const ReferencePtr& ref, int ttl, const GetEndpointsCallbackPtr& cb)
     {
-        return getEndpoints(ref, 0, ttl, cached);
+        getEndpoints(ref, 0, ttl, cb);
     }
-    std::vector<EndpointIPtr> getEndpoints(const ReferencePtr&, const ReferencePtr&, int, bool&);
-
-    void getEndpointsWithCallback(const ReferencePtr& ref, int ttl, const GetEndpointsCallbackPtr& cb)
-    {
-        getEndpointsWithCallback(ref, 0, ttl, cb);
-    }
-    void getEndpointsWithCallback(const ReferencePtr&, const ReferencePtr&, int, const GetEndpointsCallbackPtr&);
+    void getEndpoints(const ReferencePtr&, const ReferencePtr&, int, const GetEndpointsCallbackPtr&);
 
     void clearCache(const ReferencePtr&);
 

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -13,7 +13,7 @@ using System.Threading;
 
 using Test;
 
-public class AllTests : TestCommon.TestApp
+public class AllTests : TestCommon.AllTests
 {
     static IceMX.ConnectionMetrics
     getServerConnectionMetrics(IceMX.MetricsAdminPrx metrics, long expected)
@@ -78,6 +78,12 @@ public class AllTests : TestCommon.TestApp
         private bool _wait;
     };
 
+    static string
+    getPort(Ice.PropertiesAdminPrx p)
+    {
+        return TestCommon.Application.getTestPort(p.ice_getCommunicator().getProperties(), 0).ToString();
+    }
+
     static private Dictionary<string, string>
     getClientProps(Ice.PropertiesAdminPrx p, Dictionary<string, string> orig, string m)
     {
@@ -96,7 +102,7 @@ public class AllTests : TestCommon.TestApp
             map += "Map." + m + '.';
         }
         props["IceMX.Metrics.View." + map + "Reject.parent"] = "Ice\\.Admin";
-        props["IceMX.Metrics.View." + map + "Accept.endpointPort"] = "12010";
+        props["IceMX.Metrics.View." + map + "Accept.endpointPort"] = getPort(p);
         props["IceMX.Metrics.View." + map + "Reject.identity"] = ".*/admin|controller";
         return props;
     }
@@ -119,7 +125,7 @@ public class AllTests : TestCommon.TestApp
             map += "Map." + m + '.';
         }
         props["IceMX.Metrics.View." + map + "Reject.parent"] = "Ice\\.Admin|Controller";
-        props["IceMX.Metrics.View." + map + "Accept.endpointPort"] = "12010";
+        props["IceMX.Metrics.View." + map + "Accept.endpointPort"] = getPort(p);
         return props;
     }
 
@@ -194,6 +200,22 @@ public class AllTests : TestCommon.TestApp
     }
 
     static void
+    waitForObserverCurrent(ObserverI observer, int value)
+    {
+        for(int i = 0; i < 10; ++i)
+        {
+            if(observer.getCurrent() > 0)
+            {
+                Thread.Sleep(10);
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    static void
     testAttribute(IceMX.MetricsAdminPrx metrics,
                   Ice.PropertiesAdminPrx props,
                   UpdateCallbackI update,
@@ -249,7 +271,7 @@ public class AllTests : TestCommon.TestApp
     {
         if(proxy.ice_getCachedConnection() != null)
         {
-            proxy.ice_getCachedConnection().close(false);
+            proxy.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
         }
 
         try
@@ -262,7 +284,7 @@ public class AllTests : TestCommon.TestApp
 
         if(proxy.ice_getCachedConnection() != null)
         {
-            proxy.ice_getCachedConnection().close(false);
+            proxy.ice_getCachedConnection().close(Ice.ConnectionClose.GracefullyWithWait);
         }
     }
 
@@ -367,9 +389,17 @@ public class AllTests : TestCommon.TestApp
         return m;
     }
 
-    public static MetricsPrx allTests(Ice.Communicator communicator, CommunicatorObserverI obsv)
+    public static MetricsPrx allTests(TestCommon.Application app, CommunicatorObserverI obsv)
     {
-        MetricsPrx metrics = MetricsPrxHelper.checkedCast(communicator.stringToProxy("metrics:default -p 12010"));
+        Ice.Communicator communicator = app.communicator();
+
+        string host = app.getTestHost();
+        string port = app.getTestPort(0).ToString();
+        string hostAndPort = host + ":" + port;
+        string protocol = app.getTestProtocol();
+        string endpoint = protocol + " -h " + host + " -p " + port;
+
+        MetricsPrx metrics = MetricsPrxHelper.checkedCast(communicator.stringToProxy("metrics:" + endpoint));
         bool collocated = metrics.ice_getConnection() == null;
 
         Write("testing metrics admin facet checkedCast... ");
@@ -418,6 +448,8 @@ public class AllTests : TestCommon.TestApp
         metrics.ice_connectionId("Con1").ice_ping();
         metrics.ice_connectionId("Con1").ice_ping();
 
+        waitForCurrent(clientMetrics, "View", "Invocation", 0);
+
         view = clientMetrics.getMetricsView("View", out timestamp);
         test(view["Thread"].Length == 5);
         if(!collocated)
@@ -454,8 +486,8 @@ public class AllTests : TestCommon.TestApp
 
         if(!collocated)
         {
-            metrics.ice_getConnection().close(false);
-            metrics.ice_connectionId("Con1").ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
+            metrics.ice_connectionId("Con1").ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             waitForCurrent(clientMetrics, "View", "Connection", 0);
             waitForCurrent(serverMetrics, "View", "Connection", 0);
@@ -464,6 +496,15 @@ public class AllTests : TestCommon.TestApp
         clearView(clientProps, serverProps, update);
 
         WriteLine("ok");
+
+        string type = "";
+        string isSecure = "";
+        if(!collocated)
+        {
+            Ice.EndpointInfo endpointInfo = metrics.ice_getConnection().getEndpoint().getInfo();
+            type = endpointInfo.type().ToString();
+            isSecure = endpointInfo.secure() ? "True": "False";
+        }
 
         Dictionary<string, IceMX.Metrics> map;
 
@@ -541,7 +582,7 @@ public class AllTests : TestCommon.TestApp
             test(map["active"].current == 1);
 
             ControllerPrx controller = ControllerPrxHelper.checkedCast(
-                communicator.stringToProxy("controller:default -p 12011"));
+                communicator.stringToProxy("controller:" + app.getTestEndpoint(1)));
             controller.hold();
 
             map = toMap(clientMetrics.getMetricsView("View", out timestamp)["Connection"]);
@@ -549,7 +590,7 @@ public class AllTests : TestCommon.TestApp
             map = toMap(serverMetrics.getMetricsView("View", out timestamp)["Connection"]);
             test(map["holding"].current == 1);
 
-            metrics.ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             map = toMap(clientMetrics.getMetricsView("View", out timestamp)["Connection"]);
             test(map["closing"].current == 1);
@@ -564,7 +605,7 @@ public class AllTests : TestCommon.TestApp
             props["IceMX.Metrics.View.Map.Connection.GroupBy"] = "none";
             updateProps(clientProps, serverProps, update, props, "Connection");
 
-            metrics.ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             metrics.ice_timeout(500).ice_ping();
             controller.hold();
@@ -600,27 +641,27 @@ public class AllTests : TestCommon.TestApp
             testAttribute(clientMetrics, clientProps, update, "Connection", "parent", "Communicator");
             //testAttribute(clientMetrics, clientProps, update, "Connection", "id", "");
             testAttribute(clientMetrics, clientProps, update, "Connection", "endpoint",
-                          "tcp -h 127.0.0.1 -p 12010 -t 500");
+                          endpoint + " -t 500");
 
-            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointType", "1");
+            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointType", type);
             testAttribute(clientMetrics, clientProps, update, "Connection", "endpointIsDatagram", "False");
-            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointIsSecure", "False");
+            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointIsSecure", isSecure);
             testAttribute(clientMetrics, clientProps, update, "Connection", "endpointTimeout", "500");
             testAttribute(clientMetrics, clientProps, update, "Connection", "endpointCompress", "False");
-            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointHost", "127.0.0.1");
-            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointPort", "12010");
+            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointHost", host);
+            testAttribute(clientMetrics, clientProps, update, "Connection", "endpointPort", port);
 
             testAttribute(clientMetrics, clientProps, update, "Connection", "incoming", "False");
             testAttribute(clientMetrics, clientProps, update, "Connection", "adapterName", "");
             testAttribute(clientMetrics, clientProps, update, "Connection", "connectionId", "Con1");
-            testAttribute(clientMetrics, clientProps, update, "Connection", "localHost", "127.0.0.1");
+            testAttribute(clientMetrics, clientProps, update, "Connection", "localHost", host);
             //testAttribute(clientMetrics, clientProps, update, "Connection", "localPort", "");
-            testAttribute(clientMetrics, clientProps, update, "Connection", "remoteHost", "127.0.0.1");
-            testAttribute(clientMetrics, clientProps, update, "Connection", "remotePort", "12010");
+            testAttribute(clientMetrics, clientProps, update, "Connection", "remoteHost", host);
+            testAttribute(clientMetrics, clientProps, update, "Connection", "remotePort", port);
             testAttribute(clientMetrics, clientProps, update, "Connection", "mcastHost", "");
             testAttribute(clientMetrics, clientProps, update, "Connection", "mcastPort", "");
 
-            m.ice_getConnection().close(false);
+            m.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
 
             waitForCurrent(clientMetrics, "View", "Connection", 0);
             waitForCurrent(serverMetrics, "View", "Connection", 0);
@@ -638,13 +679,13 @@ public class AllTests : TestCommon.TestApp
 
             test(clientMetrics.getMetricsView("View", out timestamp)["ConnectionEstablishment"].Length == 1);
             IceMX.Metrics m1 = clientMetrics.getMetricsView("View", out timestamp)["ConnectionEstablishment"][0];
-            test(m1.current == 0 && m1.total == 1 && m1.id.Equals("127.0.0.1:12010"));
+            test(m1.current == 0 && m1.total == 1 && m1.id.Equals(hostAndPort));
 
-            metrics.ice_getConnection().close(false);
+            metrics.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
             controller.hold();
             try
             {
-                communicator.stringToProxy("test:tcp -p 12010 -h 127.0.0.1").ice_timeout(10).ice_ping();
+                communicator.stringToProxy("test:tcp -h 127.0.0.1 -p " + port).ice_timeout(10).ice_ping();
                 test(false);
             }
             catch(Ice.ConnectTimeoutException)
@@ -657,27 +698,26 @@ public class AllTests : TestCommon.TestApp
             controller.resume();
             test(clientMetrics.getMetricsView("View", out timestamp)["ConnectionEstablishment"].Length == 1);
             m1 = clientMetrics.getMetricsView("View", out timestamp)["ConnectionEstablishment"][0];
-            test(m1.id.Equals("127.0.0.1:12010") && m1.total == 3 && m1.failures == 2);
+            test(m1.id.Equals(hostAndPort) && m1.total == 3 && m1.failures == 2);
 
             checkFailure(clientMetrics, "ConnectionEstablishment", m1.id, "::Ice::ConnectTimeoutException", 2);
 
             System.Action c = () => { connect(metrics); };
             testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "parent", "Communicator", c);
-            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "id", "127.0.0.1:12010", c);
+            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "id", hostAndPort, c);
             testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpoint",
-                          "tcp -h 127.0.0.1 -p 12010 -t 60000", c);
+                          endpoint + " -t 60000", c);
 
-            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointType", "1", c);
+            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointType", type, c);
             testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointIsDatagram", "False",
                           c);
-            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointIsSecure", "False",
+            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointIsSecure", isSecure,
                           c);
             testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointTimeout", "60000", c);
             testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointCompress", "False",
                           c);
-            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointHost", "127.0.0.1",
-                          c);
-            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointPort", "12010", c);
+            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointHost", host, c);
+            testAttribute(clientMetrics, clientProps, update, "ConnectionEstablishment", "endpointPort", port, c);
 
             WriteLine("ok");
 
@@ -688,19 +728,25 @@ public class AllTests : TestCommon.TestApp
             updateProps(clientProps, serverProps, update, props, "EndpointLookup");
             test(clientMetrics.getMetricsView("View", out timestamp)["EndpointLookup"].Length == 0);
 
-            Ice.ObjectPrx prx = communicator.stringToProxy("metrics:default -p 12010 -h localhost -t infinite");
-            prx.ice_ping();
+            Ice.ObjectPrx prx =
+                communicator.stringToProxy("metrics:" + protocol + " -p " + port + " -h localhost -t 500");
+            try
+            {
+                prx.ice_ping();
+                prx.ice_getConnection().close(Ice.ConnectionClose.GracefullyWithWait);
+            }
+            catch(Ice.LocalException)
+            {
+            }
 
             test(clientMetrics.getMetricsView("View", out timestamp)["EndpointLookup"].Length == 1);
             m1 = clientMetrics.getMetricsView("View", out timestamp)["EndpointLookup"][0];
-            test(m1.current <= 1 && m1.total == 1 && m1.id.Equals("tcp -h localhost -p 12010 -t infinite"));
-
-            prx.ice_getConnection().close(false);
+            test(m1.current <= 1 && m1.total == 1);
 
             bool dnsException = false;
             try
             {
-                communicator.stringToProxy("test:tcp -t 500 -p 12010 -h unknownfoo.zeroc.com").ice_ping();
+                communicator.stringToProxy("test:tcp -t 500 -h unknownfoo.zeroc.com -p " + port).ice_ping();
                 test(false);
             }
             catch(Ice.DNSException)
@@ -713,11 +759,11 @@ public class AllTests : TestCommon.TestApp
             }
             test(clientMetrics.getMetricsView("View", out timestamp)["EndpointLookup"].Length == 2);
             m1 = clientMetrics.getMetricsView("View", out timestamp)["EndpointLookup"][0];
-            if(!m1.id.Equals("tcp -h unknownfoo.zeroc.com -p 12010 -t 500"))
+            if(!m1.id.Equals("tcp -h unknownfoo.zeroc.com -p " + port + " -t 500"))
             {
                 m1 = clientMetrics.getMetricsView("View", out timestamp)["EndpointLookup"][1];
             }
-            test(m1.id.Equals("tcp -h unknownfoo.zeroc.com -p 12010 -t 500") && m1.total == 2 &&
+            test(m1.id.Equals("tcp -h unknownfoo.zeroc.com -p " + port + " -t 500") && m1.total == 2 &&
                  (!dnsException || m1.failures == 2));
             if(dnsException)
             {
@@ -728,17 +774,17 @@ public class AllTests : TestCommon.TestApp
 
             testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "parent", "Communicator", c);
             testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "id",
-                          "tcp -h localhost -p 12010 -t infinite", c);
+                          prx.ice_getConnection().getEndpoint().ToString(), c);
             testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpoint",
-                          "tcp -h localhost -p 12010 -t infinite", c);
+                          prx.ice_getConnection().getEndpoint().ToString(), c);
 
-            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointType", "1", c);
+            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointType", type, c);
             testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointIsDatagram", "False", c);
-            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointIsSecure", "False", c);
-            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointTimeout", "-1", c);
+            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointIsSecure", isSecure, c);
+            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointTimeout", "500", c);
             testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointCompress", "False", c);
             testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointHost", "localhost", c);
-            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointPort", "12010", c);
+            testAttribute(clientMetrics, clientProps, update, "EndpointLookup", "endpointPort", port, c);
 
             WriteLine("ok");
         }
@@ -795,7 +841,7 @@ public class AllTests : TestCommon.TestApp
         }
 
         map = toMap(serverMetrics.getMetricsView("View", out timestamp)["Dispatch"]);
-        test(!collocated ? map.Count == 6 : map.Count == 5);
+        test(collocated ? map.Count == 5 : map.Count == 6);
 
         IceMX.DispatchMetrics dm1;
         dm1 = (IceMX.DispatchMetrics)map["op"];
@@ -828,24 +874,24 @@ public class AllTests : TestCommon.TestApp
         if(!collocated)
         {
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpoint",
-                          "tcp -h 127.0.0.1 -p 12010 -t 60000", op);
+                          endpoint + " -t 60000", op);
             //testAttribute(serverMetrics, serverProps, update, "Dispatch", "connection", "", op);
 
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointType", "1", op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointType", type, op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointIsDatagram", "False", op);
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointIsSecure", "False", op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointIsSecure", isSecure, op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointTimeout", "60000", op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointCompress", "False", op);
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointHost", "127.0.0.1", op);
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointPort", "12010", op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointHost", host, op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "endpointPort", port, op);
 
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "incoming", "True", op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "adapterName", "TestAdapter", op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "connectionId", "", op);
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "localHost", "127.0.0.1", op);
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "localPort", "12010", op);
-            testAttribute(serverMetrics, serverProps, update, "Dispatch", "remoteHost", "127.0.0.1", op);
-            //testAttribute(serverMetrics, serverProps, update, "Dispatch", "remotePort", "12010", op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "localHost", host, op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "localPort", port, op);
+            testAttribute(serverMetrics, serverProps, update, "Dispatch", "remoteHost", host, op);
+            //testAttribute(serverMetrics, serverProps, update, "Dispatch", "remotePort", port, op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "mcastHost", "", op);
             testAttribute(serverMetrics, serverProps, update, "Dispatch", "mcastPort", "", op);
         }
@@ -979,45 +1025,45 @@ public class AllTests : TestCommon.TestApp
         }
 
         map = toMap(clientMetrics.getMetricsView("View", out timestamp)["Invocation"]);
-        test(map.Count == (!collocated ? 6 : 5));
+        test(map.Count == (collocated ? 5 : 6));
 
         IceMX.InvocationMetrics im1;
         IceMX.ChildInvocationMetrics rim1;
         im1 = (IceMX.InvocationMetrics)map["op"];
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
-        test(!collocated ? im1.remotes.Length == 1 : im1.collocated.Length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.Length == 1 : im1.remotes.Length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 63 && rim1.replySize == 21);
 
         im1 = (IceMX.InvocationMetrics)map["opWithUserException"];
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
-        test(!collocated ? im1.remotes.Length == 1 : im1.collocated.Length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.Length == 1 : im1.remotes.Length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 114 && rim1.replySize == 69);
         test(im1.userException == 3);
 
         im1 = (IceMX.InvocationMetrics)map["opWithLocalException"];
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 3 && im1.retry == 0);
-        test(!collocated ? im1.remotes.Length == 1 : im1.collocated.Length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.Length == 1 : im1.remotes.Length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 117 && rim1.replySize > 7);
         checkFailure(clientMetrics, "Invocation", im1.id, "::Ice::UnknownLocalException", 3);
 
         im1 = (IceMX.InvocationMetrics)map["opWithRequestFailedException"];
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 3 && im1.retry == 0);
-        test(!collocated ? im1.remotes.Length == 1 : im1.collocated.Length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.Length == 1 : im1.remotes.Length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 141 && rim1.replySize == 120);
         checkFailure(clientMetrics, "Invocation", im1.id, "::Ice::ObjectNotExistException", 3);
 
         im1 = (IceMX.InvocationMetrics)map["opWithUnknownException"];
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 3 && im1.retry == 0);
-        test(!collocated ? im1.remotes.Length == 1 : im1.collocated.Length == 1);
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? im1.collocated.Length == 1 : im1.remotes.Length == 1);
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current == 0 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 123 && rim1.replySize > 7);
         checkFailure(clientMetrics, "Invocation", im1.id, "::Ice::UnknownException", 3);
@@ -1044,7 +1090,7 @@ public class AllTests : TestCommon.TestApp
         testAttribute(clientMetrics, clientProps, update, "Invocation", "encoding", "1.1", op);
         testAttribute(clientMetrics, clientProps, update, "Invocation", "mode", "twoway", op);
         testAttribute(clientMetrics, clientProps, update, "Invocation", "proxy",
-                      "metrics -t -e 1.1:tcp -h 127.0.0.1 -p 12010 -t 60000", op);
+                      "metrics -t -e 1.1:" + endpoint + " -t 60000", op);
 
         testAttribute(clientMetrics, clientProps, update, "Invocation", "context.entry1", "test", op);
         testAttribute(clientMetrics, clientProps, update, "Invocation", "context.entry2", "", op);
@@ -1057,7 +1103,7 @@ public class AllTests : TestCommon.TestApp
         props["IceMX.Metrics.View.Map.Invocation.GroupBy"] = "operation";
         props["IceMX.Metrics.View.Map.Invocation.Map.Remote.GroupBy"] = "localPort";
         updateProps(clientProps, serverProps, update, props, "Invocation");
-        
+
         MetricsPrx metricsOneway = (MetricsPrx)metrics.ice_oneway();
         metricsOneway.op();
         metricsOneway.end_op(metricsOneway.begin_op());
@@ -1068,12 +1114,12 @@ public class AllTests : TestCommon.TestApp
 
         im1 = (IceMX.InvocationMetrics)map["op"];
         test(im1.current <= 1 && im1.total == 3 && im1.failures == 0 && im1.retry == 0);
-        test(!collocated ? (im1.remotes.Length == 1) : (im1.collocated.Length == 1));
-        rim1 = (IceMX.ChildInvocationMetrics)(!collocated ? im1.remotes[0] : im1.collocated[0]);
+        test(collocated ? (im1.collocated.Length == 1) : (im1.remotes.Length == 1));
+        rim1 = (IceMX.ChildInvocationMetrics)(collocated ? im1.collocated[0] : im1.remotes[0]);
         test(rim1.current <= 1 && rim1.total == 3 && rim1.failures == 0);
         test(rim1.size == 63 && rim1.replySize == 0);
 
-        testAttribute(clientMetrics, clientProps, update, "Invocation", "mode", "oneway", 
+        testAttribute(clientMetrics, clientProps, update, "Invocation", "mode", "oneway",
                       () => { invokeOp(metricsOneway); });
 
         //
@@ -1082,7 +1128,7 @@ public class AllTests : TestCommon.TestApp
         props["IceMX.Metrics.View.Map.Invocation.GroupBy"] = "operation";
         props["IceMX.Metrics.View.Map.Invocation.Map.Remote.GroupBy"] = "localPort";
         updateProps(clientProps, serverProps, update, props, "Invocation");
-        
+
         MetricsPrx metricsBatchOneway = (MetricsPrx)metrics.ice_batchOneway();
         metricsBatchOneway.op();
         metricsBatchOneway.end_op(metricsBatchOneway.begin_op());
@@ -1095,8 +1141,8 @@ public class AllTests : TestCommon.TestApp
         test(im1.current == 0 && im1.total == 2 && im1.failures == 0 && im1.retry == 0);
         test(im1.remotes.Length == 0);
 
-        testAttribute(clientMetrics, clientProps, update, "Invocation", "mode", "batch-oneway", 
-                      () => { invokeOp(metricsBatchOneway); }); 
+        testAttribute(clientMetrics, clientProps, update, "Invocation", "mode", "batch-oneway",
+                      () => { invokeOp(metricsBatchOneway); });
 
         WriteLine("ok");
 
@@ -1158,24 +1204,17 @@ public class AllTests : TestCommon.TestApp
             test(obsv.connectionObserver.getCurrent() > 0);
             test(obsv.connectionEstablishmentObserver.getCurrent() == 0);
             test(obsv.endpointLookupObserver.getCurrent() == 0);
+            waitForObserverCurrent(obsv.invocationObserver.remoteObserver, 0);
             test(obsv.invocationObserver.remoteObserver.getCurrent() == 0);
         }
         else
         {
-            for(int i = 0; i < 10; ++i)
-            {
-                if(obsv.invocationObserver.collocatedObserver.getCurrent() > 0)
-                {
-                    Thread.Sleep(10);
-                }
-                else
-                {
-                    break;
-                }
-            }
+            waitForObserverCurrent(obsv.invocationObserver.collocatedObserver, 0);
             test(obsv.invocationObserver.collocatedObserver.getCurrent() == 0);
         }
+        waitForObserverCurrent(obsv.dispatchObserver, 0);
         test(obsv.dispatchObserver.getCurrent() == 0);
+        waitForObserverCurrent(obsv.invocationObserver, 0);
         test(obsv.invocationObserver.getCurrent() == 0);
 
         test(obsv.threadObserver.getFailedCount() == 0);

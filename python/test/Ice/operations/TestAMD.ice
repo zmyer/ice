@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,7 +19,7 @@ enum MyEnum
     enum3
 };
 
-class MyClass;
+interface MyClass;
 
 struct AnotherStruct
 {
@@ -89,7 +89,7 @@ dictionary<string, DoubleS> StringDoubleSD;
 dictionary<string, StringS> StringStringSD;
 dictionary<MyEnum, MyEnumS> MyEnumMyEnumSD;
 
-["amd"] class MyClass
+["amd"] interface MyClass
 {
     void shutdown();
 
@@ -247,6 +247,15 @@ dictionary<MyEnum, MyEnumS> MyEnumMyEnumSD;
 
     StringS opStringLiterals();
     StringS opWStringLiterals();
+
+    ["marshaled-result"] Structure opMStruct1();
+    ["marshaled-result"] Structure opMStruct2(Structure p1, out Structure p2);
+
+    ["marshaled-result"] StringS opMSeq1();
+    ["marshaled-result"] StringS opMSeq2(StringS p1, out StringS p2);
+
+    ["marshaled-result"] StringStringD opMDict1();
+    ["marshaled-result"] StringStringD opMDict2(StringStringD p1, out StringStringD p2);
 };
 
 struct MyStruct1
@@ -263,7 +272,7 @@ class MyClass1
     string myClass1; // Same name as the enclosing class
 };
 
-["amd"] class MyDerivedClass extends MyClass
+["amd"] interface MyDerivedClass extends MyClass
 {
     void opDerived();
     MyClass1 opMyClass1(MyClass1 opMyClass1);
@@ -312,9 +321,9 @@ const string sw10 = "\U00000DA7";                     // Sinhala Letter Alpapraa
 \v	vertical tab	byte 0x0b in ASCII encoding
 **/
 
-const string ss0 = "\'\"\?\\\a\b\f\n\r\t\v";
-const string ss1 = "\u0027\u0022\u003f\u005c\u0007\u0008\u000c\u000a\u000d\u0009\u000b";
-const string ss2 = "\U00000027\U00000022\U0000003f\U0000005c\U00000007\U00000008\U0000000c\U0000000a\U0000000d\U00000009\U0000000b";
+const string ss0 = "\'\"\?\\\a\b\f\n\r\t\v\6";
+const string ss1 = "\u0027\u0022\u003f\u005c\u0007\u0008\u000c\u000a\u000d\u0009\u000b\u0006";
+const string ss2 = "\U00000027\U00000022\U0000003f\U0000005c\U00000007\U00000008\U0000000c\U0000000a\U0000000d\U00000009\U0000000b\U00000006";
 
 const string ss3 = "\\\\U\\u\\"; /* \\U\u\  */
 const string ss4 = "\\\u0041\\"; /* \A\     */

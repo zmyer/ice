@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -16,7 +16,6 @@
 #include <Ice/TransceiverF.h>
 #include <Ice/ConnectorF.h>
 #include <Ice/AcceptorF.h>
-#include <Ice/VirtualShared.h>
 
 namespace Ice
 {
@@ -29,24 +28,28 @@ class InputStream;
 namespace IceInternal
 {
 
-class ICE_API EndpointI_connectors : public virtual ICE_SHARED
+class ICE_API EndpointI_connectors
+#ifndef ICE_CPP11_MAPPING
+    : public virtual IceUtil::Shared
+#endif
 {
 public:
 
-    virtual ~EndpointI_connectors() { }
+    virtual ~EndpointI_connectors();
 
     virtual void connectors(const std::vector<ConnectorPtr>&) = 0;
     virtual void exception(const Ice::LocalException&) = 0;
 };
 
-class ICE_API EndpointI : public Ice::Endpoint, public virtual ICE_SHARED
+class ICE_API EndpointI : public Ice::Endpoint
 {
 public:
 
     //
     // Marshal the endpoint.
     //
-    virtual void streamWrite(Ice::OutputStream*) const = 0;
+    virtual void streamWrite(Ice::OutputStream*) const;
+    virtual void streamWriteImpl(Ice::OutputStream*) const = 0;
 
     //
     // Return the endpoint type.
@@ -177,6 +180,8 @@ public:
 
     InfoI(const EndpointIPtr& endpoint) : _endpoint(endpoint)
     {
+        T::compress = _endpoint->compress();
+        T::timeout = _endpoint->timeout();
     }
 
     virtual Ice::Short

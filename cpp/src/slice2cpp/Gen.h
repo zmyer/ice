@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -51,6 +51,12 @@ private:
     // or an empty string if no global metadata was found.
     //
     std::string getHeaderExt(const std::string& file, const UnitPtr& unit);
+    
+    //
+    // Returns the source extension defined in the global metadata for a given file,
+    // or an empty string if no global metadata was found.
+    //
+    std::string getSourceExt(const std::string& file, const UnitPtr& unit);
 
     ::IceUtilInternal::Output H;
     ::IceUtilInternal::Output C;
@@ -143,6 +149,8 @@ private:
         ::IceUtilInternal::Output& C;
 
         std::string _dllExport;
+        std::string _dllClassExport;
+        std::string _dllMemberExport;
         int _useWstring;
         std::list<int> _useWstringHist;
     };
@@ -290,6 +298,7 @@ private:
     private:
 
         ::IceUtilInternal::Output& H;
+        ::IceUtilInternal::Output& C;
 
         std::string _dllExport;
         int _useWstring;
@@ -329,6 +338,7 @@ private:
         virtual bool visitModuleStart(const ModulePtr&);
         virtual void visitModuleEnd(const ModulePtr&);
         virtual bool visitStructStart(const StructPtr&);
+        virtual bool visitClassDefStart(const ClassDefPtr&);
         virtual bool visitExceptionStart(const ExceptionPtr&);
         virtual void visitEnum(const EnumPtr&);
 
@@ -391,6 +401,8 @@ private:
         ::IceUtilInternal::Output& C;
 
         std::string _dllExport;
+        std::string _dllClassExport;
+        std::string _dllMemberExport;
         bool _doneStaticSymbol;
         int _useWstring;
         std::list<int> _useWstringHist;
@@ -415,29 +427,12 @@ private:
         ::IceUtilInternal::Output& H;
         ::IceUtilInternal::Output& C;
 
-        std::string _dllExport;
+        std::string _dllClassExport;
+        std::string _dllMemberExport;
         int _useWstring;
         std::list<int> _useWstringHist;
     };
 
-    class Cpp11ProxyDeclVisitor : private ::IceUtil::noncopyable, public ParserVisitor
-    {
-    public:
-
-        Cpp11ProxyDeclVisitor(::IceUtilInternal::Output&, ::IceUtilInternal::Output&, const std::string&);
-
-        virtual bool visitUnitStart(const UnitPtr&);
-        virtual void visitUnitEnd(const UnitPtr&);
-        virtual bool visitModuleStart(const ModulePtr&);
-        virtual void visitModuleEnd(const ModulePtr&);
-        virtual void visitClassDecl(const ClassDeclPtr&);
-
-    private:
-
-        ::IceUtilInternal::Output& H;
-
-        std::string _dllExport;
-    };
 
     class Cpp11ObjectVisitor : public ParserVisitor
     {
@@ -455,6 +450,8 @@ private:
         ::IceUtilInternal::Output& C;
 
         std::string _dllExport;
+        std::string _dllClassExport;
+        std::string _dllMemberExport;
         bool _doneStaticSymbol;
         int _useWstring;
         std::list<int> _useWstringHist;
@@ -507,51 +504,6 @@ private:
         void emitUpcall(const ClassDefPtr&, const std::string&);
     };
 
-    class Cpp11AsyncVisitor : private ::IceUtil::noncopyable, public ParserVisitor
-    {
-    public:
-
-        Cpp11AsyncVisitor(::IceUtilInternal::Output&, ::IceUtilInternal::Output&, const std::string&);
-
-        virtual bool visitModuleStart(const ModulePtr&);
-        virtual void visitModuleEnd(const ModulePtr&);
-        virtual bool visitClassDefStart(const ClassDefPtr&);
-        virtual void visitClassDefEnd(const ClassDefPtr&);
-        virtual void visitOperation(const OperationPtr&);
-
-    private:
-
-        ::IceUtilInternal::Output& H;
-
-        std::string _dllExport;
-        int _useWstring;
-        std::list<int> _useWstringHist;
-    };
-
-    class Cpp11AsyncImplVisitor : private ::IceUtil::noncopyable, public ParserVisitor
-    {
-    public:
-
-        Cpp11AsyncImplVisitor(::IceUtilInternal::Output&, ::IceUtilInternal::Output&, const std::string&);
-
-        virtual bool visitUnitStart(const UnitPtr&);
-        virtual void visitUnitEnd(const UnitPtr&);
-        virtual bool visitModuleStart(const ModulePtr&);
-        virtual void visitModuleEnd(const ModulePtr&);
-        virtual bool visitClassDefStart(const ClassDefPtr&);
-        virtual void visitClassDefEnd(const ClassDefPtr&);
-        virtual void visitOperation(const OperationPtr&);
-
-    private:
-
-        ::IceUtilInternal::Output& H;
-        ::IceUtilInternal::Output& C;
-
-        std::string _dllExport;
-        int _useWstring;
-        std::list<int> _useWstringHist;
-    };
-
     class Cpp11StreamVisitor : private ::IceUtil::noncopyable, public ParserVisitor
     {
     public:
@@ -561,6 +513,8 @@ private:
         virtual bool visitModuleStart(const ModulePtr&);
         virtual void visitModuleEnd(const ModulePtr&);
         virtual bool visitStructStart(const StructPtr&);
+        virtual bool visitClassDefStart(const ClassDefPtr&);
+        virtual void visitExceptionEnd(const ExceptionPtr&);
         virtual void visitEnum(const EnumPtr&);
 
     private:
@@ -642,13 +596,42 @@ private:
 
     private:
 
-        void validate(const SyntaxTreeBasePtr&, const StringList&, const std::string&, const std::string&,
-                      bool = false);
+        StringList validate(const SyntaxTreeBasePtr&, const StringList&, const std::string&, const std::string&,
+                            bool = false);
+    };
 
-        StringSet _history;
+    class NormalizeMetaDataVisitor : public ParserVisitor
+    {
+    public:
+
+        NormalizeMetaDataVisitor(bool);
+
+        virtual bool visitUnitStart(const UnitPtr&);
+        virtual bool visitModuleStart(const ModulePtr&);
+        virtual void visitModuleEnd(const ModulePtr&);
+        virtual void visitClassDecl(const ClassDeclPtr&);
+        virtual bool visitClassDefStart(const ClassDefPtr&);
+        virtual void visitClassDefEnd(const ClassDefPtr&);
+        virtual bool visitExceptionStart(const ExceptionPtr&);
+        virtual void visitExceptionEnd(const ExceptionPtr&);
+        virtual bool visitStructStart(const StructPtr&);
+        virtual void visitStructEnd(const StructPtr&);
+        virtual void visitOperation(const OperationPtr&);
+        virtual void visitDataMember(const DataMemberPtr&);
+        virtual void visitSequence(const SequencePtr&);
+        virtual void visitDictionary(const DictionaryPtr&);
+        virtual void visitEnum(const EnumPtr&);
+        virtual void visitConst(const ConstPtr&);
+
+    private:
+
+        StringList normalize(const StringList&);
+
+        bool _cpp11;
     };
 
     static void validateMetaData(const UnitPtr&);
+    static void normalizeMetaData(const UnitPtr&, bool);
 };
 
 }

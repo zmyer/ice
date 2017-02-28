@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,6 @@
     var Ice = require("ice").Ice;
     var Glacier2 = require("ice").Glacier2;
     var Test = require("Callback").Test;
-    var Promise = Ice.Promise;
 
     var test = function(b)
     {
@@ -25,58 +24,58 @@
     var CallbackPrx = Test.CallbackPrx;
     var CallbackReceiverPrx = Test.CallbackReceiverPrx;
 
-    var CallbackReceiverI = function()
+    class CallbackReceiverI extends Test._CallbackReceiverDisp
     {
-        this._callback = false;
-        this._p = new Promise();
-    };
-    CallbackReceiverI.prototype = new Test.CallbackReceiver();
-    CallbackReceiverI.prototype.constructor = CallbackReceiverI;
-
-    CallbackReceiverI.prototype.callback = function(current)
-    {
-        test(!this._callback);
-        this._p.succeed();
-    };
-
-    CallbackReceiverI.prototype.callbackEx = function(current)
-    {
-        this.callback(current);
-        var ex = new Test.CallbackException();
-        ex.someValue = 3.14;
-        ex.someString = "3.14";
-        throw ex;
-    };
-
-    CallbackReceiverI.prototype.callbackOK = function()
-    {
-        var p = new Promise();
-        var self = this;
-        this._p.then(function(){
-            p.succeed();
+        constructor()
+        {
+            super();
             this._callback = false;
-            self._p = new Promise();
-        });
-        return p;
-    };
+            this._p = new Ice.Promise();
+        }
+
+
+        callback(current)
+        {
+            test(!this._callback);
+            this._p.resolve();
+        }
+
+        callbackEx(current)
+        {
+            this.callback(current);
+            var ex = new Test.CallbackException();
+            ex.someValue = 3.14;
+            ex.someString = "3.14";
+            throw ex;
+        }
+
+        callbackOK()
+        {
+            var p = new Ice.Promise();
+            this._p.then(() =>
+                {
+                    p.resolve();
+                    this._callback = false;
+                    this._p = new Ice.Promise();
+                });
+            return p;
+        }
+    }
 
     var allTests = function(out, communicator)
     {
-        var p = new Promise();
-
         var failCB = function () { test(false); };
 
-        var router, base, session, twoway, oneway, category, processBase, process,
-            adapter,callbackReceiverImpl,
+        var router, base, session, twoway, oneway, category, processBase, processPrx, adapter,callbackReceiverImpl,
             callbackReceiver,
             twowayR, onewayR,
             fakeTwowayR;
 
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 out.write("testing stringToProxy for router... ");
-                var routerBase = communicator.stringToProxy("Glacier2/router:default -p 12347");
+                var routerBase = communicator.stringToProxy("Glacier2/router:default -p 12020");
                 test(routerBase !== null);
                 out.writeLine("ok");
 
@@ -100,11 +99,11 @@
         ).then(
             function(timeout)
             {
-                test(timeout.low === 30);
+                test(timeout.toNumber() === 30);
                 out.writeLine("ok");
 
                 out.write("testing stringToProxy for server object... ");
-                base = communicator.stringToProxy("c1/callback:tcp -p 12010");
+                base = communicator.stringToProxy("c1/callback:default -p 12010");
                 out.writeLine("ok");
 
                 out.write("trying to ping server before session creation... ");
@@ -274,7 +273,7 @@
                 var context = new Ice.Context();
                 context.set("_fwd", "t");
                 var otherCategoryTwoway = CallbackPrx.uncheckedCast(
-                    twoway.ice_identity(communicator.stringToIdentity("c2/callback")));
+                    twoway.ice_identity(Ice.stringToIdentity("c2/callback")));
                 return otherCategoryTwoway.initiateCallback(twowayR, context);
             }
         ).then(
@@ -290,7 +289,7 @@
                 var context = new Ice.Context();
                 context.set("_fwd", "t");
                 var otherCategoryTwoway = CallbackPrx.uncheckedCast(
-                    twoway.ice_identity(communicator.stringToIdentity("c3/callback")));
+                    twoway.ice_identity(Ice.stringToIdentity("c3/callback")));
                 return otherCategoryTwoway.initiateCallback(twowayR, context);
             }
         ).then(
@@ -303,7 +302,7 @@
                 var context = new Ice.Context();
                 context.set("_fwd", "t");
                 var otherCategoryTwoway = CallbackPrx.uncheckedCast(
-                    twoway.ice_identity(communicator.stringToIdentity("_userid/callback")));
+                    twoway.ice_identity(Ice.stringToIdentity("_userid/callback")));
                 return otherCategoryTwoway.initiateCallback(twowayR, context);
             }
         ).then(
@@ -314,11 +313,14 @@
         ).then(
             function()
             {
-                out.writeLine("ok");
-                out.write("testing server shutdown... ");
-                return twoway.shutdown();
-                // No ping, otherwise the router prints a warning message if it's
-                // started with --Ice.Warn.Connections.
+                if(process.argv.indexOf("--shutdown") > -1)
+                {
+                    out.writeLine("ok");
+                    out.write("testing server shutdown... ");
+                    return twoway.shutdown();
+                    // No ping, otherwise the router prints a warning message if it's
+                    // started with --Ice.Warn.Connections.
+                }
             }
         ).then(
             function()
@@ -343,45 +345,48 @@
                 test(ex instanceof Ice.ConnectionLostException);
                 out.writeLine("ok");
 
-                out.write("uninstalling router with communicator... ");
-                communicator.setDefaultRouter(null);
-                out.writeLine("ok");
+                if(process.argv.indexOf("--shutdown") > -1)
+                {
+                    out.write("uninstalling router with communicator... ");
+                    communicator.setDefaultRouter(null);
+                    out.writeLine("ok");
 
-                out.write("testing stringToProxy for process object... ");
-                processBase = communicator.stringToProxy("Glacier2/admin -f Process:tcp -h 127.0.0.1 -p 12348");
-                out.writeLine("ok");
+                    out.write("testing stringToProxy for process object... ");
+                    processBase = communicator.stringToProxy("Glacier2/admin -f Process:default -h 127.0.0.1 -p 12021");
+                    out.writeLine("ok");
 
-                out.write("testing checked cast for admin object... ");
-                return Ice.ProcessPrx.checkedCast(processBase);
-            }
-        ).then(
-            function(o)
-            {
-                process = o;
-                test(process !== null);
-                out.writeLine("ok");
+                    out.write("testing checked cast for admin object... ");
+                    return Ice.ProcessPrx.checkedCast(processBase).then(
+                        function(o)
+                        {
+                            processPrx = o;
+                            test(processPrx !== null);
+                            out.writeLine("ok");
 
-                out.write("testing Glacier2 shutdown... ");
-                return process.shutdown();
+                            out.write("testing Glacier2 shutdown... ");
+                            return processPrx.shutdown();
+                        }
+                    ).then(
+                        function()
+                        {
+                            return processPrx.ice_ping();
+                        }
+                    ).then(
+                        failCB,
+                        function(ex)
+                        {
+                            test(ex instanceof Ice.LocalException);
+                            out.writeLine("ok");
+                        }
+                    );
+                }
             }
-        ).then(
-            function()
-            {
-                return process.ice_ping();
-            }
-        ).then(
-            failCB,
-            function(ex)
-            {
-                test(ex instanceof Ice.LocalException);
-                out.writeLine("ok");
-            }
-        );
+        )
     };
 
     var run = function(out, id)
     {
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 id.properties.setProperty("Ice.Warn.Dispatch", "1");
@@ -397,8 +402,9 @@
                     });
             });
     };
-    exports.__test__ = run;
+    exports._test = run;
+    exports._runServer = true;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,11 +9,15 @@
 
 #pragma once
 
-[["cpp:header-ext:h", "objc:header-dir:objc", "js:ice-build"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "js:ice-build"]]
 
 #include <Ice/Identity.ice>
 #include <Ice/Version.ice>
 #include <Ice/BuiltinSequences.ice>
+
+#ifndef __SLICE2JAVA_COMPAT__
+[["java:package:com.zeroc"]]
+#endif
 
 ["objc:prefix:ICE"]
 module Ice
@@ -513,7 +517,6 @@ local exception SocketException extends SyscallException
  * This exception indicates CFNetwork errors.
  *
  **/
-#ifdef ICE_USE_CFSTREAM
 ["cpp:ice_print"]
 local exception CFNetworkException extends SocketException
 {
@@ -524,7 +527,6 @@ local exception CFNetworkException extends SocketException
      **/
     string domain;
 };
-#endif
 
 /**
  *
@@ -812,14 +814,16 @@ local exception CloseConnectionException extends ProtocolException
 /**
  *
  * This exception is raised by an operation call if the application
- * forcefully closes the connection {@link Connection#close}.
+ * closes the connection locally using {@link Connection#close}.
  *
  * @see Connection#close
  *
  **/
 ["cpp:ice_print"]
-local exception ForcedCloseConnectionException extends ProtocolException
+local exception ConnectionManuallyClosedException
 {
+    /** True if the connection was closed gracefully, false otherwise. **/
+    bool graceful;
 };
 
 /**
@@ -916,7 +920,7 @@ local exception NoValueFactoryException extends MarshalException
  * This can happen if client and server are compiled with mismatched Slice
  * definitions or if a class of the wrong type is passed as a parameter
  * or return value using dynamic invocation. This exception can also be
- * raised if {@link IceStorm} is used to send Slice class instances and
+ * raised if IceStorm is used to send Slice class instances and
  * an operation is subscribed to the wrong topic.
  *
  **/
@@ -1030,6 +1034,4 @@ local exception ResponseSentException
 {
 };
 
-
 };
-

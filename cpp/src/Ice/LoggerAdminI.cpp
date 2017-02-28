@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -27,7 +27,10 @@ namespace
 
 const char* traceCategory = "Admin.Logger";
 
-class LoggerAdminI : public Ice::LoggerAdmin, public Ice::EnableSharedFromThis<LoggerAdminI>
+class LoggerAdminI : public Ice::LoggerAdmin
+#ifdef ICE_CPP11_MAPPING
+                   , public std::enable_shared_from_this<LoggerAdminI>
+#endif
 {
 public:
 
@@ -55,7 +58,7 @@ public:
 
     void deadRemoteLogger(const RemoteLoggerPrxPtr&, const LoggerPtr&, const LocalException&, const string&);
 
-    const int getTraceLevel() const
+    int getTraceLevel() const
     {
         return _traceLevel;
     }
@@ -138,7 +141,11 @@ public:
 typedef IceUtil::Handle<Job> JobPtr;
 
 
-class LoggerAdminLoggerI : public Ice::EnableSharedFromThis<LoggerAdminLoggerI>, public IceInternal::LoggerAdminLogger
+class LoggerAdminLoggerI : public IceInternal::LoggerAdminLogger
+#ifdef ICE_CPP11_MAPPING
+                         , public std::enable_shared_from_this<LoggerAdminLoggerI>
+#endif
+
 {
 public:
 
@@ -416,7 +423,7 @@ LoggerAdminI::attachRemoteLogger(const RemoteLoggerPrx& prx,
     try
     {
         auto self = shared_from_this();
-        remoteLogger->init_async(logger->getPrefix(), initLogMessages,
+        remoteLogger->initAsync(logger->getPrefix(), initLogMessages,
             [self, logger, remoteLogger]()
             {
                 if(self->_traceLevel > 1)
@@ -855,7 +862,7 @@ LoggerAdminLoggerI::run()
 #ifdef ICE_CPP11_MAPPING
                 RemoteLoggerPrxPtr remoteLogger = *p;
                 auto self = shared_from_this();
-                remoteLogger->log_async(job->logMessage,
+                remoteLogger->logAsync(job->logMessage,
                     [self, remoteLogger]()
                     {
                         if(self->_loggerAdmin->getTraceLevel() > 1)

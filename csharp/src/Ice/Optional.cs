@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -106,7 +106,7 @@ namespace Ice
             {
                 if(!_isSet)
                 {
-                    throw new System.InvalidOperationException();
+                    throw new InvalidOperationException();
                 }
                 return _value;
             }
@@ -126,7 +126,7 @@ namespace Ice
 
         public override bool Equals(object other)
         {
-            if(object.ReferenceEquals(this, other))
+            if(ReferenceEquals(this, other))
             {
                 return true;
             }
@@ -190,8 +190,7 @@ namespace Ice
     /// <summary>
     /// Handles callbacks for an optional object parameter.
     /// </summary>
-    public class OptionalPatcher<T>
-        where T : Ice.Object
+    public class OptionalPatcher<T> where T : Ice.Value
     {
         /// <summary>
         /// Instantiates the class with the given optional.
@@ -206,7 +205,7 @@ namespace Ice
         /// Sets the Ice object of the optional to the passed instance.
         /// </summary>
         /// <param name="v">The new object for the optional.</param>
-        public void patch(Ice.Object v)
+        public void patch(Ice.Value v)
         {
             if(v == null || typeof(T).IsAssignableFrom(v.GetType()))
             {
@@ -219,7 +218,7 @@ namespace Ice
                 // However, when v is null, the optional might be cleared, which
                 // is not the result we want.
                 //
-                this.value = new Optional<T>((T)v);
+                value = new Optional<T>((T)v);
             }
             else
             {

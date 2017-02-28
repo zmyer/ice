@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,12 +12,8 @@
     var Ice = require("ice").Ice;
     var Test = require("Test").Test;
 
-    var Promise = Ice.Promise;
-
     var allTests = function(out, communicator)
     {
-        var failCB = function() { test(false); };
-
         var p = new Ice.Promise();
         var test = function(b)
         {
@@ -29,7 +25,7 @@
                 }
                 catch(err)
                 {
-                    p.fail(err);
+                    p.reject(err);
                     throw err;
                 }
             }
@@ -39,7 +35,7 @@
             base4, base5, base6, bases, obj, obj2, obj3,
             obj4, obj5, obj6, hello, anotherRouter, router;
 
-        Promise.try(
+        Ice.Promise.try(
             function()
             {
                 manager = Test.ServerManagerPrx.uncheckedCast(
@@ -292,7 +288,7 @@
                 return base.ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 test(ex instanceof Ice.NotRegisteredException);
@@ -304,7 +300,7 @@
                 return base.ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 test(ex instanceof Ice.NotRegisteredException);
@@ -317,7 +313,7 @@
         ).then(
             function(count)
             {
-                return Promise.try(
+                return Ice.Promise.try(
                     function()
                     {
                         // No locator cache.
@@ -338,7 +334,7 @@
         ).then(
             function(count)
             {
-                return Promise.try(
+                return Ice.Promise.try(
                     function()
                     {
                         // No locator cache.
@@ -359,8 +355,8 @@
         ).then(
             function(count)
             {
-                var p = new Promise();
-                Promise.try(
+                var p = new Ice.Promise();
+                Ice.Promise.try(
                     function()
                     {
                         // 1s timeout.
@@ -377,20 +373,16 @@
                         test(count == newCount);
                         Ice.Timer.setTimeout(
                             function(){
-                                p.succeed(count);
+                                p.resolve(count);
                             }, 1200);
                     },
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    }
-                );
+                    p.reject);
                 return p;
             }
         ).then(
             function(count)
             {
-                return Promise.try(
+                return Ice.Promise.try(
                     function()
                     {
                         // 1s timeout.
@@ -411,7 +403,7 @@
         ).then(
             function(count)
             {
-                return Promise.try(
+                return Ice.Promise.try(
                     function()
                     {
                         // No locator cache.
@@ -432,7 +424,7 @@
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
                 // 1s timeout.
                 communicator.stringToProxy("test").ice_locatorCacheTimeout(1).ice_ping().then(
                     function()
@@ -443,14 +435,14 @@
                     function(newCount)
                     {
                         test(count == newCount);
-                        p.succeed(count);
+                        p.resolve(count);
                     }
-                ).exception(
+                ).catch(
                     function(ex)
                     {
                         Ice.Timer.setTimeout(
                             function(){
-                                p.fail(ex);
+                                p.reject(ex);
                             }, 1200);
                     });
                 return p;
@@ -458,7 +450,7 @@
         ).then(
             function(count)
             {
-                return Promise.try(
+                return Ice.Promise.try(
                     function()
                     {
                         // No locator cache.
@@ -480,7 +472,7 @@
         ).then(
             function(count)
             {
-                return Promise.try(
+                return Ice.Promise.try(
                     function()
                     {
                         // 1s timeout.
@@ -501,7 +493,7 @@
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
                 // 1s timeout.
                 communicator.stringToProxy("test").ice_locatorCacheTimeout(-1).ice_ping().then(
                     function()
@@ -512,19 +504,15 @@
                     function(newCount)
                     {
                         test(count == newCount);
-                        p.succeed(count);
+                        p.resolve(count);
                     }
-                ).exception(
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    });
+                ).catch(p.reject);
                 return p;
             }
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
                 // 1s timeout.
                 communicator.stringToProxy("test@TestAdapter").ice_ping().then(
                     function()
@@ -535,19 +523,15 @@
                     function(newCount)
                     {
                         test(count == newCount);
-                        p.succeed(count);
+                        p.resolve(count);
                     }
-                ).exception(
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    });
+                ).catch(p.reject);
                 return p;
             }
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
                 // 1s timeout.
                 communicator.stringToProxy("test").ice_ping().then(
                     function()
@@ -558,13 +542,9 @@
                     function(newCount)
                     {
                         test(count == newCount);
-                        p.succeed(count);
+                        p.resolve(count);
                     }
-                ).exception(
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    });
+                ).catch(p.reject);
                 return p;
             }
         ).then(
@@ -579,14 +559,14 @@
             function(o)
             {
                 obj = o;
-                return Promise.all(obj.getHello(), obj.getReplicatedHello());
+                return Ice.Promise.all([obj.getHello(), obj.getReplicatedHello()]);
             }
         ).then(
-            function(r1, r2)
+            function(r)
             {
-                hello = r1[0];
+                hello = r[0];
                 test(hello.ice_getAdapterId() == "TestAdapter");
-                hello = r2[0];
+                hello = r[1];
                 test(hello.ice_getAdapterId() == "ReplicatedAdapter");
                 return hello.sayHello();
             }
@@ -623,7 +603,7 @@
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
                 hello.ice_ping().then(
                     function()
                     {
@@ -633,12 +613,9 @@
                     function(newCount)
                     {
                         test(++count == newCount);
-                        p.succeed(count);
+                        p.resolve(count);
                     }
-                ).exception(
-                    function(ex){
-                        p.fail(ex);
-                    });
+                ).catch(p.reject);
                 return p;
             }
         ).then(
@@ -650,9 +627,9 @@
                     all.push(hello.sayHello());
                 }
 
-                var p = new Promise();
+                var p = new Ice.Promise();
 
-                Promise.all.apply(Promise, all).then(
+                Ice.Promise.all(all).then(
                     function()
                     {
                         return locator.getRequestCount();
@@ -668,19 +645,15 @@
                         }
                         hello = hello.ice_adapterId("unknown");
                         count = newCount;
-                        p.succeed(count);
+                        p.resolve(count);
                     }
-                ).exception(
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    });
+                ).catch(p.reject);
                 return p;
             }
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
 
                 var all = 0;
                 var exCB = function(ex)
@@ -696,13 +669,13 @@
                     }
                     else
                     {
-                        p.succeed();
+                        p.resolve();
                     }
                 };
 
                 var okCB = function()
                 {
-                    p.fail("test failed");
+                    p.reject("test failed");
                 };
 
                 for(var i = 0; i < 1000; ++i)
@@ -720,7 +693,7 @@
                 return communicator.stringToProxy("test@TestAdapter3").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.NotRegisteredException))
@@ -745,7 +718,11 @@
         ).then(
             function()
             {
-                registry.setAdapterDirectProxy("TestAdapter3", communicator.stringToProxy("dummy:tcp"));
+                return registry.setAdapterDirectProxy("TestAdapter3", communicator.stringToProxy("dummy:default"));
+            }
+        ).then(
+            function()
+            {
                 return communicator.stringToProxy("test@TestAdapter3").ice_ping();
             }
         ).then(
@@ -754,7 +731,7 @@
                 return communicator.stringToProxy("test@TestAdapter3").ice_locatorCacheTimeout(0).ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -764,7 +741,7 @@
                 return communicator.stringToProxy("test@TestAdapter3").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -776,7 +753,11 @@
         ).then(
             function(adapter)
             {
-                registry.setAdapterDirectProxy("TestAdapter3", adapter);
+                return registry.setAdapterDirectProxy("TestAdapter3", adapter);
+            }
+        ).then(
+            function()
+            {
                 return communicator.stringToProxy("test@TestAdapter3").ice_ping();
             }
         ).then(
@@ -785,6 +766,11 @@
                 out.writeLine("ok");
                 out.write("testing well-known object locator cache... ");
                 return registry.addObject(communicator.stringToProxy("test3@TestUnknown"));
+            },
+            function(ex)
+            {
+                console.log(ex);
+                test(false);
             }
         ).then(
             function()
@@ -792,7 +778,7 @@
                 return communicator.stringToProxy("test3").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.NotRegisteredException))
@@ -810,7 +796,7 @@
         ).then(
             function()
             {
-                return registry.setAdapterDirectProxy("TestAdapter4", communicator.stringToProxy("dummy:tcp"));
+                return registry.setAdapterDirectProxy("TestAdapter4", communicator.stringToProxy("dummy:default"));
             }
         ).then(
             function()
@@ -818,7 +804,7 @@
                 return communicator.stringToProxy("test3").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -840,7 +826,7 @@
         ).then(
             function()
             {
-                return registry.setAdapterDirectProxy("TestAdapter4", communicator.stringToProxy("dummy:tcp"));
+                return registry.setAdapterDirectProxy("TestAdapter4", communicator.stringToProxy("dummy:default"));
             }
         ).then(
             function()
@@ -853,7 +839,7 @@
                 return communicator.stringToProxy("test@TestAdapter4").ice_locatorCacheTimeout(0).ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -863,7 +849,7 @@
                 return communicator.stringToProxy("test@TestAdapter4").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -873,7 +859,7 @@
                 return communicator.stringToProxy("test3").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -898,7 +884,7 @@
                 return communicator.stringToProxy("test4").ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.NoEndpointException))
@@ -913,7 +899,7 @@
                 initData.properties.setProperty("Ice.BackgroundLocatorCacheUpdates", "1");
                 var ic = Ice.initialize(initData);
 
-                var p = new Promise();
+                var p = new Ice.Promise();
 
                 locator.findAdapterById("TestAdapter").then(
                     function(adapter)
@@ -933,7 +919,7 @@
                 ).then(
                     function(count)
                     {
-                        var p1 = new Promise();
+                        var p1 = new Ice.Promise();
                         // No locator cache.
                         ic.stringToProxy("test@TestAdapter5").ice_locatorCacheTimeout(0).ice_ping().then(
                             function()
@@ -951,23 +937,20 @@
                             {
                                 count += 3;
                                 test(count === newCount);
-                                p1.succeed(count);
+                                p1.resolve(count);
                             }
-                        ).exception(
-                            function(ex){
-                                p1.fail(ex);
-                            });
+                        ).catch(p1.reject);
 
                         return p1;
                     }
                 ).then(
                     function(count)
                     {
-                        var p1 = new Promise();
+                        var p1 = new Ice.Promise();
                         registry.setAdapterDirectProxy("TestAdapter5", null).then(
                             function()
                             {
-                                return registry.addObject(communicator.stringToProxy("test3:tcp"));
+                                return registry.addObject(communicator.stringToProxy("test3:default"));
                             }
                         ).then(
                             function()
@@ -992,20 +975,16 @@
                                 test(count = newCount);
                                 Ice.Timer.setTimeout(
                                     function(){
-                                        p1.succeed(count);
+                                        p1.resolve(count);
                                     }, 1200);
                             }
-                        ).exception(
-                            function(ex)
-                            {
-                                p1.fail(ex);
-                            });
+                        ).catch(p1.reject);
                         return p1;
                     }
                 ).then(
                     function(count)
                     {
-                        var p1 = new Promise();
+                        var p1 = new Ice.Promise();
                         // The following request should trigger the background updates but still use the cached endpoints
                         // and therefore succeed.
 
@@ -1016,23 +995,12 @@
                                 // 1s timeout.
                                 return ic.stringToProxy("test3").ice_locatorCacheTimeout(1).ice_ping();
                             }
-                        ).then(
-                            function()
-                            {
-                                p1.succeed();
-                            }
-                        ).exception(
-                            function(ex)
-                            {
-                                p1.fail(ex);
-                            }
-                        );
-
+                        ).then(p1.resolve, p1.reject);
                         return p1;
                     }
                 ).then(
                     function(){
-                        var p1 = new Promise();
+                        var p1 = new Ice.Promise();
 
                         var f1 = function()
                         {
@@ -1045,19 +1013,14 @@
                                 {
                                     if(ex instanceof Ice.LocalException)
                                     {
-                                        p1.succeed();
+                                        p1.resolve();
                                     }
                                     else
                                     {
-                                        p1.fail(ex);
+                                        p1.reject(ex);
                                     }
                                 }
-                            ).exception(
-                                function(ex)
-                                {
-                                    p1.fail(ex);
-                                }
-                            );
+                            ).catch(p1.reject);
                         };
 
                         f1();
@@ -1067,31 +1030,27 @@
                 ).then(
                     function()
                     {
-                        var p1 = new Promise();
+                        var p1 = new Ice.Promise();
 
                         var f1 = function()
                         {
                             ic.stringToProxy("test3").ice_locatorCacheTimeout(1).ice_ping().then(
                                 function()
                                 {
-                                    Ice.Timer.setTimeout(function(){ f1(); }, 10000);
+                                    Ice.Timer.setTimeout(f1, 10000);
                                 },
                                 function(ex)
                                 {
                                     if(ex instanceof Ice.LocalException)
                                     {
-                                        p1.succeed();
+                                        p1.resolve();
                                     }
                                     else
                                     {
-                                        p1.fail(ex);
+                                        p1.reject(ex);
                                     }
                                 }
-                            ).exception(
-                                function(ex)
-                                {
-                                    p1.fail(ex);
-                                });
+                            ).catch(p1.reject);
                         };
 
                         f1();
@@ -1102,17 +1061,7 @@
                     {
                         return ic.destroy();
                     }
-                ).then(
-                    function()
-                    {
-                        p.succeed();
-                    }
-                ).exception(
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    }
-                );
+                ).then(p.resolve, p.reject);
                 return p;
             }
         ).then(
@@ -1159,7 +1108,7 @@
         ).then(
             function(con)
             {
-                return con.close(false);
+                return con.close(Ice.ConnectionClose.GracefullyWithWait);
             }
         ).then(
             function()
@@ -1201,7 +1150,7 @@
         ).then(
             function(count)
             {
-                var p = new Promise();
+                var p = new Ice.Promise();
 
                 var prx = communicator.stringToProxy("test@TestAdapter").ice_encodingVersion(
                                                                                         Ice.Encoding_1_1);
@@ -1237,14 +1186,9 @@
                     function(newCount)
                     {
                         test(++count == newCount);
-                        p.succeed();
+                        p.resolve();
                     }
-                ).exception(
-                    function(ex)
-                    {
-                        p.fail(ex);
-                    }
-                );
+                ).catch(p.reject);
 
                 return p;
             }
@@ -1263,7 +1207,7 @@
                 return obj2.ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -1273,7 +1217,7 @@
                 return obj3.ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -1283,7 +1227,7 @@
                 return obj5.ice_ping();
             }
         ).then(
-            failCB,
+            function() { test(false); },
             function(ex)
             {
                 if(!(ex instanceof Ice.LocalException))
@@ -1292,23 +1236,14 @@
                 }
                 out.writeLine("ok");
                 out.write("shutdown server manager... ");
-                manager.shutdown();
+                return manager.shutdown();
             }
         ).then(
             function()
             {
                 out.writeLine("ok");
             }
-        ).then(
-            function()
-            {
-                p.succeed();
-            },
-            function(ex)
-            {
-                p.fail(ex);
-            }
-        );
+        ).then(p.resolve, p.reject);
         return p;
     };
 
@@ -1316,7 +1251,7 @@
     {
         id.properties.setProperty("Ice.Default.Locator", "locator:default -p 12010");
         var c = Ice.initialize(id);
-        return Promise.try(
+        return Ice.Promise.try(
             function()
             {
                 return allTests(out, c);
@@ -1328,9 +1263,9 @@
             }
         );
     };
-    exports.__test__ = run;
-    exports.__runServer__ = true;
+    exports._test = run;
+    exports._runServer = true;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

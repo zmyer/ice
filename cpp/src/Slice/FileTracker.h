@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -21,7 +21,9 @@ class FileException : public ::IceUtil::Exception
 public:
 
     FileException(const char*, int, const std::string&);
-    ~FileException() ICE_NOEXCEPT;
+#ifndef ICE_CPP11_COMPILER
+    ~FileException() throw();
+#endif
     virtual std::string ice_id() const;
     virtual void ice_print(std::ostream&) const;
 #ifndef ICE_CPP11_MAPPING
@@ -50,20 +52,16 @@ public:
     static FileTrackerPtr instance();
 
     void setSource(const std::string&);
-    void setOutput(const std::string&, bool);
     void addFile(const std::string&);
     void addDirectory(const std::string&);
-
+    void error();
     void cleanup();
     void dumpxml();
 
 private:
 
-    std::string escape(const std::string&) const;
-
     std::list<std::pair< std::string, bool> > _files;
     std::string _source;
-    std::map<std::string, std::string> _errors;
     std::map<std::string, std::list<std::string> > _generated;
     std::map<std::string, std::list<std::string> >::iterator _curr;
 };

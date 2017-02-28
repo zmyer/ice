@@ -14,21 +14,23 @@ addons:
     - ruby-dev
     - libdbus-glib-1-dev
     - libbluetooth-dev
+    - oracle-java8-installer
 
 env:
   global:
     - CXX=g++-5
     - GCC_COMPILER=yes
     - MCPP_HOME=${TRAVIS_BUILD_DIR}/mcpp
-    - OPTIMIZE=yes
     - LMDB_REVISION=0.9.16
     - LMDB_BUILD_DIR=${TRAVIS_BUILD_DIR}/lmdb-LMDB_${LMDB_REVISION}
     - LMDB_HOME=${TRAVIS_BUILD_DIR}/lmdb
     - PYTHONUSERBASE=${HOME}/python-deps
     - PYTHONPATH=${PYTHONUSERBASE}
+    - JAVA_HOME=/usr/lib/jvm/java-8-oracle
+    - USE_NAMESPACES=no
 
   matrix:
-    - WORK_DIR=${TRAVIS_BUILD_DIR}/cpp SKIP="IceBT" CONFIGS="cpp11-shared" TEST_FLAGS="--c++11"
+    - WORK_DIR=${TRAVIS_BUILD_DIR}/cpp SKIP="IceBT" CONFIGS="cpp11-shared"
     - WORK_DIR=${TRAVIS_BUILD_DIR}
 
 cache:
@@ -41,6 +43,8 @@ before_install:
 - git clone https://github.com/zeroc-ice/mcpp.git mcpp
 - wget https://github.com/LMDB/lmdb/archive/LMDB_${LMDB_REVISION}.tar.gz
 - tar xvf LMDB_${LMDB_REVISION}.tar.gz
+- nvm install node
+- nvm use node
 
 install:
 - make -C ${MCPP_HOME} -j3
@@ -55,7 +59,7 @@ install:
 
 script:
 - cd ${WORK_DIR}
-- python allTests.py ${TEST_FLAGS} --protocol=ssl
+- python allTests.py -d --protocol=ssl --workers=4
 
 notifications:
   email: travis-ci@zeroc.com

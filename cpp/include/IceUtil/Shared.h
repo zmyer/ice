@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -38,9 +38,7 @@ public:
     SimpleShared();
     SimpleShared(const SimpleShared&);
 
-    virtual ~SimpleShared()
-    {
-    }
+    virtual ~SimpleShared();
 
     SimpleShared& operator=(const SimpleShared&)
     {

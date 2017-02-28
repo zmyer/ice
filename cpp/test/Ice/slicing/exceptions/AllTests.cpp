@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -396,7 +396,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->baseAsBase_async();
+        auto result = test->baseAsBaseAsync();
         try
         {
             result.get();
@@ -411,7 +411,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
         {
             test(false);
         }
-            
+
 #else
         CallbackPtr cb = new Callback;
         test->begin_baseAsBase(
@@ -443,7 +443,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of unknown derived (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->unknownDerivedAsBase_async();
+        auto result = test->unknownDerivedAsBaseAsync();
         try
         {
             result.get();
@@ -491,7 +491,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "non-slicing of known derived as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownDerivedAsBase_async();
+        auto result = test->knownDerivedAsBaseAsync();
         try
         {
             result.get();
@@ -539,7 +539,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "non-slicing of known derived as derived (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownDerivedAsKnownDerived_async();
+        auto result = test->knownDerivedAsKnownDerivedAsync();
         try
         {
             result.get();
@@ -557,7 +557,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_knownDerivedAsKnownDerived(
-            newCallback_TestIntf_knownDerivedAsKnownDerived(cb, &Callback::response, 
+            newCallback_TestIntf_knownDerivedAsKnownDerived(cb, &Callback::response,
                                                             &Callback::exception_knownDerivedAsKnownDerived));
         cb->check();
 #endif
@@ -586,7 +586,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of unknown intermediate as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->unknownIntermediateAsBase_async();
+        auto result = test->unknownIntermediateAsBaseAsync();
         try
         {
             result.get();
@@ -604,7 +604,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_unknownIntermediateAsBase(
-            newCallback_TestIntf_unknownIntermediateAsBase(cb, &Callback::response, 
+            newCallback_TestIntf_unknownIntermediateAsBase(cb, &Callback::response,
                                                            &Callback::exception_unknownIntermediateAsBase));
         cb->check();
 #endif
@@ -634,7 +634,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of known intermediate as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownIntermediateAsBase_async();
+        auto result = test->knownIntermediateAsBaseAsync();
         try
         {
             result.get();
@@ -653,7 +653,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_knownIntermediateAsBase(
-            newCallback_TestIntf_knownIntermediateAsBase(cb, &Callback::response, 
+            newCallback_TestIntf_knownIntermediateAsBase(cb, &Callback::response,
                                                          &Callback::exception_knownIntermediateAsBase));
         cb->check();
 #endif
@@ -684,7 +684,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of known most derived as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownMostDerivedAsBase_async();
+        auto result = test->knownMostDerivedAsBaseAsync();
         try
         {
             result.get();
@@ -704,7 +704,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_knownMostDerivedAsBase(
-            newCallback_TestIntf_knownMostDerivedAsBase(cb, &Callback::response, 
+            newCallback_TestIntf_knownMostDerivedAsBase(cb, &Callback::response,
                                                         &Callback::exception_knownMostDerivedAsBase));
         cb->check();
 #endif
@@ -734,7 +734,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "non-slicing of known intermediate as intermediate (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownIntermediateAsKnownIntermediate_async();
+        auto result = test->knownIntermediateAsKnownIntermediateAsync();
         try
         {
             result.get();
@@ -753,7 +753,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_knownIntermediateAsKnownIntermediate(
-            newCallback_TestIntf_knownIntermediateAsKnownIntermediate(cb, &Callback::response, 
+            newCallback_TestIntf_knownIntermediateAsKnownIntermediate(cb, &Callback::response,
                                                         &Callback::exception_knownIntermediateAsKnownIntermediate));
         cb->check();
 #endif
@@ -784,7 +784,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "non-slicing of known most derived as intermediate (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownMostDerivedAsKnownIntermediate_async();
+        auto result = test->knownMostDerivedAsKnownIntermediateAsync();
         try
         {
             result.get();
@@ -804,7 +804,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_knownMostDerivedAsKnownIntermediate(
-            newCallback_TestIntf_knownMostDerivedAsKnownIntermediate(cb, &Callback::response, 
+            newCallback_TestIntf_knownMostDerivedAsKnownIntermediate(cb, &Callback::response,
                                                         &Callback::exception_knownMostDerivedAsKnownIntermediate));
         cb->check();
 #endif
@@ -835,7 +835,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "non-slicing of known most derived as most derived (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->knownMostDerivedAsKnownMostDerived_async();
+        auto result = test->knownMostDerivedAsKnownMostDerivedAsync();
         try
         {
             result.get();
@@ -855,7 +855,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_knownMostDerivedAsKnownMostDerived(
-            newCallback_TestIntf_knownMostDerivedAsKnownMostDerived(cb, &Callback::response, 
+            newCallback_TestIntf_knownMostDerivedAsKnownMostDerived(cb, &Callback::response,
                                                         &Callback::exception_knownMostDerivedAsKnownMostDerived));
         cb->check();
 #endif
@@ -885,7 +885,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of unknown most derived, known intermediate as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->unknownMostDerived1AsBase_async();
+        auto result = test->unknownMostDerived1AsBaseAsync();
         try
         {
             result.get();
@@ -904,7 +904,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_unknownMostDerived1AsBase(
-            newCallback_TestIntf_unknownMostDerived1AsBase(cb, &Callback::response, 
+            newCallback_TestIntf_unknownMostDerived1AsBase(cb, &Callback::response,
                                                            &Callback::exception_unknownMostDerived1AsBase));
         cb->check();
 #endif
@@ -934,7 +934,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of unknown most derived, known intermediate as intermediate (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->unknownMostDerived1AsKnownIntermediate_async();
+        auto result = test->unknownMostDerived1AsKnownIntermediateAsync();
         try
         {
             result.get();
@@ -953,7 +953,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_unknownMostDerived1AsKnownIntermediate(
-            newCallback_TestIntf_unknownMostDerived1AsKnownIntermediate(cb, &Callback::response, 
+            newCallback_TestIntf_unknownMostDerived1AsKnownIntermediate(cb, &Callback::response,
                                                          &Callback::exception_unknownMostDerived1AsKnownIntermediate));
         cb->check();
 #endif
@@ -982,7 +982,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "slicing of unknown most derived, unknown intermediate as base (AMI)... " << flush;
     {
 #ifdef ICE_CPP11_MAPPING
-        auto result = test->unknownMostDerived2AsBase_async();
+        auto result = test->unknownMostDerived2AsBaseAsync();
         try
         {
             result.get();
@@ -1000,7 +1000,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
 #else
         CallbackPtr cb = new Callback;
         test->begin_unknownMostDerived2AsBase(
-            newCallback_TestIntf_unknownMostDerived2AsBase(cb, &Callback::response, 
+            newCallback_TestIntf_unknownMostDerived2AsBase(cb, &Callback::response,
                                                          &Callback::exception_unknownMostDerived2AsBase));
         cb->check();
 #endif
@@ -1072,11 +1072,6 @@ allTests(const Ice::CommunicatorPtr& communicator)
         catch(const Ice::OperationNotExistException&)
         {
         }
-    catch(const Ice::LocalException& ex)
-    {
-        cout << endl << "** OOPS" << endl << ex << endl;
-        test(false);
-    }
         catch(...)
         {
             test(false);

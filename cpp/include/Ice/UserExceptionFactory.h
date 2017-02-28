@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -14,6 +14,26 @@
 #include <IceUtil/Handle.h>
 #include <Ice/Config.h>
 
+#ifdef ICE_CPP11_MAPPING
+
+namespace IceInternal
+{
+
+template<class E>
+void
+#ifdef NDEBUG
+defaultUserExceptionFactory(const std::string&)
+#else
+defaultUserExceptionFactory(const std::string& typeId)
+#endif
+{
+    assert(typeId == E::ice_staticId());
+    throw E();
+}
+
+}
+#else
+
 namespace Ice
 {
 
@@ -22,7 +42,7 @@ class ICE_API UserExceptionFactory : public IceUtil::Shared
 public:
 
     virtual void createAndThrow(const ::std::string&) = 0;
-    virtual ~UserExceptionFactory() {}
+    virtual ~UserExceptionFactory();
 };
 typedef ::IceUtil::Handle<UserExceptionFactory> UserExceptionFactoryPtr;
 
@@ -35,16 +55,16 @@ template<class E>
 class DefaultUserExceptionFactory : public Ice::UserExceptionFactory
 {
 public:
-    
+
     DefaultUserExceptionFactory(const ::std::string& typeId) :
         _typeId(typeId)
     {
     }
 
-#ifndef NDEBUG
-    virtual void createAndThrow(const ::std::string& typeId)
-#else
+#ifdef NDEBUG
     virtual void createAndThrow(const ::std::string&)
+#else
+    virtual void createAndThrow(const ::std::string& typeId)
 #endif
     {
         assert(typeId == _typeId);
@@ -57,4 +77,5 @@ private:
 
 }
 
+#endif
 #endif

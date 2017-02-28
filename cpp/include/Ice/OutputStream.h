@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,6 @@
 #ifndef ICE_OUTPUT_STREAM_H
 #define ICE_OUTPUT_STREAM_H
 
-#include <IceUtil/StringConverter.h>
 #include <Ice/CommunicatorF.h>
 #include <Ice/InstanceF.h>
 #include <Ice/Object.h>
@@ -34,8 +33,8 @@ public:
 
     //
     // Constructing an OutputStream without providing a communicator means the stream will
-    // use the default encoding version, the default format for class encoding, and will not
-    // use string converters. You can supply a communicator later by calling initialize().
+    // use the default encoding version, the default format for class encoding, and the
+    // process string converters. You can supply a communicator later by calling initialize().
     //
     OutputStream();
 
@@ -67,8 +66,8 @@ public:
     }
 
     //
-    // Initializes the stream to use the communicator's default encoding version, class
-    // encoding format, and string converters.
+    // Initializes the stream to use the communicator's default encoding version and class
+    // encoding format
     //
     void initialize(const CommunicatorPtr&);
 
@@ -85,8 +84,6 @@ public:
     // optimization reasons (see comments below).
     //
     IceInternal::Instance* instance() const { return _instance; } // Inlined for performance reasons.
-
-    void setStringConverters(const IceUtil::StringConverterPtr&, const IceUtil::WstringConverterPtr&);
 
     void setFormat(FormatType);
 
@@ -289,6 +286,7 @@ public:
             write(&v[0], &v[0] + v.size());
         }
     }
+
     template<typename T> void write(const T* begin, const T* end)
     {
         writeSize(static_cast<Int>(end - begin));
@@ -297,6 +295,50 @@ public:
             write(*p);
         }
     }
+
+#ifdef ICE_CPP11_MAPPING
+
+    template<typename T> void writeAll(const T& v)
+    {
+        write(v);
+    }
+
+    template<typename T, typename... Te> void writeAll(const T& v, const Te&... ve)
+    {
+        write(v);
+        writeAll(ve...);
+    }
+
+    template<size_t I = 0, typename... Te>
+    typename std::enable_if<I == sizeof...(Te), void>::type
+    writeAll(std::tuple<Te...>)
+    {
+        // Do nothing. Either tuple is empty or we are at the end.
+    }
+
+    template<size_t I = 0, typename... Te>
+    typename std::enable_if<I < sizeof...(Te), void>::type
+    writeAll(std::tuple<Te...> tuple)
+    {
+        write(std::get<I>(tuple));
+        writeAll<I + 1, Te...>(tuple);
+    }
+
+    template<typename T>
+    void writeAll(std::initializer_list<int> tags, const IceUtil::Optional<T>& v)
+    {
+        write(*(tags.begin() + tags.size() - 1), v);
+    }
+
+    template<typename T, typename... Te>
+    void writeAll(std::initializer_list<int> tags, const IceUtil::Optional<T>& v, const IceUtil::Optional<Te>&... ve)
+    {
+        size_t index = tags.size() - sizeof...(ve) - 1;
+        write(*(tags.begin() + index), v);
+        writeAll(tags, ve...);
+    }
+
+#endif
 
     // Write type and tag for optionals
     bool writeOptional(Int tag, OptionalFormat format)
@@ -358,13 +400,7 @@ public:
     void write(const Int*, const Int*);
 
     // Long
-
-#ifdef ICE_CPP11_MAPPING
-    void write(long long int);
-#else
     void write(Long);
-#endif
-
     void write(const Long*, const Long*);
 
     // Float
@@ -379,7 +415,7 @@ public:
     void write(const std::string& v, bool convert = true)
     {
         Int sz = static_cast<Int>(v.size());
-        if(convert && sz > 0 && _stringConverter != 0)
+        if(convert && sz > 0)
         {
             writeConverted(v.data(), static_cast<size_t>(sz));
         }
@@ -399,7 +435,7 @@ public:
     void write(const char* vdata, size_t vsize, bool convert = true)
     {
         Int sz = static_cast<Int>(vsize);
-        if(convert && sz > 0 && _stringConverter != 0)
+        if(convert && sz > 0)
         {
             writeConverted(vdata, vsize);
         }
@@ -428,7 +464,7 @@ public:
 
     // Proxy
 #ifdef ICE_CPP11_MAPPING
-    void writeProxy(const ObjectPrxPtr&);
+    void writeProxy(const ::std::shared_ptr<ObjectPrx>&);
 
     template<typename T, typename ::std::enable_if<::std::is_base_of<ObjectPrx, T>::value>::type* = nullptr>
     void write(const ::std::shared_ptr<T>& v)
@@ -484,7 +520,7 @@ public:
     void initialize(IceInternal::Instance*, const EncodingVersion&);
 
     void finished(std::vector<Byte>&);
-    virtual std::pair<const Byte*, const Byte*> finished();
+    std::pair<const Byte*, const Byte*> finished();
 
     // Optionals
     bool writeOptImpl(Int, OptionalFormat);
@@ -524,7 +560,7 @@ private:
     {
     public:
 
-        virtual ~EncapsEncoder() { }
+        virtual ~EncapsEncoder();
 
         virtual void write(const ValuePtr&) = 0;
         virtual void write(const UserException&) = 0;
@@ -668,7 +704,7 @@ private:
 
     public:
 
-        Encaps() : format(DefaultFormat), encoder(0), previous(0)
+        Encaps() : format(ICE_ENUM(FormatType, DefaultFormat)), encoder(0), previous(0)
         {
             // Inlined for performance reasons.
         }
@@ -710,9 +746,6 @@ private:
     void initEncaps();
 
     Encaps _preAllocatedEncaps;
-
-    IceUtil::StringConverterPtr _stringConverter;
-    IceUtil::WstringConverterPtr _wstringConverter;
 };
 
 } // End namespace Ice

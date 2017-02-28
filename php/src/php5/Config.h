@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -39,7 +39,7 @@ extern "C"
 #ifdef _WIN32
 #   pragma warning( disable : 4018) // suppress signed/unsigned mismatch in zend_execute.h (PHP 5.3.x)
 #elif defined(__GNUC__)
-#	pragma GCC diagnostic warning "-Wsign-compare"
+#   pragma GCC diagnostic warning "-Wsign-compare"
 #endif
 
 #ifdef _WIN64

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -651,7 +651,7 @@ Resolver::operator()(const Ice::Identity& value, const string& name) const
 {
     assert(_communicator);
     string str = asId(_communicator->identityToString(value), name, false);
-    Ice::Identity id = _communicator->stringToIdentity(str);
+    Ice::Identity id = Ice::stringToIdentity(str);
     if(id.name.empty())
     {
         exception("invalid object identity `" + _communicator->identityToString(value) + "': name empty");

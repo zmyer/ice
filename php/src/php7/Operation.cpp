@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -64,8 +64,7 @@ class OperationI : public Operation
 {
 public:
 
-    OperationI(const char*, Ice::OperationMode, Ice::OperationMode, Ice::FormatType, zval*, zval*, zval*, zval*
-              );
+    OperationI(const char*, Ice::OperationMode, Ice::OperationMode, Ice::FormatType, zval*, zval*, zval*, zval*);
     ~OperationI();
 
     virtual zend_function* function();
@@ -369,13 +368,13 @@ IcePHP::OperationI::convertParam(zval* p, int pos)
     ParamInfoPtr param = new ParamInfo;
 
     param->type = Wrapper<TypeInfoPtr>::value(zend_hash_index_find(arr, 0));
+    param->optional = zend_hash_num_elements(arr) > 1;
 
-    assert(Z_TYPE_P(zend_hash_index_find(arr, 1)) == IS_TRUE || Z_TYPE_P(zend_hash_index_find(arr, 1)) == IS_FALSE);
-    param->optional = Z_TYPE_P(zend_hash_index_find(arr, 1)) == IS_TRUE;
-
-    assert(Z_TYPE_P(zend_hash_index_find(arr, 2)) == IS_LONG);
-    param->tag = static_cast<int>(Z_LVAL_P(zend_hash_index_find(arr, 2)));
-
+    if(param->optional)
+    {
+        assert(Z_TYPE_P(zend_hash_index_find(arr, 1)) == IS_LONG);
+        param->tag = static_cast<int>(Z_LVAL_P(zend_hash_index_find(arr, 1)));
+    }
     param->pos = pos;
 
     return param;
@@ -462,7 +461,7 @@ IcePHP::TypedInvocation::prepareRequest(int argc, zval* args, Ice::OutputStream*
                 zval* arg = &args[info->pos];
                 assert(!Z_ISREF_P(arg));
 
-                if((!info->optional || !isUnset(arg)) && !info->type->validate(arg))
+                if((!info->optional || !isUnset(arg)) && !info->type->validate(arg, false))
                 {
                     invalidArgument("invalid value for argument %d in operation `%s'", info->pos + 1,
                                     _op->name.c_str());
@@ -841,11 +840,13 @@ ZEND_FUNCTION(IcePHP_defineOperation)
     }
 
     TypeInfoPtr type = Wrapper<TypeInfoPtr>::value(cls);
-    ClassInfoPtr c = ClassInfoPtr::dynamicCast(type);
+    ProxyInfoPtr c = ProxyInfoPtr::dynamicCast(type);
     assert(c);
 
-    OperationIPtr op = new OperationI(name, static_cast<Ice::OperationMode>(mode),
-                                      static_cast<Ice::OperationMode>(sendMode), static_cast<Ice::FormatType>(format),
+    OperationIPtr op = new OperationI(name,
+                                      static_cast<Ice::OperationMode>(mode),
+                                      static_cast<Ice::OperationMode>(sendMode),
+                                      static_cast<Ice::FormatType>(format),
                                       inParams, outParams, returnType, exceptions);
 
     c->addOperation(name, op);
@@ -854,17 +855,17 @@ ZEND_FUNCTION(IcePHP_defineOperation)
 ZEND_FUNCTION(IcePHP_Operation_call)
 {
     Ice::ObjectPrx proxy;
-    ClassInfoPtr cls;
+    ProxyInfoPtr info;
     CommunicatorInfoPtr comm;
 #ifndef NDEBUG
     bool b =
 #endif
-    fetchProxy(getThis(), proxy, cls, comm);
+    fetchProxy(getThis(), proxy, info, comm);
     assert(b);
     assert(proxy);
-    assert(cls);
+    assert(info);
 
-    OperationPtr op = cls->getOperation(get_active_function_name());
+    OperationPtr op = info->getOperation(get_active_function_name());
     assert(op); // handleGetMethod should have already verified the operation's existence.
     OperationIPtr opi = OperationIPtr::dynamicCast(op);
     assert(opi);

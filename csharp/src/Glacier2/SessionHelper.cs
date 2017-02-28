@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -310,7 +310,7 @@ public class SessionHelper
                 {
                     _callback.connected(this);
                 }
-                catch(Glacier2.SessionNotExistException)
+                catch(SessionNotExistException)
                 {
                     destroy();
                 }
@@ -320,7 +320,7 @@ public class SessionHelper
     private void
     destroyInternal()
     {
-        Glacier2.RouterPrx router;
+        RouterPrx router;
         Ice.Communicator communicator;
         lock(this)
         {
@@ -361,13 +361,7 @@ public class SessionHelper
             communicator.getLogger().warning("SessionHelper: unexpected exception when destroying the session:\n" + e);
         }
 
-        try
-        {
-            communicator.destroy();
-        }
-        catch(Exception)
-        {
-        }
+        communicator.destroy();
 
         // Notify the callback that the session is gone.
         dispatchCallback(() =>
@@ -384,16 +378,11 @@ public class SessionHelper
         {
             communicator = _communicator;
         }
-        try
-        {
-            communicator.destroy();
-        }
-        catch(Exception)
-        {
-        }
+
+        communicator.destroy();
     }
 
-    delegate Glacier2.SessionPrx ConnectStrategy(Glacier2.RouterPrx router);
+    delegate SessionPrx ConnectStrategy(RouterPrx router);
 
     private void
     connectImpl(ConnectStrategy factory)
@@ -453,19 +442,14 @@ public class SessionHelper
                         _callback.createdCommunicator(this);
                     });
 
-                Glacier2.RouterPrx routerPrx = Glacier2.RouterPrxHelper.uncheckedCast(_communicator.getDefaultRouter());
-                Glacier2.SessionPrx session = factory(routerPrx);
+                RouterPrx routerPrx = RouterPrxHelper.uncheckedCast(_communicator.getDefaultRouter());
+                SessionPrx session = factory(routerPrx);
                 connected(routerPrx, session);
             }
             catch(Exception ex)
             {
-                try
-                {
-                    _communicator.destroy();
-                }
-                catch(Exception)
-                {
-                }
+                _communicator.destroy();
+
                 dispatchCallback(() =>
                     {
                         _callback.connectFailed(this, ex);
@@ -474,13 +458,8 @@ public class SessionHelper
         })).Start();
     }
 
-#if COMPACT
     private void
-    dispatchCallback(Ice.VoidAction callback, Ice.Connection conn)
-#else
-    private void
-    dispatchCallback(System.Action callback, Ice.Connection conn)
-#endif
+    dispatchCallback(Action callback, Ice.Connection conn)
     {
         if(_initData.dispatcher != null)
         {
@@ -492,13 +471,8 @@ public class SessionHelper
         }
     }
 
-#if COMPACT
     private void
-    dispatchCallbackAndWait(Ice.VoidAction callback)
-#else
-    private void
-    dispatchCallbackAndWait(System.Action callback)
-#endif
+    dispatchCallbackAndWait(Action callback)
     {
         if(_initData.dispatcher != null)
         {
@@ -519,8 +493,8 @@ public class SessionHelper
     private readonly Ice.InitializationData _initData;
     private Ice.Communicator _communicator;
     private Ice.ObjectAdapter _adapter;
-    private Glacier2.RouterPrx _router;
-    private Glacier2.SessionPrx _session;
+    private RouterPrx _router;
+    private SessionPrx _session;
     private bool _connected = false;
     private string _category;
     private string _finderStr;

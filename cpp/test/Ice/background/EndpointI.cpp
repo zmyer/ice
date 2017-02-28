@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -32,12 +32,10 @@ EndpointI::EndpointI(const IceInternal::EndpointIPtr& endpoint) :
 }
 
 void
-EndpointI::streamWrite(Ice::OutputStream* s) const
+EndpointI::streamWriteImpl(Ice::OutputStream* s) const
 {
-    s->startEncapsulation();
     s->write(_endpoint->type());
     _endpoint->streamWrite(s);
-    s->endEncapsulation();
 }
 
 Ice::Short
@@ -70,7 +68,7 @@ EndpointI::timeout(int timeout) const
     IceInternal::EndpointIPtr endpoint = _endpoint->timeout(timeout);
     if(endpoint == _endpoint)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(EndpointI);
     }
     else
     {
@@ -84,7 +82,7 @@ EndpointI::connectionId(const string& connectionId) const
     IceInternal::EndpointIPtr endpoint = _endpoint->connectionId(connectionId);
     if(endpoint == _endpoint)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(EndpointI);
     }
     else
     {
@@ -104,7 +102,7 @@ EndpointI::compress(bool compress) const
     IceInternal::EndpointIPtr endpoint = _endpoint->compress(compress);
     if(endpoint == _endpoint)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(EndpointI);
     }
     else
     {
@@ -185,7 +183,7 @@ EndpointI::connectors_async(Ice::EndpointSelectionType selType, const IceInterna
 IceInternal::AcceptorPtr
 EndpointI::acceptor(const string& adapterName) const
 {
-    return new Acceptor(shared_from_this(), _endpoint->acceptor(adapterName));
+    return new Acceptor(ICE_SHARED_FROM_CONST_THIS(EndpointI), _endpoint->acceptor(adapterName));
 }
 
 /*IceInternal::EndpointIPtr
@@ -215,7 +213,7 @@ EndpointI::expand() const
     vector<IceInternal::EndpointIPtr> e = _endpoint->expand();
     for(vector<IceInternal::EndpointIPtr>::iterator p = e.begin(); p != e.end(); ++p)
     {
-        *p = (*p == _endpoint) ? shared_from_this() : ICE_MAKE_SHARED(EndpointI, *p);
+        *p = (*p == _endpoint) ? ICE_SHARED_FROM_CONST_THIS(EndpointI) : ICE_MAKE_SHARED(EndpointI, *p);
     }
     return e;
 }

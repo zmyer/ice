@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,6 @@ namespace IceInternal
 
     using System.Collections.Generic;
     using System.Diagnostics;
-    using System.Net;
     using System;
 
     public interface EndpointI_connectors
@@ -21,7 +20,7 @@ namespace IceInternal
         void exception(Ice.LocalException ex);
     }
 
-    public abstract class EndpointI : Ice.Endpoint, System.IComparable<EndpointI>
+    public abstract class EndpointI : Ice.Endpoint, IComparable<EndpointI>
     {
         public override string ToString()
         {
@@ -60,7 +59,13 @@ namespace IceInternal
         //
         // Marshal the endpoint.
         //
-        public abstract void streamWrite(Ice.OutputStream s);
+        virtual public void streamWrite(Ice.OutputStream s)
+        {
+            s.startEncapsulation();
+            streamWriteImpl(s);
+            s.endEncapsulation();
+        }
+        public abstract void streamWriteImpl(Ice.OutputStream s);
 
         //
         // Return the endpoint type.

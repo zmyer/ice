@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -23,7 +23,6 @@ public:
     Buffer(const Ice::Byte* beg, const Ice::Byte* end) : b(beg, end), i(b.begin()) { }
     Buffer(const std::vector<Ice::Byte>& v) : b(v), i(b.begin()) { }
     Buffer(Buffer& o, bool adopt) : b(o.b, adopt), i(b.begin()) { }
-    virtual ~Buffer() { }
 
     void swapBuffer(Buffer&);
 

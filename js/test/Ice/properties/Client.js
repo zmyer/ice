@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -10,7 +10,6 @@
 (function(module, require, exports)
 {
     var Ice = require("ice").Ice;
-    var Promise = Ice.Promise;
 
     var test = function(b)
     {
@@ -22,8 +21,7 @@
 
     var run = function(out)
     {
-        return Promise.try(
-            function()
+        return Ice.Promise.try(() =>
             {
                 out.write("testing configuration file escapes... ");
                 var props =
@@ -57,7 +55,7 @@
                     //
                     // We are runing with NodeJS we load the properties file from the file system.
                     //
-                    properties.parse(require("fs").readFileSync("escapes.cfg", {encoding: "utf8"}));
+                    properties.parse(require("fs").readFileSync(process.argv[3] + "/config/escapes.cfg", {encoding: "utf8"}));
                     for(var key in props)
                     {
                         test(props[key] == properties.getProperty(key));
@@ -74,42 +72,32 @@
                         //
                         // We are runing in a web browser load the properties file from the web server.
                         //
-                        var p = new Promise();
+                        var p = new Ice.Promise();
                         /*jshint jquery: true */
                         $.ajax(
                             {
-                                url: "escapes.cfg",
+                                url: "config/escapes.cfg",
                                 //
                                 // Use text data type to avoid problems interpreting the data.
                                 //
                                 dataType: "text"
-                            }).done(
-                                function(data)
+                            }).done(data =>
                                 {
                                     properties.parse(data);
                                     for(var key in props)
                                     {
                                         test(props[key] == properties.getProperty(key));
                                     }
-                                    p.succeed();
-                                }
-                            ).fail(
-                                function()
-                                {
-                                    p.fail();
-                                });
+                                    p.resolve();
+                                }).fail(p.reject);
                         return p;
                     }
                 }
             }
-        ).then(
-            function()
-            {
-                out.writeLine("ok");
-            });
+        ).then(() => out.writeLine("ok"));
     };
-    exports.__test__ = run;
+    exports._test = run;
 }
 (typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? module : undefined,
- typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice.__require,
+ typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? require : this.Ice._require,
  typeof(global) !== "undefined" && typeof(global.process) !== "undefined" ? exports : this));

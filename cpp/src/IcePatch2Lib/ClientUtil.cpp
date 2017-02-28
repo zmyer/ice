@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,6 +19,17 @@ using namespace Ice;
 using namespace IceUtil;
 using namespace IcePatch2;
 using namespace IcePatch2Internal;
+
+
+IcePatch2::Patcher::~Patcher()
+{
+    // Out of line to avoid weak vtable
+}
+
+IcePatch2::PatcherFeedback::~PatcherFeedback()
+{
+    // Out of line to avoid weak vtable
+}
 
 namespace
 {
@@ -852,8 +863,14 @@ PatcherI::updateFilesInternal(const LargeFileInfoSeq& files, const DecompressorP
                             throw ": cannot write `" + pathBZ2 + "':\n" + IceUtilInternal::lastErrorToString();
                         }
 
-                        pos += bytes.size();
-                        updated += bytes.size();
+                        // 'bytes' is always returned with size '_chunkSize'. When a file is smaller than '_chunkSize'
+                        // or we are reading the last chunk of a file, 'bytes' will be larger than necessary. In this
+                        // case we calculate the current position and updated size based on the known file size.
+                        size_t size = (pos + bytes.size()) > static_cast<size_t>(p->size) ?
+                            static_cast<size_t>(p->size - pos) : bytes.size();
+
+                        pos += size;
+                        updated += size;
 
                         if(!_feedback->patchProgress(pos, p->size, updated, total))
                         {

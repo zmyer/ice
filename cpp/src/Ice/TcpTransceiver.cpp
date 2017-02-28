@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -31,11 +31,7 @@ IceInternal::TcpTransceiver::initialize(Buffer& readBuffer, Buffer& writeBuffer)
 }
 
 SocketOperation
-#ifdef ICE_CPP11_MAPPING
-IceInternal::TcpTransceiver::closing(bool initiator, exception_ptr)
-#else
 IceInternal::TcpTransceiver::closing(bool initiator, const Ice::LocalException&)
-#endif
 {
     // If we are initiating the connection closure, wait for the peer
     // to close the TCP/IP connection. Otherwise, close immediately.
@@ -60,7 +56,7 @@ IceInternal::TcpTransceiver::read(Buffer& buf)
     return _stream->read(buf);
 }
 
-#ifdef ICE_USE_IOCP
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 bool
 IceInternal::TcpTransceiver::startWrite(Buffer& buf)
 {
@@ -108,16 +104,12 @@ Ice::ConnectionInfoPtr
 IceInternal::TcpTransceiver::getInfo() const
 {
     TCPConnectionInfoPtr info = ICE_MAKE_SHARED(TCPConnectionInfo);
-    fillConnectionInfo(info);
-    return info;
-}
-
-Ice::ConnectionInfoPtr
-IceInternal::TcpTransceiver::getWSInfo(const Ice::HeaderDict& headers) const
-{
-    WSConnectionInfoPtr info = ICE_MAKE_SHARED(WSConnectionInfo);
-    fillConnectionInfo(info);
-    info->headers = headers;
+    fdToAddressAndPort(_stream->fd(), info->localAddress, info->localPort, info->remoteAddress, info->remotePort);
+    if(_stream->fd() != INVALID_SOCKET)
+    {
+        info->rcvSize = getRecvBufferSize(_stream->fd());
+        info->sndSize = getSendBufferSize(_stream->fd());
+    }
     return info;
 }
 
@@ -140,15 +132,4 @@ IceInternal::TcpTransceiver::TcpTransceiver(const ProtocolInstancePtr& instance,
 
 IceInternal::TcpTransceiver::~TcpTransceiver()
 {
-}
-
-void
-IceInternal::TcpTransceiver::fillConnectionInfo(const TCPConnectionInfoPtr& info) const
-{
-    fdToAddressAndPort(_stream->fd(), info->localAddress, info->localPort, info->remoteAddress, info->remotePort);
-    if(_stream->fd() != INVALID_SOCKET)
-    {
-        info->rcvSize = getRecvBufferSize(_stream->fd());
-        info->sndSize = getSendBufferSize(_stream->fd());
-    }
 }

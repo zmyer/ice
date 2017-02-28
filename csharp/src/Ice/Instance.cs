@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -336,6 +336,13 @@ namespace IceInternal
             return _batchAutoFlushSize;
         }
 
+        public Ice.ToStringMode
+        toStringMode()
+        {
+            // No mutex lock, immutable
+            return _toStringMode;
+        }
+
         public int cacheMessageBuffers()
         {
             // No mutex lock, immutable.
@@ -358,17 +365,6 @@ namespace IceInternal
         {
             return _implicitContext;
         }
-
-        public Ice.Identity stringToIdentity(string s)
-        {
-            return Ice.Util.stringToIdentity(s);
-        }
-
-        public string identityToString(Ice.Identity ident)
-        {
-            return Ice.Util.identityToString(ident);
-        }
-
 
         public Ice.ObjectPrx
         createAdmin(Ice.ObjectAdapter adminAdapter, Ice.Identity adminIdentity)
@@ -745,14 +741,14 @@ namespace IceInternal
                                 throw fe;
                             }
                             outStream.AutoFlush = true;
-                            System.Console.Out.Close();
-                            System.Console.SetOut(outStream);
+                            Console.Out.Close();
+                            Console.SetOut(outStream);
                         }
                         if(stdErr.Length > 0)
                         {
                             if(stdErr.Equals(stdOut))
                             {
-                                System.Console.SetError(outStream);
+                                Console.SetError(outStream);
                             }
                             else
                             {
@@ -768,8 +764,8 @@ namespace IceInternal
                                     throw fe;
                                 }
                                 errStream.AutoFlush = true;
-                                System.Console.Error.Close();
-                                System.Console.SetError(errStream);
+                                Console.Error.Close();
+                                Console.SetError(errStream);
                             }
                         }
 
@@ -780,19 +776,8 @@ namespace IceInternal
                 if(_initData.logger == null)
                 {
                     string logfile = _initData.properties.getProperty("Ice.LogFile");
-                    if(_initData.properties.getPropertyAsInt("Ice.UseSyslog") > 0 &&
-                       AssemblyUtil.platform_ != AssemblyUtil.Platform.Windows)
+                    if(logfile.Length != 0)
                     {
-                        if(logfile.Length != 0)
-                        {
-                            throw new Ice.InitializationException("Ice.LogFile and Ice.UseSyslog cannot both be set.");
-                        }
-                        _initData.logger = new Ice.SysLoggerI(_initData.properties.getProperty("Ice.ProgramName"),
-                            _initData.properties.getPropertyWithDefault("Ice.SyslogFacility", "LOG_USER"));
-                    }
-                    else if(logfile.Length != 0)
-                    {
-
                         _initData.logger =
                             new Ice.FileLoggerI(_initData.properties.getProperty("Ice.ProgramName"), logfile);
                     }
@@ -801,16 +786,14 @@ namespace IceInternal
                         //
                         // Ice.ConsoleListener is enabled by default.
                         //
-                        bool console =
-                            _initData.properties.getPropertyAsIntWithDefault("Ice.ConsoleListener", 1) > 0;
+                        bool console = _initData.properties.getPropertyAsIntWithDefault("Ice.ConsoleListener", 1) > 0;
                         _initData.logger =
                             new Ice.TraceLoggerI(_initData.properties.getProperty("Ice.ProgramName"), console);
                     }
 
                     if(Ice.Util.getProcessLogger() is Ice.LoggerI)
                     {
-                        _initData.logger =
-                            new Ice.ConsoleLoggerI(_initData.properties.getProperty("Ice.ProgramName"));
+                        _initData.logger = new Ice.ConsoleLoggerI(_initData.properties.getProperty("Ice.ProgramName"));
                     }
                     else
                     {
@@ -873,6 +856,24 @@ namespace IceInternal
                     }
                 }
 
+                string toStringModeStr = _initData.properties.getPropertyWithDefault("Ice.ToStringMode", "Unicode");
+                if(toStringModeStr == "Unicode")
+                {
+                    _toStringMode = Ice.ToStringMode.Unicode;
+                }
+                else if(toStringModeStr == "ASCII")
+                {
+                    _toStringMode = Ice.ToStringMode.ASCII;
+                }
+                else if(toStringModeStr == "Compat")
+                {
+                    _toStringMode = Ice.ToStringMode.Compat;
+                }
+                else
+                {
+                    throw new Ice.InitializationException("The value for Ice.ToStringMode must be Unicode, ASCII or Compat");
+                }
+
                 _cacheMessageBuffers = _initData.properties.getPropertyAsIntWithDefault("Ice.CacheMessageBuffers", 2);
 
                 _implicitContext = Ice.ImplicitContextI.create(_initData.properties.getProperty("Ice.ImplicitContext"));
@@ -928,6 +929,11 @@ namespace IceInternal
                 _objectAdapterFactory = new ObjectAdapterFactory(this, communicator);
 
                 _retryQueue = new RetryQueue(this);
+
+                if(_initData.properties.getPropertyAsIntWithDefault("Ice.PreloadAssemblies", 0) > 0)
+                {
+                    AssemblyUtil.preloadAssemblies();
+                } 
             }
             catch(Ice.LocalException)
             {
@@ -952,13 +958,13 @@ namespace IceInternal
             if(tcpFactory != null)
             {
                 ProtocolInstance instance = new ProtocolInstance(this, Ice.WSEndpointType.value, "ws", false);
-                _endpointFactoryManager.add(new WSEndpointFactory(instance, tcpFactory.clone(instance)));
+                _endpointFactoryManager.add(new WSEndpointFactory(instance, tcpFactory.clone(instance, null)));
             }
             EndpointFactory sslFactory = _endpointFactoryManager.get(Ice.SSLEndpointType.value);
             if(sslFactory != null)
             {
                 ProtocolInstance instance = new ProtocolInstance(this, Ice.WSSEndpointType.value, "wss", true);
-                _endpointFactoryManager.add(new WSEndpointFactory(instance, sslFactory.clone(instance)));
+                _endpointFactoryManager.add(new WSEndpointFactory(instance, sslFactory.clone(instance, null)));
             }
 
             //
@@ -1015,7 +1021,7 @@ namespace IceInternal
                 PropertiesAdminI propsAdmin = null;
                 if(_adminFacetFilter.Count == 0 || _adminFacetFilter.Contains(propertiesFacetName))
                 {
-                     propsAdmin= new PropertiesAdminI(_initData.properties, _initData.logger);
+                     propsAdmin= new PropertiesAdminI(this);
                     _adminFacets.Add(propertiesFacetName, propsAdmin);
                 }
 
@@ -1052,18 +1058,10 @@ namespace IceInternal
             //
             try
             {
-                if(initializationData().properties.getProperty("Ice.ThreadPriority").Length > 0)
-                {
-                    ThreadPriority priority = IceInternal.Util.stringToThreadPriority(
-                                                initializationData().properties.getProperty("Ice.ThreadPriority"));
-                    _timer = new Timer(this, priority);
-                }
-                else
-                {
-                    _timer = new Timer(this);
-                }
+                _timer = new Timer(this, Util.stringToThreadPriority(
+                                                initializationData().properties.getProperty("Ice.ThreadPriority")));
             }
-            catch(System.Exception ex)
+            catch(Exception ex)
             {
                 string s = "cannot create thread for timer:\n" + ex;
                 _initData.logger.error(s);
@@ -1074,7 +1072,7 @@ namespace IceInternal
             {
                 _endpointHostResolver = new EndpointHostResolver(this);
             }
-            catch(System.Exception ex)
+            catch(Exception ex)
             {
                 string s = "cannot create thread for endpoint host resolver:\n" + ex;
                 _initData.logger.error(s);
@@ -1115,7 +1113,7 @@ namespace IceInternal
                 {
                     using(Process p = Process.GetCurrentProcess())
                     {
-                        System.Console.WriteLine(p.Id);
+                        Console.WriteLine(p.Id);
                     }
                     _printProcessIdDone = true;
                 }
@@ -1550,6 +1548,7 @@ namespace IceInternal
         private DefaultsAndOverrides _defaultsAndOverrides; // Immutable, not reset by destroy().
         private int _messageSizeMax; // Immutable, not reset by destroy().
         private int _batchAutoFlushSize; // Immutable, not reset by destroy().
+        private Ice.ToStringMode _toStringMode; // Immutable, not reset by destroy().
         private int _cacheMessageBuffers; // Immutable, not reset by destroy().
         private ACMConfig _clientACM; // Immutable, not reset by destroy().
         private ACMConfig _serverACM; // Immutable, not reset by destroy().
@@ -1581,6 +1580,6 @@ namespace IceInternal
         private static bool _printProcessIdDone = false;
         private static bool _oneOffDone = false;
         private Dictionary<string, Ice.ObjectFactory> _objectFactoryMap = new Dictionary<string, Ice.ObjectFactory>();
-        private static System.Object _staticLock = new System.Object();
+        private static object _staticLock = new object();
     }
 }

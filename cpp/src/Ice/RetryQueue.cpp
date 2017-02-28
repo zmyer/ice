@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -41,12 +41,6 @@ IceInternal::RetryTask::runTimerTask()
     // exception callbacks with CommunicatorDestroyedException).
     //
     _queue->remove(ICE_SHARED_FROM_THIS);
-}
-
-void
-IceInternal::RetryTask::requestCanceled(OutgoingBase*, const Ice::LocalException&)
-{
-    assert(false);
 }
 
 void

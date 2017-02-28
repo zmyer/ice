@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,7 +19,6 @@
 #include <Ice/BuiltinSequences.h>
 #include <Ice/Identity.h>
 #include <Ice/Comparable.h>
-#include <Ice/VirtualShared.h>
 
 #include <set>
 
@@ -44,15 +43,15 @@ public:
 private:
 
 #ifdef ICE_CPP11_MAPPING
-    using RouterTableMap = std::map<std::shared_ptr<Ice::RouterPrx>,
-    RouterInfoPtr,
-                                    Ice::TargetLess<std::shared_ptr<::Ice::RouterPrx>>>;
+    using RouterInfoTable = std::map<std::shared_ptr<Ice::RouterPrx>,
+                                     RouterInfoPtr,
+                                     Ice::TargetCompare<std::shared_ptr<Ice::RouterPrx>, std::less>>;
 #else
-    typedef std::map<Ice::RouterPrxPtr, RouterInfoPtr> RouterTableMap;
+    typedef std::map<Ice::RouterPrx, RouterInfoPtr> RouterInfoTable;
 #endif
 
-    RouterTableMap _table;
-    RouterTableMap::iterator _tableHint;
+    RouterInfoTable _table;
+    RouterInfoTable::iterator _tableHint;
 };
 
 class RouterInfo : public IceUtil::Shared, public IceUtil::Mutex
@@ -68,7 +67,10 @@ public:
     };
     typedef IceUtil::Handle<GetClientEndpointsCallback> GetClientEndpointsCallbackPtr;
 
-    class AddProxyCallback : public Ice::EnableSharedFromThis<AddProxyCallback>
+    class AddProxyCallback
+#ifndef ICE_CPP11_MAPPING
+        : public virtual IceUtil::Shared
+#endif
     {
     public:
 
@@ -82,7 +84,6 @@ public:
     void destroy();
 
     bool operator==(const RouterInfo&) const;
-    bool operator!=(const RouterInfo&) const;
     bool operator<(const RouterInfo&) const;
 
     const Ice::RouterPrxPtr& getRouter() const
@@ -127,7 +128,6 @@ public:
 
     void addProxyResponse(const Ice::ObjectProxySeq&, const AddProxyCookiePtr&);
     void addProxyException(const Ice::Exception&, const AddProxyCookiePtr&);
-    void addProxy(const Ice::ObjectPrxPtr&);
     bool addProxy(const Ice::ObjectPrxPtr&, const AddProxyCallbackPtr&);
 
     void setAdapter(const Ice::ObjectAdapterPtr&);

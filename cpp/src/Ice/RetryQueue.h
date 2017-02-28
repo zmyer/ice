@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,14 +17,15 @@
 #include <Ice/OutgoingAsyncF.h>
 #include <Ice/InstanceF.h>
 #include <Ice/RequestHandler.h> // For CancellationHandler
-#include <Ice/VirtualShared.h>
 
 namespace IceInternal
 {
 
 class RetryTask : public IceUtil::TimerTask,
-                  public CancellationHandler,
-                  public Ice::EnableSharedFromThis<RetryTask>
+                  public CancellationHandler
+#ifdef ICE_CPP11_MAPPING
+                , public std::enable_shared_from_this<RetryTask>
+#endif
 {
 public:
 
@@ -32,7 +33,6 @@ public:
 
     virtual void runTimerTask();
 
-    virtual void requestCanceled(OutgoingBase*, const Ice::LocalException&);
     virtual void asyncRequestCanceled(const OutgoingAsyncBasePtr&, const Ice::LocalException&);
 
     void destroy();

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -63,16 +63,15 @@ public:
 
     void waitUntilFinished();
 
-    void create(const std::vector<EndpointIPtr>&, bool, Ice::EndpointSelectionType,
-                const CreateConnectionCallbackPtr&);
+    void create(const std::vector<EndpointIPtr>&, bool, Ice::EndpointSelectionType, const CreateConnectionCallbackPtr&);
     void setRouterInfo(const RouterInfoPtr&);
     void removeAdapter(const Ice::ObjectAdapterPtr&);
-    void flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr&);
+    void flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr&, Ice::CompressBatch);
 
     OutgoingConnectionFactory(const Ice::CommunicatorPtr&, const InstancePtr&);
     virtual ~OutgoingConnectionFactory();
     friend class Instance;
-    
+
 private:
 
     struct ConnectorInfo
@@ -88,8 +87,11 @@ private:
     };
 
     class ConnectCallback : public Ice::ConnectionI::StartCallback,
-                            public IceInternal::EndpointI_connectors,
-                            public Ice::EnableSharedFromThis<IceInternal::OutgoingConnectionFactory::ConnectCallback>
+                            public IceInternal::EndpointI_connectors
+#ifdef ICE_CPP11_MAPPING
+                          , public std::enable_shared_from_this<ConnectCallback>
+#endif
+
     {
     public:
 
@@ -162,7 +164,7 @@ private:
     std::map<ConnectorPtr, std::set<ConnectCallbackPtr> > _pending;
 
 #ifdef ICE_CPP11_MAPPING
-    std::multimap<EndpointIPtr, Ice::ConnectionIPtr, Ice::TargetLess<EndpointIPtr>> _connectionsByEndpoint;
+    std::multimap<EndpointIPtr, Ice::ConnectionIPtr, Ice::TargetCompare<EndpointIPtr, std::less>> _connectionsByEndpoint;
 #else
     std::multimap<EndpointIPtr, Ice::ConnectionIPtr> _connectionsByEndpoint;
 #endif
@@ -171,8 +173,7 @@ private:
 
 class IncomingConnectionFactory : public EventHandler,
                                   public Ice::ConnectionI::StartCallback,
-                                  public IceUtil::Monitor<IceUtil::Mutex>,
-                                  public Ice::EnableSharedFromThis<IncomingConnectionFactory>
+                                  public IceUtil::Monitor<IceUtil::Mutex>
 {
 public:
 
@@ -180,10 +181,8 @@ public:
     void hold();
     void destroy();
 
-#if TARGET_OS_IPHONE != 0
     void startAcceptor();
     void stopAcceptor();
-#endif
 
     void updateConnectionObservers();
 
@@ -192,13 +191,13 @@ public:
 
     EndpointIPtr endpoint() const;
     std::list<Ice::ConnectionIPtr> connections() const;
-    void flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr&);
+    void flushAsyncBatchRequests(const CommunicatorFlushBatchAsyncPtr&, Ice::CompressBatch);
 
     //
     // Operations from EventHandler
     //
 
-#if defined(ICE_USE_IOCP) || defined(ICE_OS_WINRT)
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
     virtual bool startAsync(SocketOperation);
     virtual bool finishAsync(SocketOperation);
 #endif
@@ -214,7 +213,14 @@ public:
     IncomingConnectionFactory(const InstancePtr&, const EndpointIPtr&, const Ice::ObjectAdapterIPtr&);
     void initialize();
     virtual ~IncomingConnectionFactory();
-    
+
+#ifdef ICE_CPP11_MAPPING
+    std::shared_ptr<IncomingConnectionFactory> shared_from_this()
+    {
+        return std::static_pointer_cast<IncomingConnectionFactory>(EventHandler::shared_from_this());
+    }
+#endif
+
 private:
 
     friend class Ice::ObjectAdapterI;
@@ -239,17 +245,17 @@ private:
     const TransceiverPtr _transceiver;
     EndpointIPtr _endpoint;
 
-#if TARGET_OS_IPHONE != 0
     bool _acceptorStarted;
-#endif
+    bool _acceptorStopped;
 
     Ice::ObjectAdapterIPtr _adapter;
-
     const bool _warn;
-
     std::set<Ice::ConnectionIPtr> _connections;
-
     State _state;
+
+#if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
+    IceInternal::UniquePtr<Ice::LocalException> _acceptorException;
+#endif
 };
 
 }

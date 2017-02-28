@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,6 @@
 
 #include <IceUtil/Shared.h>
 #include <Ice/ProxyF.h>
-#include <Ice/VirtualShared.h>
 
 namespace Ice
 {
@@ -31,14 +30,18 @@ public:
     virtual const Ice::ObjectPrxPtr& getProxy() const = 0;
 };
 
-class BatchRequestInterceptor : public ICE_SHARED
+#ifndef ICE_CPP11_MAPPING
+
+class BatchRequestInterceptor : public IceUtil::Shared
 {
 public:
 
     virtual void enqueue(const BatchRequest&, int, int) = 0;
 };
-ICE_DEFINE_PTR(BatchRequestInterceptorPtr, BatchRequestInterceptor);
+typedef IceUtil::Handle<BatchRequestInterceptor> BatchRequestInterceptorPtr;
 
-};
+#endif
+
+}
 
 #endif

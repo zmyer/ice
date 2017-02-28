@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -81,7 +81,7 @@ IceInternal::IPEndpointInfoI::secure() const
 Ice::EndpointInfoPtr
 IceInternal::IPEndpointI::getInfo() const
 {
-    Ice::IPEndpointInfoPtr info = ICE_MAKE_SHARED(IPEndpointInfoI, shared_from_this());
+    Ice::IPEndpointInfoPtr info = ICE_MAKE_SHARED(IPEndpointInfoI, ICE_SHARED_FROM_CONST_THIS(IPEndpointI));
     fillEndpointInfo(info.get());
     return info;
 }
@@ -106,11 +106,10 @@ IceInternal::IPEndpointI::secure() const
 }
 
 void
-IceInternal::IPEndpointI::streamWrite(OutputStream* s) const
+IceInternal::IPEndpointI::streamWriteImpl(OutputStream* s) const
 {
-    s->startEncapsulation();
-    streamWriteImpl(s);
-    s->endEncapsulation();
+    s->write(_host, false);
+    s->write(_port);
 }
 
 const string&
@@ -124,7 +123,7 @@ IceInternal::IPEndpointI::connectionId(const string& connectionId) const
 {
     if(connectionId == _connectionId)
     {
-        return shared_from_this();
+        return ICE_SHARED_FROM_CONST_THIS(IPEndpointI);
     }
     else
     {
@@ -132,22 +131,10 @@ IceInternal::IPEndpointI::connectionId(const string& connectionId) const
     }
 }
 
-const std::string&
-IceInternal::IPEndpointI::host() const
-{
-    return _host;
-}
-
-int
-IceInternal::IPEndpointI::port() const
-{
-    return _port;
-}
-
 void
 IceInternal::IPEndpointI::connectors_async(Ice::EndpointSelectionType selType, const EndpointI_connectorsPtr& cb) const
 {
-    _instance->resolve(_host, _port, selType, shared_from_this(), cb);
+    _instance->resolve(_host, _port, selType, ICE_SHARED_FROM_CONST_THIS(IPEndpointI), cb);
 }
 
 vector<EndpointIPtr>
@@ -157,7 +144,7 @@ IceInternal::IPEndpointI::expand() const
     vector<string> hosts = getHostsForEndpointExpand(_host, _instance->protocolSupport(), false);
     if(hosts.empty())
     {
-        endps.push_back(shared_from_this());
+        endps.push_back(ICE_SHARED_FROM_CONST_THIS(IPEndpointI));
     }
     else
     {
@@ -355,13 +342,6 @@ IceInternal::IPEndpointI::connectors(const vector<Address>& addresses, const Net
 }
 
 void
-IceInternal::IPEndpointI::streamWriteImpl(OutputStream* s) const
-{
-    s->write(_host, false);
-    s->write(_port);
-}
-
-void
 IceInternal::IPEndpointI::hashInit(Ice::Int& h) const
 {
     hashAdd(h, _host);
@@ -462,7 +442,7 @@ IceInternal::IPEndpointI::checkOption(const string& option, const string& argume
             ex.str = "no argument provided for --sourceAddress option in endpoint " + endpoint;
             throw ex;
         }
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
         const_cast<Address&>(_sourceAddr) = getNumericAddress(argument);
         if(!isAddressValid(_sourceAddr))
         {
@@ -506,7 +486,7 @@ IceInternal::IPEndpointI::IPEndpointI(const ProtocolInstancePtr& instance, Input
     s->read(const_cast<Ice::Int&>(_port));
 }
 
-#ifndef ICE_OS_WINRT
+#ifndef ICE_OS_UWP
 
 IceInternal::EndpointHostResolver::EndpointHostResolver(const InstancePtr& instance) :
     IceUtil::Thread("Ice.HostResolver"),
@@ -627,7 +607,7 @@ IceInternal::EndpointHostResolver::run()
 
         if(threadObserver)
         {
-            threadObserver->stateChanged(ThreadStateIdle, ThreadStateInUseForOther);
+            threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateIdle), ICE_ENUM(ThreadState, ThreadStateInUseForOther));
         }
 
         try
@@ -643,29 +623,26 @@ IceInternal::EndpointHostResolver::run()
                 }
             }
 
-            r.callback->connectors(r.endpoint->connectors(getAddresses(r.host,
-                                                                       r.port,
-                                                                       protocol,
-                                                                       r.selType,
-                                                                       _preferIPv6,
-                                                                       true),
-                                                          networkProxy));
-
-            if(threadObserver)
-            {
-                threadObserver->stateChanged(ThreadStateInUseForOther, ThreadStateIdle);
-            }
-
+            vector<Address> addresses = getAddresses(r.host, r.port, protocol, r.selType, _preferIPv6, true);
             if(r.observer)
             {
                 r.observer->detach();
+                r.observer = 0;
             }
+
+            r.callback->connectors(r.endpoint->connectors(addresses, networkProxy));
+
+            if(threadObserver)
+            {
+                threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateInUseForOther), ICE_ENUM(ThreadState, ThreadStateIdle));
+            }
+
         }
         catch(const Ice::LocalException& ex)
         {
             if(threadObserver)
             {
-                threadObserver->stateChanged(ThreadStateInUseForOther, ThreadStateIdle);
+                threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateInUseForOther), ICE_ENUM(ThreadState, ThreadStateIdle));
             }
             if(r.observer)
             {
@@ -701,7 +678,7 @@ IceInternal::EndpointHostResolver::updateObserver()
     const CommunicatorObserverPtr& obsv = _instance->initializationData().observer;
     if(obsv)
     {
-        _observer.attach(obsv->getThreadObserver("Communicator", name(), ThreadStateIdle, _observer.get()));
+        _observer.attach(obsv->getThreadObserver("Communicator", name(), ICE_ENUM(ThreadState, ThreadStateIdle), _observer.get()));
     }
 }
 
@@ -721,7 +698,7 @@ IceInternal::EndpointHostResolver::resolve(const string& host,
                                            const EndpointI_connectorsPtr& callback)
 {
     //
-    // No DNS lookup support with WinRT.
+    // No DNS lookup support with UWP.
     //
     callback->connectors(endpoint->connectors(getAddresses(host, port,
                                                            _instance->protocolSupport(),

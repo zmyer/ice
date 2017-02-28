@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -9,11 +9,20 @@
 
 #pragma once
 
-[["cpp:header-ext:h", "objc:header-dir:objc", "js:ice-build"]]
+[["ice-prefix", "cpp:header-ext:h", "objc:header-dir:objc", "js:ice-build"]]
+
+#ifndef ICE_BUILDING_ICEGRIDDB
+[["cpp:dll-export:ICEGRID_API", "objc:dll-export:ICEGRID_API"]]
+#endif
+
 [["cpp:include:IceGrid/Config.h"]]
 
 #include <Ice/Identity.ice>
 #include <Ice/BuiltinSequences.ice>
+
+#ifndef __SLICE2JAVA_COMPAT__
+[["java:package:com.zeroc"]]
+#endif
 
 ["objc:prefix:ICEGRID"]
 module IceGrid
@@ -381,4 +390,3 @@ exception FileNotAvailableException
 
 
 };
-

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -15,7 +15,7 @@
 #include <IceUtil/Mutex.h>
 #include <IceUtil/RecMutex.h>
 #include <IceUtil/Timer.h>
-#include <IceUtil/StringConverter.h>
+#include <Ice/StringConverter.h>
 #include <Ice/InstanceF.h>
 #include <Ice/CommunicatorF.h>
 #include <Ice/InstrumentationF.h>
@@ -42,7 +42,6 @@
 #include <Ice/FacetMap.h>
 #include <Ice/Process.h>
 #include <list>
-#include <IceUtil/UniquePtr.h>
 
 namespace Ice
 {
@@ -110,6 +109,7 @@ public:
     size_t messageSizeMax() const { return _messageSizeMax; }
     size_t batchAutoFlushSize() const { return _batchAutoFlushSize; }
     bool collectObjects() const { return _collectObjects; }
+    Ice::ToStringMode toStringMode() const { return _toStringMode; }
     const ACMConfig& clientACM() const;
     const ACMConfig& serverACM() const;
 
@@ -130,13 +130,13 @@ public:
 
     void setLogger(const Ice::LoggerPtr&);
 #ifdef ICE_CPP11_MAPPING
-    void setThreadHook(std::function<void ()>, std::function<void ()>);
+    void setThreadHook(std::function<void()>, std::function<void()>);
 #else
     void setThreadHook(const Ice::ThreadNotificationPtr&);
 #endif
 
-    IceUtil::StringConverterPtr getStringConverter() const { return _stringConverter; }
-    IceUtil::WstringConverterPtr getWstringConverter() const { return _wstringConverter; }
+    const Ice::StringConverterPtr& getStringConverter() const { return _stringConverter; }
+    const Ice::WstringConverterPtr& getWstringConverter() const { return _wstringConverter; }
 
     BufSizeWarnInfo getBufSizeWarn(Ice::Short type);
     void setSndBufSizeWarn(Ice::Short type, int size);
@@ -177,6 +177,7 @@ private:
     const size_t _messageSizeMax; // Immutable, not reset by destroy().
     const size_t _batchAutoFlushSize; // Immutable, not reset by destroy().
     const bool _collectObjects; // Immutable, not reset by destroy().
+    const Ice::ToStringMode _toStringMode; // Immutable, not reset by destroy()
     ACMConfig _clientACM;
     ACMConfig _serverACM;
     RouterManagerPtr _routerManager;
@@ -198,8 +199,8 @@ private:
     DynamicLibraryListPtr _dynamicLibraryList;
     Ice::PluginManagerPtr _pluginManager;
     const Ice::ImplicitContextIPtr _implicitContext;
-    IceUtil::StringConverterPtr _stringConverter;
-    IceUtil::WstringConverterPtr _wstringConverter;
+    Ice::StringConverterPtr _stringConverter;
+    Ice::WstringConverterPtr _wstringConverter;
     bool _adminEnabled;
     Ice::ObjectAdapterPtr _adminAdapter;
     Ice::FacetMap _adminFacets;

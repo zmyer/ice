@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -22,7 +22,7 @@ void
 setupObjectAdapter(const Ice::CommunicatorPtr& communicator)
 {
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("");
-    adapter->add(ICE_MAKE_SHARED(RetryI), communicator->stringToIdentity("retry"));
+    adapter->add(ICE_MAKE_SHARED(RetryI), Ice::stringToIdentity("retry"));
     //adapter->activate(); // Don't activate OA to ensure collocation is used.
 }
 
@@ -46,8 +46,7 @@ main(int argc, char* argv[])
 #endif
     try
     {
-        Ice::InitializationData initData;
-        initData.properties = Ice::createProperties(argc, argv);
+        Ice::InitializationData initData = getTestInitData(argc, argv);
         initData.observer = getObserver();
 
         initData.properties->setProperty("Ice.RetryIntervals", "0 1 10 1");

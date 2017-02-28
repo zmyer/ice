@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -17,7 +17,12 @@ using namespace IceInternal;
 
 IceUtil::Shared* IceInternal::upCast(NetworkProxy* p) { return p; }
 
-#ifndef ICE_OS_WINRT
+NetworkProxy::~NetworkProxy()
+{
+    // Out of line to avoid weak vtable
+}
+
+#ifndef ICE_OS_UWP
 
 namespace
 {
@@ -163,7 +168,7 @@ NetworkProxyPtr
 SOCKSNetworkProxy::resolveHost(ProtocolSupport protocol) const
 {
     assert(!_host.empty());
-    return new SOCKSNetworkProxy(getAddresses(_host, _port, protocol, Ice::Random, false, true)[0]);
+    return new SOCKSNetworkProxy(getAddresses(_host, _port, protocol, Ice::ICE_ENUM(EndpointSelectionType, Random), false, true)[0]);
 }
 
 Address
@@ -267,7 +272,7 @@ NetworkProxyPtr
 HTTPNetworkProxy::resolveHost(ProtocolSupport protocol) const
 {
     assert(!_host.empty());
-    return new HTTPNetworkProxy(getAddresses(_host, _port, protocol, Ice::Random, false, true)[0], protocol);
+    return new HTTPNetworkProxy(getAddresses(_host, _port, protocol, Ice::ICE_ENUM(EndpointSelectionType, Random), false, true)[0], protocol);
 }
 
 Address
@@ -299,8 +304,8 @@ IceInternal::createNetworkProxy(const Ice::PropertiesPtr& properties, ProtocolSu
     proxyHost = properties->getProperty("Ice.SOCKSProxyHost");
     if(!proxyHost.empty())
     {
-#ifdef ICE_OS_WINRT
-        throw Ice::InitializationException(__FILE__, __LINE__, "SOCKS proxy not supported with WinRT");
+#ifdef ICE_OS_UWP
+        throw Ice::InitializationException(__FILE__, __LINE__, "SOCKS proxy not supported with UWP");
 #else
         if(protocolSupport == EnableIPv6)
         {
@@ -314,8 +319,8 @@ IceInternal::createNetworkProxy(const Ice::PropertiesPtr& properties, ProtocolSu
     proxyHost = properties->getProperty("Ice.HTTPProxyHost");
     if(!proxyHost.empty())
     {
-#ifdef ICE_OS_WINRT
-        throw Ice::InitializationException(__FILE__, __LINE__, "HTTP proxy not supported with WinRT");
+#ifdef ICE_OS_UWP
+        throw Ice::InitializationException(__FILE__, __LINE__, "HTTP proxy not supported with UWP");
 #else
         return new HTTPNetworkProxy(proxyHost, properties->getPropertyAsIntWithDefault("Ice.HTTPProxyPort", 1080));
 #endif

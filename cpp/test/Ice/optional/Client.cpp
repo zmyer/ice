@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,8 +19,8 @@ using namespace Test;
 int
 run(int, char**, const Ice::CommunicatorPtr& communicator)
 {
-    InitialPrx allTests(const Ice::CommunicatorPtr&, bool);
-    InitialPrx initial = allTests(communicator, false);
+    InitialPrxPtr allTests(const Ice::CommunicatorPtr&, bool);
+    InitialPrxPtr initial = allTests(communicator, false);
     initial->shutdown();
     return EXIT_SUCCESS;
 }
@@ -37,11 +37,9 @@ main(int argc, char* argv[])
 
     try
     {
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv);
-        RemoteConfig rc("Ice/optional", argc, argv, ich.communicator());
-        int status = run(argc, argv, ich.communicator());
-        rc.finished(status);
-        return status;
+        Ice::InitializationData initData = getTestInitData(argc, argv);
+        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        return run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)
     {

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -19,10 +19,11 @@
 #include <IceUtil/Thread.h>
 #include <IceUtil/Time.h>
 #include <IceUtil/ThreadException.h>
+#include <Ice/ConsoleUtil.h>
 #include <climits>
 #include <exception>
 
-#ifdef ICE_OS_WINRT
+#ifdef ICE_OS_UWP
 #   include <thread>
 #endif
 
@@ -32,8 +33,9 @@
 #endif
 
 using namespace std;
+using namespace IceInternal;
 
-#ifdef ICE_OS_WINRT
+#ifdef ICE_OS_UWP
 
 IceUtil::ThreadControl::ThreadControl() :
     _id(this_thread::get_id())
@@ -169,7 +171,7 @@ WINAPI startHook(void* arg)
     {
         if(!thread->name().empty())
         {
-            cerr << thread->name() << " terminating" << endl;
+            consoleErr << thread->name() << " terminating" << endl;
         }
         std::terminate();
     }
@@ -235,12 +237,6 @@ bool
 IceUtil::Thread::operator==(const Thread& rhs) const
 {
     return this == &rhs;
-}
-
-bool
-IceUtil::Thread::operator!=(const Thread& rhs) const
-{
-    return this != &rhs;
 }
 
 bool
@@ -410,7 +406,7 @@ WINAPI startHook(void* arg)
     {
         if(!thread->name().empty())
         {
-            cerr << thread->name() << " terminating" << endl;
+            consoleErr << thread->name() << " terminating" << endl;
         }
         std::terminate();
     }
@@ -500,12 +496,6 @@ bool
 IceUtil::Thread::operator==(const Thread& rhs) const
 {
     return this == &rhs;
-}
-
-bool
-IceUtil::Thread::operator!=(const Thread& rhs) const
-{
-    return this != &rhs;
 }
 
 bool
@@ -662,7 +652,7 @@ startHook(void* arg)
     {
         if(!thread->name().empty())
         {
-            cerr << thread->name() << " terminating" << endl;
+            consoleErr << thread->name() << " terminating" << endl;
         }
         std::terminate();
     }
@@ -787,12 +777,6 @@ bool
 IceUtil::Thread::operator==(const Thread& rhs) const
 {
     return this == &rhs;
-}
-
-bool
-IceUtil::Thread::operator!=(const Thread& rhs) const
-{
-    return this != &rhs;
 }
 
 bool

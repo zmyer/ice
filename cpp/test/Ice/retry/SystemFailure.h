@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -29,7 +29,12 @@ public:
         return "SystemFailure";
     }
 
-#ifndef ICE_CPP11_MAPPING
+#ifdef ICE_CPP11_MAPPING
+    virtual IceUtil::Exception* ice_cloneImpl() const
+    {
+        return new SystemFailure(*this);
+    }
+#else
     virtual SystemException* ice_clone() const
     {
         return new SystemFailure(*this);
@@ -40,6 +45,7 @@ public:
     {
         throw SystemFailure(*this);
     }
+
 };
 
 #endif

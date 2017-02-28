@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,6 +11,7 @@
 #include <IceUtil/FileUtil.h>
 #include <expat.h>
 #include <list>
+#include <fstream>
 
 using namespace std;
 using namespace IceXML;
@@ -19,18 +20,20 @@ using namespace IceXML;
 // ParserException
 //
 IceXML::ParserException::ParserException(const string& reason) :
-    IceUtil::Exception(), _reason(reason)
+    _reason(reason)
 {
 }
 
 IceXML::ParserException::ParserException(const char* file, int line, const string& reason) :
-    IceUtil::Exception(file, line), _reason(reason)
+    IceUtil::ExceptionHelper<ParserException>(file, line), _reason(reason)
 {
 }
 
-IceXML::ParserException::~ParserException() ICE_NOEXCEPT
+#ifndef ICE_CPP11_COMPILER
+IceXML::ParserException::~ParserException() throw()
 {
 }
+#endif
 
 string
 IceXML::ParserException::ice_id() const
@@ -59,12 +62,6 @@ IceXML::ParserException::ice_clone() const
     return new ParserException(*this);
 }
 #endif
-
-void
-IceXML::ParserException::ice_throw() const
-{
-    throw *this;
-}
 
 string
 IceXML::ParserException::reason() const
@@ -399,7 +396,7 @@ IceXML::Parser::parse(istream& in)
 void
 IceXML::Parser::parse(const string& file, Handler& handler) // The given filename must be UTF-8 encoded
 {
-    IceUtilInternal::ifstream in(file);
+    ifstream in(IceUtilInternal::streamFilename(file).c_str());
     if(!in.good())
     {
         ostringstream out;
@@ -412,7 +409,7 @@ IceXML::Parser::parse(const string& file, Handler& handler) // The given filenam
 void
 IceXML::Parser::parse(istream& in, Handler& handler)
 {
-    XML_Parser parser = XML_ParserCreate(NULL);
+    XML_Parser parser = XML_ParserCreate(ICE_NULLPTR);
     CallbackData cb;
     cb.parser = parser;
     cb.handler = &handler;
@@ -433,7 +430,7 @@ IceXML::Parser::parse(istream& in, Handler& handler)
             }
             if(XML_Parse(parser, buff, static_cast<int>(in.gcount()), isFinal) != 1)
             {
-                handler.error(XML_ErrorString(XML_GetErrorCode(parser)), 
+                handler.error(XML_ErrorString(XML_GetErrorCode(parser)),
                               static_cast<int>(XML_GetCurrentLineNumber(parser)),
                               static_cast<int>(XML_GetCurrentColumnNumber(parser)));
                 return;

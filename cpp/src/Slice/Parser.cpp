@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -63,6 +63,56 @@ filterOrderedOptionalDataMembers(const DataMemberList& members)
     return result;
 }
 
+void
+sortOptionalParameters(ParamDeclList& params)
+{
+    //
+    // Sort optional parameters by tag.
+    //
+    class SortFn
+    {
+    public:
+        static bool compare(const ParamDeclPtr& lhs, const ParamDeclPtr& rhs)
+        {
+            return lhs->tag() < rhs->tag();
+        }
+    };
+    params.sort(SortFn::compare);
+}
+
+bool
+isMutableAfterReturnType(const TypePtr& type)
+{
+    //
+    // Returns true if the type contains data types which can be referenced by user code
+    // and mutated after a dispatch returns.
+    //
+
+    if(ClassDeclPtr::dynamicCast(type))
+    {
+        return true;
+    }
+
+    BuiltinPtr builtin = BuiltinPtr::dynamicCast(type);
+    if(builtin && (builtin->kind() == Builtin::KindObject || builtin->kind() == Builtin::KindValue))
+    {
+        return true;
+    }
+
+    if(SequencePtr::dynamicCast(type) || DictionaryPtr::dynamicCast(type))
+    {
+        return true;
+    }
+
+    StructPtr s = StructPtr::dynamicCast(type);
+    if(s)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 }
 
 namespace Slice
@@ -79,6 +129,7 @@ Unit* unit;
 Slice::DefinitionContext::DefinitionContext(int includeLevel, const StringList& metaData) :
     _includeLevel(includeLevel), _metaData(metaData), _seenDefinition(false)
 {
+    initSuppressedWarnings();
 }
 
 string
@@ -121,6 +172,7 @@ void
 Slice::DefinitionContext::setMetaData(const StringList& metaData)
 {
     _metaData = metaData;
+    initSuppressedWarnings();
 }
 
 string
@@ -141,6 +193,74 @@ StringList
 Slice::DefinitionContext::getMetaData() const
 {
     return _metaData;
+}
+
+void
+Slice::DefinitionContext::warning(WarningCategory category, const string& file, int line, const string& msg) const
+{
+    if(!suppressWarning(category))
+    {
+        emitWarning(file, line, msg);
+    }
+}
+
+void
+Slice::DefinitionContext::warning(WarningCategory category, const string& file, const string& line, const string& msg) const
+{
+    if(!suppressWarning(category))
+    {
+        emitWarning(file, line, msg);
+    }
+}
+
+bool
+Slice::DefinitionContext::suppressWarning(WarningCategory category) const
+{
+    return _suppressedWarnings.find(category) != _suppressedWarnings.end() ||
+        _suppressedWarnings.find(All) != _suppressedWarnings.end();
+}
+
+void
+Slice::DefinitionContext::initSuppressedWarnings()
+{
+    _suppressedWarnings.clear();
+    const string prefix = "suppress-warning";
+    string value = findMetaData(prefix);
+    if(value == prefix)
+    {
+        _suppressedWarnings.insert(All);
+    }
+    else if(!value.empty())
+    {
+        assert(value.length() > prefix.length());
+        if(value[prefix.length()] == ':')
+        {
+            value = value.substr(prefix.length() + 1);
+            vector<string> result;
+            IceUtilInternal::splitString(value, ",", result);
+            for(vector<string>::iterator p = result.begin(); p != result.end(); ++p)
+            {
+                string s = IceUtilInternal::trim(*p);
+                if(s == "all")
+                {
+                    _suppressedWarnings.insert(All);
+                }
+                else if(s == "deprecated")
+                {
+                    _suppressedWarnings.insert(Deprecated);
+                }
+                else if(s == "invalid-metadata")
+                {
+                    _suppressedWarnings.insert(InvalidMetaData);
+                }
+                else
+                {
+                    warning(InvalidMetaData, "", "", string("invalid category `") + s +
+                            "' in global metadata suppress-warning");
+                }
+            }
+        }
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -375,12 +495,13 @@ string
 Slice::Contained::flattenedScope() const
 {
     string s = scope();
-    string flattenedScope;
-    for(string::const_iterator r = s.begin(); r != s.end(); ++r)
+    string::size_type pos = 0;
+    while((pos = s.find("::", pos)) != string::npos)
     {
-        flattenedScope += ((*r) == ':') ? '_' : *r;
+        s.replace(pos, 2, "_");
+
     }
-    return flattenedScope;
+    return s;
 }
 
 string
@@ -501,12 +622,6 @@ bool
 Slice::Contained::operator==(const Contained& rhs) const
 {
     return _scoped == rhs._scoped;
-}
-
-bool
-Slice::Contained::operator!=(const Contained& rhs) const
-{
-    return _scoped != rhs._scoped;
 }
 
 Slice::Contained::Contained(const ContainerPtr& container, const string& name) :
@@ -982,7 +1097,7 @@ Slice::Container::createDictionary(const string& name, const TypePtr& keyType, c
         }
         if(containsSequence)
         {
-            _unit->warning("use of sequences in dictionary keys has been deprecated");
+            _unit->warning(Deprecated, "use of sequences in dictionary keys has been deprecated");
         }
     }
 
@@ -1052,13 +1167,8 @@ Slice::Container::createEnum(const string& name, bool local, NodeType nt)
 EnumeratorPtr
 Slice::Container::createEnumerator(const string& name)
 {
-    EnumeratorPtr p = validateEnumerator(name);
-    if(p)
-    {
-        return p;
-    }
-
-    p = new Enumerator(this, name);
+    validateEnumerator(name);
+    EnumeratorPtr p = new Enumerator(this, name);
     _contents.push_back(p);
     return p;
 }
@@ -1066,13 +1176,8 @@ Slice::Container::createEnumerator(const string& name)
 EnumeratorPtr
 Slice::Container::createEnumerator(const string& name, int value)
 {
-    EnumeratorPtr p = validateEnumerator(name);
-    if(p)
-    {
-        return p;
-    }
-
-    p = new Enumerator(this, name, value);
+    validateEnumerator(name);
+    EnumeratorPtr p = new Enumerator(this, name, value);
     _contents.push_back(p);
     return p;
 }
@@ -1118,15 +1223,17 @@ Slice::Container::createConst(const string name, const TypePtr& constType, const
         checkForGlobalDef(name, "constant"); // Don't return here -- we create the constant anyway.
     }
 
+    SyntaxTreeBasePtr resolvedValueType = valueType;
+
     //
-    // Validate the constant and its value.
+    // Validate the constant and its value; for enums, find enumerator
     //
-    if(nt == Real && !validateConstant(name, constType, valueType, value, true))
+    if(nt == Real && !validateConstant(name, constType, resolvedValueType, value, true))
     {
         return 0;
     }
 
-    ConstPtr p = new Const(this, name, constType, metaData, valueType, value, literal);
+    ConstPtr p = new Const(this, name, constType, metaData, resolvedValueType, value, literal);
     _contents.push_back(p);
     return p;
 }
@@ -1511,6 +1618,86 @@ Slice::Container::enums() const
     return result;
 }
 
+EnumeratorList
+Slice::Container::enumerators() const
+{
+    EnumeratorList result;
+    for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+    {
+        EnumeratorPtr q = EnumeratorPtr::dynamicCast(*p);
+        if(q)
+        {
+            result.push_back(q);
+        }
+    }
+    return result;
+}
+
+//
+// Find enumerators using the old unscoped enumerators lookup
+//
+EnumeratorList
+Slice::Container::enumerators(const string& scoped) const
+{
+    EnumeratorList result;
+    string::size_type lastColon = scoped.rfind(':');
+
+    if(lastColon == string::npos)
+    {
+        // check all enclosing scopes
+        ContainerPtr container = const_cast<Container*>(this);
+        do
+        {
+            EnumList enums = container->enums();
+            for(EnumList::iterator p = enums.begin(); p != enums.end(); ++p)
+            {
+                ContainedList cl = (*p)->lookupContained(scoped, false);
+                if(!cl.empty())
+                {
+                    result.push_back(EnumeratorPtr::dynamicCast(cl.front()));
+                }
+            }
+
+            ContainedPtr contained = ContainedPtr::dynamicCast(container);
+            if(contained)
+            {
+                container = contained->container();
+            }
+            else
+            {
+                container = 0;
+            }
+        }
+        while(result.empty() && container);
+    }
+    else
+    {
+        // Find the referenced scope
+        ContainerPtr container = const_cast<Container*>(this);
+        string scope = scoped.substr(0, scoped.rfind("::"));
+        ContainedList cl = container->lookupContained(scope, false);
+        if(!cl.empty())
+        {
+            container = ContainerPtr::dynamicCast(cl.front());
+            if(container)
+            {
+                EnumList enums = container->enums();
+                string name = scoped.substr(lastColon + 1);
+                for(EnumList::iterator p = enums.begin(); p != enums.end(); ++p)
+                {
+                    ContainedList cl = (*p)->lookupContained(name, false);
+                    if(!cl.empty())
+                    {
+                        result.push_back(EnumeratorPtr::dynamicCast(cl.front()));
+                    }
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
 ConstList
 Slice::Container::consts() const
 {
@@ -1649,7 +1836,47 @@ Slice::Container::hasNonLocalExceptions() const
     return false;
 }
 
+bool
+Slice::Container::hasStructs() const
+{
+    for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+    {
+        StructPtr q = StructPtr::dynamicCast(*p);
+        if(q)
+        {
+            return true;
+        }
 
+        ContainerPtr container = ContainerPtr::dynamicCast(*p);
+        if(container && container->hasStructs())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool
+Slice::Container::hasExceptions() const
+{
+    for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+    {
+        ExceptionPtr q = ExceptionPtr::dynamicCast(*p);
+        if(q)
+        {
+            return true;
+        }
+
+        ContainerPtr container = ContainerPtr::dynamicCast(*p);
+        if(container && container->hasExceptions())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 bool
 Slice::Container::hasClassDecls() const
@@ -2033,7 +2260,7 @@ Slice::Container::mergeModules()
             metaData2.unique();
             if(!checkGlobalMetaData(metaData1, metaData2))
             {
-                unit()->warning("global metadata mismatch for module `" + mod1->name() + "' in files " +
+                unit()->warning(All, "global metadata mismatch for module `" + mod1->name() + "' in files " +
                                 dc1->filename() + " and " + dc2->filename());
             }
 
@@ -2342,23 +2569,34 @@ Slice::Container::checkIdentifier(const string& name) const
         //
         // For rules controlled by a translator option, we don't complain about included files.
         //
-        _unit->error("illegal underscore in identifier `" + name + "'");
+
+        DefinitionContextPtr dc = _unit->currentDefinitionContext();
+        assert(dc);
+        if(dc->findMetaData("underscore") != "underscore") // no "underscore" global metadata
+        {
+            _unit->error("illegal underscore in identifier `" + name + "'");
+        }
     }
 
+    //
+    // For rules controlled by a translator option, we don't complain about included files.
+    //
     if(_unit->currentIncludeLevel() == 0 && !_unit->allowIcePrefix())
     {
-        //
-        // For rules controlled by a translator option, we don't complain about included files.
-        //
-        if(name.size() >= 3)
+        DefinitionContextPtr dc = _unit->currentDefinitionContext();
+        assert(dc);
+        if(dc->findMetaData("ice-prefix") != "ice-prefix") // no "ice-prefix" global metadata
         {
-            string prefix3;
-            prefix3 += ::tolower(static_cast<unsigned char>(name[0]));
-            prefix3 += ::tolower(static_cast<unsigned char>(name[1]));
-            prefix3 += ::tolower(static_cast<unsigned char>(name[2]));
-            if(prefix3 == "ice")
+            if(name.size() >= 3)
             {
-                _unit->error("illegal identifier `" + name + "': `" + name.substr(0, 3) + "' prefix is reserved");
+                string prefix3;
+                prefix3 += ::tolower(static_cast<unsigned char>(name[0]));
+                prefix3 += ::tolower(static_cast<unsigned char>(name[1]));
+                prefix3 += ::tolower(static_cast<unsigned char>(name[2]));
+                if(prefix3 == "ice")
+                {
+                    _unit->error("illegal identifier `" + name + "': `" + name.substr(0, 3) + "' prefix is reserved");
+                }
             }
         }
     }
@@ -2461,7 +2699,7 @@ Slice::Container::checkGlobalMetaData(const StringList& m1, const StringList& m2
 }
 
 bool
-Slice::Container::validateConstant(const string& name, const TypePtr& type, const SyntaxTreeBasePtr& valueType,
+Slice::Container::validateConstant(const string& name, const TypePtr& type, SyntaxTreeBasePtr& valueType,
                                    const string& value, bool isConstant)
 {
     //
@@ -2690,20 +2928,57 @@ Slice::Container::validateConstant(const string& name, const TypePtr& type, cons
         }
         else
         {
-            EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
+            if(valueType)
+            {
+                EnumeratorPtr lte = EnumeratorPtr::dynamicCast(valueType);
 
-            if(!lte)
-            {
-                string msg = "type of initializer is incompatible with the type of " + desc + " `" + name + "'";
-                _unit->error(msg);
-                return false;
+                if(!lte)
+                {
+                    string msg = "type of initializer is incompatible with the type of " + desc + " `" + name + "'";
+                    _unit->error(msg);
+                    return false;
+                }
+                EnumeratorList elist = e->enumerators();
+                if(find(elist.begin(), elist.end(), lte) == elist.end())
+                {
+                    string msg = "enumerator `" + value + "' is not defined in enumeration `" + e->scoped() + "'";
+                    _unit->error(msg);
+                    return false;
+                }
             }
-            EnumeratorList elist = e->getEnumerators();
-            if(find(elist.begin(), elist.end(), lte) == elist.end())
+            else
             {
-                string msg = "enumerator `" + value + "' is not defined in enumeration `" + e->scoped() + "'";
-                _unit->error(msg);
-                return false;
+                // Check if value designates an enumerator of e
+                string newVal = value;
+                string::size_type lastColon = value.rfind(':');
+                if(lastColon != string::npos && lastColon + 1 < value.length())
+                {
+                    newVal = value.substr(0, lastColon + 1) + e->name() + "::" + value.substr(lastColon + 1);
+                }
+
+                ContainedList clist = e->lookupContained(newVal, false);
+                if(clist.empty())
+                {
+                    string msg = "`" + value + "' does not designate an enumerator of `" + e->scoped() + "'";
+                    _unit->error(msg);
+                    return false;
+                }
+                EnumeratorPtr lte = EnumeratorPtr::dynamicCast(clist.front());
+                if(lte)
+                {
+                    valueType = lte;
+                    if(lastColon != string::npos)
+                    {
+                        _unit->warning(Deprecated, string("referencing enumerator `") + lte->name() +
+                                       "' in its enumeration's enclosing scope is deprecated");
+                    }
+                }
+                else
+                {
+                    string msg = "type of initializer is incompatible with the type of " + desc + " `" + name + "'";
+                    _unit->error(msg);
+                    return false;
+                }
             }
         }
     }
@@ -2711,7 +2986,7 @@ Slice::Container::validateConstant(const string& name, const TypePtr& type, cons
     return true;
 }
 
-EnumeratorPtr
+void
 Slice::Container::validateEnumerator(const string& name)
 {
     checkIdentifier(name);
@@ -2719,32 +2994,19 @@ Slice::Container::validateEnumerator(const string& name)
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
-        EnumeratorPtr p = EnumeratorPtr::dynamicCast(matches.front());
-        if(p)
-        {
-            if(_unit->ignRedefs())
-            {
-                p->updateIncludeLevel();
-                return p;
-            }
-        }
         if(matches.front()->name() == name)
         {
-            string msg = "redefinition of " + matches.front()->kindOf() + " `" + matches.front()->name();
-            msg += "' as enumerator";
-            _unit->error(msg);
+            _unit->error(string("redefinition of enumerator `") + name + "'");
         }
         else
         {
             string msg = "enumerator `" + name + "' differs only in capitalization from ";
-            msg += matches.front()->kindOf() + " `" + matches.front()->name() + "'";
+            msg += "`" + matches.front()->name() + "'";
             _unit->error(msg);
         }
     }
 
     nameIsLegal(name, "enumerator"); // Don't return here -- we create the enumerator anyway.
-
-    return 0;
 }
 
 // ----------------------------------------------------------------------
@@ -3219,6 +3481,12 @@ Slice::ClassDef::createOperation(const string& name,
         _unit->error(msg);
     }
 
+    if(!isInterface() && !isLocal() && !_hasOperations)
+    {
+        // Only warn for the first operation
+        _unit->warning(Deprecated, "classes with operations are deprecated");
+    }
+
     _hasOperations = true;
     OperationPtr op = new Operation(this, name, returnType, optional, tag, mode);
     _contents.push_back(op);
@@ -3314,7 +3582,7 @@ Slice::ClassDef::createDataMember(const string& name, const TypePtr& type, bool 
     string dv = defaultValue;
     string dl = defaultLiteral;
 
-    if(dlt)
+    if(dlt || (EnumPtr::dynamicCast(type) && !dv.empty()))
     {
         //
         // Validate the default value.
@@ -3616,6 +3884,17 @@ Slice::ClassDef::inheritsMetaData(const string& meta) const
     return false;
 }
 
+bool
+Slice::ClassDef::hasBaseDataMembers() const
+{
+    if(!_bases.empty() && !_bases.front()->isInterface())
+    {
+        return !_bases.front()->allDataMembers().empty();
+    }
+
+    return false;
+}
+
 Contained::ContainedType
 Slice::ClassDef::containedType() const
 {
@@ -3675,6 +3954,17 @@ Slice::ClassDef::ClassDef(const ContainerPtr& container, const string& name, int
     _local(local),
     _compactId(id)
 {
+    if(!local && !intf)
+    {
+        for(ClassList::const_iterator p = _bases.begin(); p != _bases.end(); ++p)
+        {  
+            if((*p)->isInterface())
+            {
+                _unit->warning(Deprecated, "classes implementing interfaces are deprecated");
+                break;
+            }
+        }
+    }
     //
     // First element of bases may be a class, all others must be
     // interfaces.
@@ -3699,13 +3989,13 @@ Slice::ClassDef::ClassDef(const ContainerPtr& container, const string& name, int
 bool
 Slice::Proxy::isLocal() const
 {
-    return __class->isLocal();
+    return _classDecl->isLocal();
 }
 
 string
 Slice::Proxy::typeId() const
 {
-    return __class->scoped();
+    return _classDecl->scoped();
 }
 
 bool
@@ -3729,13 +4019,13 @@ Slice::Proxy::isVariableLength() const
 ClassDeclPtr
 Slice::Proxy::_class() const
 {
-    return __class;
+    return _classDecl;
 }
 
 Slice::Proxy::Proxy(const ClassDeclPtr& cl) :
      SyntaxTreeBase(cl->unit()),
      Type(cl->unit()),
-    __class(cl)
+    _classDecl(cl)
 {
 }
 
@@ -3826,7 +4116,7 @@ Slice::Exception::createDataMember(const string& name, const TypePtr& type, bool
     string dv = defaultValue;
     string dl = defaultLiteral;
 
-    if(dlt)
+    if(dlt || (EnumPtr::dynamicCast(type) && !dv.empty()))
     {
         //
         // Validate the default value.
@@ -4057,6 +4347,12 @@ Slice::Exception::inheritsMetaData(const string& meta) const
     return false;
 }
 
+bool
+Slice::Exception::hasBaseDataMembers() const
+{
+    return _base && !_base->allDataMembers().empty();
+}
+
 string
 Slice::Exception::kindOf() const
 {
@@ -4091,8 +4387,6 @@ Slice::Struct::createDataMember(const string& name, const TypePtr& type, bool op
                                 const SyntaxTreeBasePtr& defaultValueType, const string& defaultValue,
                                 const string& defaultLiteral)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -4144,7 +4438,7 @@ Slice::Struct::createDataMember(const string& name, const TypePtr& type, bool op
     string dv = defaultValue;
     string dl = defaultLiteral;
 
-    if(dlt)
+    if(dlt || (EnumPtr::dynamicCast(type) && !dv.empty()))
     {
         //
         // Validate the default value.
@@ -4610,69 +4904,7 @@ Slice::Dictionary::Dictionary(const ContainerPtr& container, const string& name,
 void
 Slice::Enum::destroy()
 {
-    _enumerators.clear();
     SyntaxTreeBase::destroy();
-}
-
-EnumeratorList
-Slice::Enum::getEnumerators()
-{
-    return _enumerators;
-}
-
-void
-Slice::Enum::setEnumerators(const EnumeratorList& ens)
-{
-    _enumerators = ens;
-    int lastValue = -1;
-    set<int> values;
-    for(EnumeratorList::iterator p = _enumerators.begin(); p != _enumerators.end(); ++p)
-    {
-        (*p)->_type = this;
-
-        if((*p)->_explicitValue)
-        {
-            _explicitValue = true;
-
-            if((*p)->_value < 0)
-            {
-                string msg = "value for enumerator `" + (*p)->name() + "' is out of range";
-                _unit->error(msg);
-            }
-        }
-        else
-        {
-            if(lastValue == Int32Max)
-            {
-                string msg = "value for enumerator `" + (*p)->name() + "' is out of range";
-                _unit->error(msg);
-            }
-
-            //
-            // If the enumerator was not assigned an explicit value, we automatically assign
-            // it one more than the previous enumerator.
-            //
-            (*p)->_value = lastValue + 1;
-        }
-
-        if(values.count((*p)->_value) != 0)
-        {
-            string msg = "enumerator `" + (*p)->name() + "' has a duplicate value";
-            _unit->error(msg);
-        }
-        values.insert((*p)->_value);
-
-        lastValue = (*p)->_value;
-
-        if(lastValue > _maxValue)
-        {
-            _maxValue = lastValue;
-        }
-        if(lastValue < _minValue)
-        {
-            _minValue = lastValue;
-        }
-    }
 }
 
 bool
@@ -4743,13 +4975,75 @@ Slice::Enum::recDependencies(set<ConstructedPtr>&)
 
 Slice::Enum::Enum(const ContainerPtr& container, const string& name, bool local) :
     SyntaxTreeBase(container->unit()),
+    Container(container->unit()),
     Type(container->unit()),
     Contained(container, name),
     Constructed(container, name, local),
     _explicitValue(false),
     _minValue(Int32Max),
-    _maxValue(0)
+    _maxValue(0),
+    _lastValue(-1)
 {
+}
+
+int
+Slice::Enum::newEnumerator(const EnumeratorPtr& p)
+{
+    if(p->explicitValue())
+    {
+        _explicitValue = true;
+        _lastValue = p->value();
+
+        if(_lastValue < 0)
+        {
+            string msg = "value for enumerator `" + p->name() + "' is out of range";
+            _unit->error(msg);
+        }
+    }
+    else
+    {
+        if(_lastValue == Int32Max)
+        {
+            string msg = "value for enumerator `" + p->name() + "' is out of range";
+            _unit->error(msg);
+        }
+        else
+        {
+            //
+            // If the enumerator was not assigned an explicit value, we automatically assign
+            // it one more than the previous enumerator.
+            //
+            ++_lastValue;
+        }
+    }
+
+    bool checkForDuplicates = true;
+    if(_lastValue > _maxValue)
+    {
+        _maxValue = _lastValue;
+        checkForDuplicates = false;
+    }
+    if(_lastValue < _minValue)
+    {
+        _minValue = _lastValue;
+        checkForDuplicates = false;
+    }
+
+    if(checkForDuplicates)
+    {
+        EnumeratorList enl = enumerators();
+        for(EnumeratorList::iterator q = enl.begin(); q != enl.end(); ++q)
+        {
+            EnumeratorPtr& r = *q;
+            if(r != p && r->value() == _lastValue)
+            {
+                _unit->error(string("enumerator `") + p->name() + "' has the same value as enumerator `" +
+                             r->name() + "'");
+            }
+        }
+    }
+
+    return _lastValue;
 }
 
 // ----------------------------------------------------------------------
@@ -4759,7 +5053,7 @@ Slice::Enum::Enum(const ContainerPtr& container, const string& name, bool local)
 EnumPtr
 Slice::Enumerator::type() const
 {
-    return _type;
+    return EnumPtr::dynamicCast(container());
 }
 
 Contained::ContainedType
@@ -4798,6 +5092,7 @@ Slice::Enumerator::Enumerator(const ContainerPtr& container, const string& name)
     _explicitValue(false),
     _value(-1)
 {
+    _value = EnumPtr::dynamicCast(container)->newEnumerator(this);
 }
 
 Slice::Enumerator::Enumerator(const ContainerPtr& container, const string& name, int value) :
@@ -4806,6 +5101,7 @@ Slice::Enumerator::Enumerator(const ContainerPtr& container, const string& name,
     _explicitValue(true),
     _value(value)
 {
+    EnumPtr::dynamicCast(container)->newEnumerator(this);
 }
 
 // ----------------------------------------------------------------------
@@ -4878,6 +5174,11 @@ Slice::Const::Const(const ContainerPtr& container, const string& name, const Typ
     _value(value),
     _literal(literal)
 {
+    if(valueType == 0)
+    {
+        cerr << "const " << name << " created with null valueType" << endl;
+    }
+
 }
 
 // ----------------------------------------------------------------------
@@ -4919,6 +5220,29 @@ Slice::Operation::sendMode() const
     {
         return _mode;
     }
+}
+
+bool
+Slice::Operation::hasMarshaledResult() const
+{
+    ClassDefPtr cl = ClassDefPtr::dynamicCast(container());
+    assert(cl);
+    if(cl->hasMetaData("marshaled-result") || hasMetaData("marshaled-result"))
+    {
+        if(returnType() && isMutableAfterReturnType(returnType()))
+        {
+            return true;
+        }
+        for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+        {
+            ParamDeclPtr q = ParamDeclPtr::dynamicCast(*p);
+            if(q->isOutParam() && isMutableAfterReturnType(q->type()))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 ParamDeclPtr
@@ -5022,6 +5346,74 @@ Slice::Operation::parameters() const
         }
     }
     return result;
+}
+
+ParamDeclList
+Slice::Operation::inParameters() const
+{
+    ParamDeclList result;
+    for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+    {
+        ParamDeclPtr q = ParamDeclPtr::dynamicCast(*p);
+        if(q && !q->isOutParam())
+        {
+            result.push_back(q);
+        }
+    }
+    return result;
+}
+
+void
+Slice::Operation::inParameters(ParamDeclList& required, ParamDeclList& optional) const
+{
+    const ParamDeclList params = inParameters();
+    for(ParamDeclList::const_iterator pli = params.begin(); pli != params.end(); ++pli)
+    {
+        if((*pli)->optional())
+        {
+            optional.push_back(*pli);
+        }
+        else
+        {
+            required.push_back(*pli);
+        }
+    }
+
+    sortOptionalParameters(optional);
+}
+
+ParamDeclList
+Slice::Operation::outParameters() const
+{
+    ParamDeclList result;
+    for(ContainedList::const_iterator p = _contents.begin(); p != _contents.end(); ++p)
+    {
+        ParamDeclPtr q = ParamDeclPtr::dynamicCast(*p);
+        if(q && q->isOutParam())
+        {
+            result.push_back(q);
+        }
+    }
+    return result;
+}
+
+void
+Slice::Operation::outParameters(ParamDeclList& required, ParamDeclList& optional) const
+{
+    const ParamDeclList params = outParameters();
+    for(ParamDeclList::const_iterator pli = params.begin(); pli != params.end(); ++pli)
+    {
+        if((*pli)->optional())
+        {
+            optional.push_back(*pli);
+        }
+        else
+        {
+            required.push_back(*pli);
+        }
+    }
+
+    sortOptionalParameters(optional);
 }
 
 ExceptionList
@@ -5176,12 +5568,25 @@ Slice::Operation::returnsData() const
 }
 
 bool
+Slice::Operation::returnsMultipleValues() const
+{
+    size_t count = outParameters().size();
+
+    if(returnType())
+    {
+        ++count;
+    }
+
+    return count > 1;
+}
+
+bool
 Slice::Operation::sendsOptionals() const
 {
-    ParamDeclList pdl = parameters();
+    ParamDeclList pdl = inParameters();
     for(ParamDeclList::const_iterator i = pdl.begin(); i != pdl.end(); ++i)
     {
-        if(!(*i)->isOutParam() && (*i)->optional())
+        if((*i)->optional())
         {
             return true;
         }
@@ -5220,7 +5625,7 @@ Slice::Operation::attributes() const
         }
         if(i == 2)
         {
-            emitWarning(definitionContext()->filename(), line(), "invalid freeze metadata for operation");
+            _unit->warning(InvalidMetaData, "invalid freeze metadata for operation");
         }
         else
         {
@@ -5241,7 +5646,7 @@ Slice::Operation::attributes() const
                 {
                     if(result != 0 && (i == int(Supports) || i == int(Never)))
                     {
-                        emitWarning(definitionContext()->filename(), line(), "invalid freeze metadata for operation");
+                        _unit->warning(InvalidMetaData, "invalid freeze metadata for operation");
                     }
                     else
                     {
@@ -5255,7 +5660,7 @@ Slice::Operation::attributes() const
 
             if(i == 4)
             {
-                emitWarning(definitionContext()->filename(), line(), "invalid freeze metadata for operation");
+                _unit->warning(InvalidMetaData, "invalid freeze metadata for operation");
 
                 //
                 // Set default
@@ -5738,13 +6143,6 @@ Slice::Unit::setSeenDefinition()
 }
 
 void
-Slice::Unit::error(const char* s)
-{
-    emitError(currentFile(), _currentLine, s);
-    _errors++;
-}
-
-void
 Slice::Unit::error(const string& s)
 {
     emitError(currentFile(), _currentLine, s);
@@ -5752,15 +6150,16 @@ Slice::Unit::error(const string& s)
 }
 
 void
-Slice::Unit::warning(const char* s) const
+Slice::Unit::warning(WarningCategory category, const string& msg) const
 {
-    emitWarning(currentFile(), _currentLine, s);
-}
-
-void
-Slice::Unit::warning(const string& s) const
-{
-    emitWarning(currentFile(), _currentLine, s);
+    if(_definitionContextStack.empty())
+    {
+        emitWarning(currentFile(), _currentLine, msg);
+    }
+    else
+    {
+        _definitionContextStack.top()->warning(category, currentFile(), _currentLine, msg);
+    }
 }
 
 ContainerPtr
@@ -6001,12 +6400,6 @@ Slice::Unit::usesConsts() const
     return false;
 }
 
-FeatureProfile
-Slice::Unit::profile() const
-{
-    return _featureProfile;
-}
-
 StringList
 Slice::Unit::includeFiles() const
 {
@@ -6026,7 +6419,7 @@ Slice::Unit::allFiles() const
 }
 
 int
-Slice::Unit::parse(const string& filename, FILE* file, bool debug, Slice::FeatureProfile profile)
+Slice::Unit::parse(const string& filename, FILE* file, bool debug)
 {
     slice_debug = debug ? 1 : 0;
 
@@ -6036,7 +6429,6 @@ Slice::Unit::parse(const string& filename, FILE* file, bool debug, Slice::Featur
     _currentComment = "";
     _currentLine = 1;
     _currentIncludeLevel = 0;
-    _featureProfile = profile;
     _topLevelFile = fullPath(filename);
     pushContainer(this);
     pushDefinitionContext();
@@ -6072,6 +6464,11 @@ Slice::Unit::parse(const string& filename, FILE* file, bool debug, Slice::Featur
         popContainer();
         assert(_definitionContextStack.size() == 1);
         popDefinitionContext();
+
+        if(!checkUndefinedTypes())
+        {
+            status = EXIT_FAILURE;
+        }
     }
 
     Slice::unit = 0;
@@ -6168,6 +6565,113 @@ Slice::Unit::eraseWhiteSpace(string& s)
     {
         s.erase(++idx);
     }
+}
+
+bool
+Slice::Unit::checkUndefinedTypes()
+{
+    class Visitor : public ParserVisitor
+    {
+    public:
+
+        Visitor(int& errors) :
+            _errors(errors),
+            _local(false)
+        {
+        }
+
+        virtual bool visitClassDefStart(const ClassDefPtr& p)
+        {
+            _local = p->isLocal();
+            return true;
+        }
+
+        virtual bool visitExceptionStart(const ExceptionPtr& p)
+        {
+            _local = p->isLocal();
+            return true;
+        }
+
+        virtual bool visitStructStart(const StructPtr& p)
+        {
+            _local = p->isLocal();
+            return true;
+        }
+
+        virtual void visitOperation(const OperationPtr& p)
+        {
+            if(p->returnType())
+            {
+                checkUndefined(p->returnType(), "return type", p->file(), p->line());
+            }
+            ParamDeclList params = p->parameters();
+            for(ParamDeclList::const_iterator q = params.begin(); q != params.end(); ++q)
+            {
+                checkUndefined((*q)->type(), "parameter " + (*q)->name(), (*q)->file(), (*q)->line());
+            }
+        }
+
+        virtual void visitParamDecl(const ParamDeclPtr& p)
+        {
+            checkUndefined(p->type(), "parameter " + p->name(), p->file(), p->line());
+        }
+
+        virtual void visitDataMember(const DataMemberPtr& p)
+        {
+            checkUndefined(p->type(), "member " + p->name(), p->file(), p->line());
+        }
+
+        virtual void visitSequence(const SequencePtr& p)
+        {
+            _local = p->isLocal();
+            checkUndefined(p->type(), "element type", p->file(), p->line());
+        }
+
+        virtual void visitDictionary(const DictionaryPtr& p)
+        {
+            _local = p->isLocal();
+            checkUndefined(p->keyType(), "key type", p->file(), p->line());
+            checkUndefined(p->valueType(), "value type", p->file(), p->line());
+        }
+
+    private:
+
+        void checkUndefined(const TypePtr& type, const string& desc, const string& file, const string& line)
+        {
+            //
+            // See ICE-6867. Any use of a proxy requires the full type definition, as does any
+            // use of a class in a non-local context.
+            //
+            ProxyPtr p = ProxyPtr::dynamicCast(type);
+            if(p)
+            {
+                const ClassDeclPtr cl = p->_class();
+                if(!cl->definition())
+                {
+                    ostringstream ostr;
+                    ostr << desc << " uses a proxy for undefined type `" << cl->scoped() << "'";
+                    emitError(file, line, ostr.str());
+                    _errors++;
+                }
+            }
+
+            ClassDeclPtr cl = ClassDeclPtr::dynamicCast(type);
+            if(cl && !cl->definition() && !_local)
+            {
+                ostringstream ostr;
+                ostr << desc << " refers to undefined type `" << cl->scoped() << "'";
+                emitError(file, line, ostr.str());
+                _errors++;
+            }
+        }
+
+        int& _errors;
+        bool _local;
+    };
+
+    Visitor v(_errors);
+    visit(&v, true);
+    return _errors == 0;
 }
 
 // ----------------------------------------------------------------------

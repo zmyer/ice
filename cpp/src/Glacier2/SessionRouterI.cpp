@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -12,7 +12,7 @@
 #include <Glacier2/FilterManager.h>
 #include <Glacier2/RouterI.h>
 
-#include <IceUtil/UUID.h>
+#include <Ice/UUID.h>
 
 #include <IceSSL/IceSSL.h>
 
@@ -80,7 +80,7 @@ public:
             // Close the connection otherwise the peer has no way to know that
             // the session has gone.
             //
-            _connection->close(false);
+            _connection->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
             _router->destroySession(_connection);
         }
     }
@@ -90,6 +90,21 @@ private:
     const SessionRouterIPtr _router;
     const Ice::ConnectionPtr _connection;
 };
+
+Ice::IPConnectionInfoPtr
+getIPConnectionInfo(const Ice::ConnectionInfoPtr& info)
+{
+    for(Ice::ConnectionInfoPtr p = info; p; p = p->underlying)
+    {
+        Ice::IPConnectionInfoPtr ipInfo = Ice::IPConnectionInfoPtr::dynamicCast(p);
+        if(ipInfo)
+        {
+            return ipInfo;
+        }
+    }
+    return ICE_NULLPTR;
+}
+
 }
 
 namespace Glacier2
@@ -443,7 +458,7 @@ CreateSession::CreateSession(const SessionRouterIPtr& sessionRouter, const strin
     {
         _context["_con.type"] = current.con->type();
         {
-            Ice::IPConnectionInfoPtr info = Ice::IPConnectionInfoPtr::dynamicCast(current.con->getInfo());
+            Ice::IPConnectionInfoPtr info = getIPConnectionInfo(current.con->getInfo());
             if(info)
             {
                 ostringstream os;
@@ -832,10 +847,11 @@ SessionRouterI::createSessionFromSecureConnection_async(
             amdCB->ice_exception(PermissionDeniedException("not ssl connection"));
             return;
         }
-        sslinfo.remotePort = info->remotePort;
-        sslinfo.remoteHost = info->remoteAddress;
-        sslinfo.localPort = info->localPort;
-        sslinfo.localHost = info->localAddress;
+        Ice::IPConnectionInfoPtr ipInfo = getIPConnectionInfo(info);
+        sslinfo.remotePort = ipInfo->remotePort;
+        sslinfo.remoteHost = ipInfo->remoteAddress;
+        sslinfo.localPort = ipInfo->localPort;
+        sslinfo.localHost = ipInfo->localAddress;
         sslinfo.cipher = info->cipher;
         sslinfo.certs = info->certs;
         if(info->certs.size() > 0)
@@ -906,7 +922,7 @@ SessionRouterI::refreshSession(const Ice::ConnectionPtr& con)
             // Close the connection otherwise the peer has no way to know that the
             // session has gone.
             //
-            con->close(false);
+            con->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
             throw SessionNotExistException();
         }
     }
@@ -1133,10 +1149,10 @@ SessionRouterI::getRouterImpl(const ConnectionPtr& connection, const Ice::Identi
         if(_rejectTraceLevel >= 1)
         {
             Trace out(_instance->logger(), "Glacier2");
-            out << "rejecting request. no session is associated with the connection.\n";
-            out << "identity: " << _instance->communicator()->identityToString(id);
+            out << "rejecting request, no session is associated with the connection.\n";
+            out << "identity: " << identityToString(id);
         }
-        connection->close(true);
+        connection->close(ICE_SCOPED_ENUM(ConnectionClose, Forcefully));
         throw ObjectNotExistException(__FILE__, __LINE__);
     }
     return 0;

@@ -1,6 +1,6 @@
 // **********************************************************************
 //
-// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -11,49 +11,37 @@
 #import <objects/TestI.h>
 
 @implementation TestObjectsBI
--(BOOL) postUnmarshalInvoked:(ICECurrent*)current
-{
-    return _postUnmarshalInvoked;
-}
 -(void) ice_preMarshal
 {
     preMarshalInvoked = YES;
 }
 -(void) ice_postUnmarshal
 {
-    _postUnmarshalInvoked = YES;
+    postUnmarshalInvoked = YES;
 }
 
 @end
 
 @implementation TestObjectsCI
--(BOOL) postUnmarshalInvoked:(ICECurrent*)current
-{
-    return _postUnmarshalInvoked;
-}
 -(void) ice_preMarshal
 {
     preMarshalInvoked = YES;
 }
 -(void) ice_postUnmarshal
 {
-    _postUnmarshalInvoked = YES;
+    postUnmarshalInvoked = YES;
 }
 
 @end
 
 @implementation TestObjectsDI
--(BOOL) postUnmarshalInvoked:(ICECurrent*)current
-{
-    return _postUnmarshalInvoked;
-}
 -(void) ice_preMarshal
 {
     preMarshalInvoked = YES;
 }
 -(void) ice_postUnmarshal
 {
-    _postUnmarshalInvoked = YES;
+    postUnmarshalInvoked = YES;
 }
 @end
 
@@ -62,10 +50,7 @@
 {
     return [super init:1 s:@"hello"];
 }
--(BOOL) checkValues:(ICECurrent*)current
-{
-    return i == 1 && [s isEqualToString:@"hello"];
-}
+
 @end
 
 @implementation TestObjectsFI
@@ -207,6 +192,15 @@
     return _f;
 }
 
+-(TestObjectsB*) getMB:(ICECurrent*)current
+{
+    return _b1;
+}
+
+-(TestObjectsB*) getAMDMB:(ICECurrent*)current
+{
+    return _b1;
+}
 
 -(void) getAll:(TestObjectsB **)b1 b2:(TestObjectsB **)b2 theC:(TestObjectsC **)theC theD:(TestObjectsD **)theD current:(ICECurrent *)current;
 {
@@ -233,6 +227,19 @@
 -(TestObjectsI*) getH:(ICECurrent*)current
 {
     return (TestObjectsI*)[TestObjectsH h];
+}
+
+-(TestObjectsI*) getD1:(TestObjectsI*)d1 current:(ICECurrent*)current
+{
+    return d1;
+}
+
+-(void) throwEDerived:(ICECurrent*)current
+{
+    @throw [TestObjectsEDerived eDerived:[TestObjectsA1 a1:@"a1"]
+                                      a2:[TestObjectsA1 a1:@"a2"]
+                                      a3:[TestObjectsA1 a1:@"a3"]
+                                      a4:[TestObjectsA1 a1:@"a4"]];
 }
 
 -(TestObjectsBaseSeq*) opBaseSeq:(TestObjectsMutableBaseSeq*)inSeq outSeq:(TestObjectsBaseSeq**)outSeq
