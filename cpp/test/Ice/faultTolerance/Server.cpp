@@ -50,7 +50,7 @@ run(int argc, char* argv[], const Ice::CommunicatorPtr& communicator)
     }
 
     ostringstream endpts;
-    endpts << getTestEndpoint(communicator, port) << ":udp";
+    endpts << getTestEndpoint(communicator, port);
     communicator->getProperties()->setProperty("TestAdapter.Endpoints", endpts.str());
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter");
     Ice::ObjectPtr object = ICE_MAKE_SHARED(TestI);
@@ -64,7 +64,9 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerIceUDP(true);
 #endif
 
     try
@@ -77,7 +79,7 @@ main(int argc, char* argv[])
         Ice::InitializationData initData = getTestInitData(argc, argv);
         initData.properties->setProperty("Ice.ServerIdleTime", "120"); // Two minutes.
 
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         return run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)

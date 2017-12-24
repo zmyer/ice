@@ -30,7 +30,6 @@ class ClassInfo;
 typedef IceUtil::Handle<ClassInfo> ClassInfoPtr;
 typedef std::vector<ClassInfoPtr> ClassInfoList;
 
-
 class ValueInfo;
 typedef IceUtil::Handle<ValueInfo> ValueInfoPtr;
 
@@ -237,11 +236,13 @@ public:
 
     virtual void print(PyObject*, IceUtilInternal::Output&, PrintObjectHistory*);
 
+    virtual void destroy();
+
     Ice::Int valueForEnumerator(PyObject*) const;
     PyObject* enumeratorForValue(Ice::Int) const;
 
     const std::string id;
-    const PyObjectHandle pythonType;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
     const Ice::Int maxValue;
     const EnumeratorMap enumerators;
 };
@@ -293,7 +294,7 @@ public:
 
     const std::string id;
     const DataMemberList members;
-    const PyObjectHandle pythonType;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
 
 private:
 
@@ -388,10 +389,8 @@ public:
 
     virtual void print(PyObject*, IceUtilInternal::Output&, PrintObjectHistory*);
 
-    virtual void destroy();
-
     const std::string id;
-    const PyObjectHandle pythonType;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
 };
 typedef IceUtil::Handle<CustomInfo> CustomInfoPtr;
 
@@ -475,8 +474,8 @@ public:
     const std::string id;
     const ClassInfoPtr base;
     const ClassInfoList interfaces;
-    const PyObjectHandle pythonType;
-    const PyObjectHandle typeObj;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
+    PyObject* typeObj; // Borrowed reference - the "_t_XXX" variable owns the reference.
     const bool defined;
 };
 
@@ -519,8 +518,8 @@ public:
     const ValueInfoPtr base;
     const DataMemberList members;
     const DataMemberList optionalMembers;
-    const PyObjectHandle pythonType;
-    const PyObjectHandle typeObj;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
+    PyObject* typeObj; // Borrowed reference - the "_t_XXX" variable owns the reference.
     const bool defined;
 };
 
@@ -549,11 +548,9 @@ public:
 
     virtual void print(PyObject*, IceUtilInternal::Output&, PrintObjectHistory*);
 
-    virtual void destroy();
-
     const std::string id;
-    const PyObjectHandle pythonType;
-    const PyObjectHandle typeObj;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
+    PyObject* typeObj; // Borrowed reference - the "_t_XXX" variable owns the reference.
 };
 typedef IceUtil::Handle<ProxyInfo> ProxyInfoPtr;
 
@@ -576,7 +573,7 @@ public:
     DataMemberList members;
     DataMemberList optionalMembers;
     bool usesClasses;
-    PyObjectHandle pythonType;
+    PyObject* pythonType; // Borrowed reference - the enclosing Python module owns the reference.
 
 private:
 

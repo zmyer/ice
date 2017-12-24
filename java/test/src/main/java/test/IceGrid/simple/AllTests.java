@@ -88,11 +88,6 @@ public class AllTests
             initData.properties.setProperty("Ice.Default.Locator", "");
             initData.properties.setProperty("Ice.Plugin.IceLocatorDiscovery",
                                             "IceLocatorDiscovery:com.zeroc.IceLocatorDiscovery.PluginFactory");
-            if(System.getProperty("os.name").contains("OS X") &&
-               initData.properties.getPropertyAsInt("Ice.PreferIPv6Address") > 0)
-            {
-                initData.properties.setProperty("IceLocatorDiscovery.Interface", "::1");
-            }
             initData.properties.setProperty("IceLocatorDiscovery.Port", Integer.toString(app.getTestPort(99)));
             initData.properties.setProperty("AdapterForDiscoveryTest.AdapterId", "discoveryAdapter");
             initData.properties.setProperty("AdapterForDiscoveryTest.Endpoints", "default");
@@ -148,6 +143,64 @@ public class AllTests
             adapter.activate();
             adapter.deactivate();
 
+            comm.destroy();
+
+            String multicast;
+            if(communicator.getProperties().getProperty("Ice.IPv6").equals("1"))
+            {
+                multicast = "\"ff15::1\"";
+            }
+            else
+            {
+                multicast = "239.255.0.1";
+            }
+
+            //
+            // Test invalid lookup endpoints
+            //
+            initData.properties = communicator.getProperties()._clone();
+            initData.properties.setProperty("Ice.Default.Locator", "");
+            initData.properties.setProperty("Ice.Plugin.IceLocatorDiscovery",
+                                            "com.zeroc.IceLocatorDiscovery.PluginFactory");
+            initData.properties.setProperty("IceLocatorDiscovery.Lookup",
+                                             "udp -h " + multicast + " --interface unknown");
+            comm = com.zeroc.Ice.Util.initialize(initData);
+            test(comm.getDefaultLocator() != null);
+            try
+            {
+                comm.stringToProxy("test @ TestAdapter").ice_ping();
+                test(false);
+            }
+            catch(com.zeroc.Ice.NoEndpointException ex)
+            {
+            }
+            comm.destroy();
+
+            initData.properties = communicator.getProperties()._clone();
+            initData.properties.setProperty("Ice.Default.Locator", "");
+            initData.properties.setProperty("Ice.Plugin.IceLocatorDiscovery",
+                                            "com.zeroc.IceLocatorDiscovery.PluginFactory");
+            {
+                String intf = initData.properties.getProperty("IceLocatorDiscovery.Interface");
+                if(!intf.isEmpty())
+                {
+                    intf = " --interface \"" + intf + "\"";
+                }
+                String port = Integer.toString(app.getTestPort(99));
+                initData.properties.setProperty("IceLocatorDiscovery.Lookup",
+                                                 "udp -h " + multicast + " --interface unknown:" +
+                                                 "udp -h " + multicast + " -p " + port + intf);
+            }
+            comm = com.zeroc.Ice.Util.initialize(initData);
+            test(comm.getDefaultLocator() != null);
+            try
+            {
+                comm.stringToProxy("test @ TestAdapter").ice_ping();
+            }
+            catch(com.zeroc.Ice.NoEndpointException ex)
+            {
+                test(false);
+            }
             comm.destroy();
         }
         out.println("ok");

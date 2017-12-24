@@ -9,6 +9,7 @@
 
 #include <IceSSL/SSLEngine.h>
 #include <IceSSL/TrustManager.h>
+#include <IceSSL/ConnectionInfo.h>
 
 #include <IceUtil/StringUtil.h>
 
@@ -22,11 +23,13 @@
 
 using namespace std;
 using namespace Ice;
+using namespace IceUtil;
 using namespace IceSSL;
 
 IceUtil::Shared* IceSSL::upCast(IceSSL::SSLEngine* p) { return p; }
 
 IceSSL::SSLEngine::SSLEngine(const Ice::CommunicatorPtr& communicator) :
+    _initialized(false),
     _communicator(communicator),
     _logger(communicator->getLogger()),
     _trustManager(new TrustManager(communicator))
@@ -80,6 +83,13 @@ IceSSL::SSLEngine::password(bool /*encrypting*/)
     }
 }
 
+bool
+IceSSL::SSLEngine::initialized() const
+{
+    Mutex::Lock lock(_mutex);
+    return _initialized;
+}
+
 string
 IceSSL::SSLEngine::getPassword() const
 {
@@ -118,9 +128,8 @@ IceSSL::SSLEngine::initialize()
 
     if(_verifyPeer < 0 || _verifyPeer > 2)
     {
-        PluginInitializationException ex(__FILE__, __LINE__);
-        ex.reason = "IceSSL: invalid value for " + propPrefix + "VerifyPeer";
-        throw ex;
+        throw PluginInitializationException(__FILE__, __LINE__, "IceSSL: invalid value for " + propPrefix +
+                                            "VerifyPeer");
     }
 
     _securityTraceLevel = properties->getPropertyAsInt("IceSSL.Trace.Security");
@@ -128,20 +137,15 @@ IceSSL::SSLEngine::initialize()
 }
 
 void
-IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoPtr& info, const string& desc)
+IceSSL::SSLEngine::verifyPeerCertName(const string& address, const ConnectionInfoPtr& info)
 {
-    const CertificateVerifierPtr verifier = getCertificateVerifier();
-
-#if defined(ICE_USE_SCHANNEL) || \
-    (defined(ICE_USE_OPENSSL) && defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < 0x10002000L)
-
     //
     // For an outgoing connection, we compare the proxy address (if any) against
     // fields in the server's certificate (if any).
     //
-    if(_checkCertName && !info->nativeCerts.empty() && !address.empty())
+    if(_checkCertName && !info->certs.empty() && !address.empty())
     {
-        const CertificatePtr cert = info->nativeCerts[0];
+        const CertificatePtr cert = info->certs[0];
 
         //
         // Extract the IP addresses and the DNS names from the subject
@@ -213,14 +217,16 @@ IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoP
 
             if(_verifyPeer > 0)
             {
-                SecurityException ex(__FILE__, __LINE__);
-                ex.reason = msg;
-                throw ex;
+                throw SecurityException(__FILE__, __LINE__, msg);
             }
         }
     }
-#endif
+}
 
+void
+IceSSL::SSLEngine::verifyPeer(const string& address, const ConnectionInfoPtr& info, const string& desc)
+{
+    const CertificateVerifierPtr verifier = getCertificateVerifier();
     if(_verifyDepthMax > 0 && static_cast<int>(info->certs.size()) > _verifyDepthMax)
     {
         ostringstream ostr;
@@ -232,9 +238,7 @@ IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoP
         {
             _logger->trace(_securityTraceCategory, msg + "\n" + desc);
         }
-        SecurityException ex(__FILE__, __LINE__);
-        ex.reason = msg;
-        throw ex;
+        throw SecurityException(__FILE__, __LINE__, msg);
     }
 
     if(!_trustManager->verify(info, desc))
@@ -244,9 +248,7 @@ IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoP
         {
             _logger->trace(_securityTraceCategory, msg + "\n" + desc);
         }
-        SecurityException ex(__FILE__, __LINE__);
-        ex.reason = msg;
-        throw ex;
+        throw SecurityException(__FILE__, __LINE__, msg);
     }
 
     if(verifier && !verifier->verify(info))
@@ -256,9 +258,7 @@ IceSSL::SSLEngine::verifyPeer(const string& address, const NativeConnectionInfoP
         {
             _logger->trace(_securityTraceCategory, msg + "\n" + desc);
         }
-        SecurityException ex(__FILE__, __LINE__);
-        ex.reason = msg;
-        throw ex;
+        throw SecurityException(__FILE__, __LINE__, msg);
     }
 }
 

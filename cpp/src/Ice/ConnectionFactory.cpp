@@ -219,8 +219,13 @@ IceInternal::OutgoingConnectionFactory::waitUntilFinished()
         cons.clear();
         _connections.clear();
         _connectionsByEndpoint.clear();
-        _monitor->destroy();
     }
+
+    //
+    // Must be destroyed outside the synchronization since this might block waiting for
+    // a timer task to complete.
+    //
+    _monitor->destroy();
 }
 
 void
@@ -809,9 +814,9 @@ void
 IceInternal::OutgoingConnectionFactory::handleException(const LocalException& ex, bool hasMore)
 {
     TraceLevelsPtr traceLevels = _instance->traceLevels();
-    if(traceLevels->retry >= 2)
+    if(traceLevels->network >= 2)
     {
-        Trace out(_instance->initializationData().logger, traceLevels->retryCat);
+        Trace out(_instance->initializationData().logger, traceLevels->networkCat);
 
         out << "couldn't resolve endpoint host";
         if(dynamic_cast<const CommunicatorDestroyedException*>(&ex))
@@ -837,9 +842,9 @@ void
 IceInternal::OutgoingConnectionFactory::handleConnectionException(const LocalException& ex, bool hasMore)
 {
     TraceLevelsPtr traceLevels = _instance->traceLevels();
-    if(traceLevels->retry >= 2)
+    if(traceLevels->network >= 2)
     {
-        Trace out(_instance->initializationData().logger, traceLevels->retryCat);
+        Trace out(_instance->initializationData().logger, traceLevels->networkCat);
 
         out << "connection to endpoint failed";
         if(dynamic_cast<const CommunicatorDestroyedException*>(&ex))
@@ -1251,14 +1256,34 @@ IceInternal::IncomingConnectionFactory::waitUntilFinished()
             cons.clear();
         }
         _connections.clear();
-        _monitor->destroy();
     }
+
+    //
+    // Must be destroyed outside the synchronization since this might block waiting for
+    // a timer task to complete.
+    //
+    _monitor->destroy();
+}
+
+bool
+IceInternal::IncomingConnectionFactory::isLocal(const EndpointIPtr& endpoint) const
+{
+    if(_publishedEndpoint && endpoint->equivalent(_publishedEndpoint))
+    {
+        return true;
+    }
+    IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
+    return endpoint->equivalent(_endpoint);
 }
 
 EndpointIPtr
 IceInternal::IncomingConnectionFactory::endpoint() const
 {
-    // No mutex protection necessary, _endpoint is immutable.
+    if(_publishedEndpoint)
+    {
+        return _publishedEndpoint;
+    }
+    IceUtil::Monitor<IceUtil::Mutex>::Lock sync(*this);
     return _endpoint;
 }
 
@@ -1561,10 +1586,12 @@ IceInternal::IncomingConnectionFactory::connectionStartFailed(const Ice::Connect
 //
 IceInternal::IncomingConnectionFactory::IncomingConnectionFactory(const InstancePtr& instance,
                                                                   const EndpointIPtr& endpoint,
+                                                                  const EndpointIPtr& publishedEndpoint,
                                                                   const ObjectAdapterIPtr& adapter) :
     _instance(instance),
     _monitor(new FactoryACMMonitor(instance, dynamic_cast<ObjectAdapterI*>(adapter.get())->getACM())),
     _endpoint(endpoint),
+    _publishedEndpoint(publishedEndpoint),
     _acceptorStarted(false),
     _acceptorStopped(false),
     _adapter(adapter),
@@ -1821,11 +1848,10 @@ IceInternal::IncomingConnectionFactory::closeAcceptor()
 
     //
     // If the acceptor hasn't been explicitly stopped (which is the case if the acceptor got closed
-    // because of an unexpected error), try to restart the acceptor in 5 seconds.
+    // because of an unexpected error), try to restart the acceptor in 1 second.
     //
     if(!_acceptorStopped && (_state == StateHolding || _state == StateActive))
     {
         _instance->timer()->schedule(ICE_MAKE_SHARED(StartAcceptor, ICE_SHARED_FROM_THIS), IceUtil::Time::seconds(1));
     }
 }
-

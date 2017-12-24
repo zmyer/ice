@@ -25,9 +25,7 @@ def test(b)
 end
 
 def run(args, communicator)
-    myClass = allTests(communicator)
-
-    myClass.shutdown()
+    allTests(communicator)
     return true
 end
 
@@ -38,12 +36,6 @@ begin
     #
     initData = Ice::InitializationData.new
     initData.properties = Ice.createProperties(ARGV)
-
-    #
-    # We need to send messages large enough to cause the transport
-    # buffers to fill up.
-    #
-    initData.properties.setProperty("Ice.MessageSizeMax", "10000");
 
     #
     # For this test, we want to disable retries.

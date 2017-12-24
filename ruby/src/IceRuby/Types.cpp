@@ -595,8 +595,8 @@ IceRuby::PrimitiveInfo::marshal(VALUE p, Ice::OutputStream* os, ObjectMap*, bool
 #if defined(_MSC_VER) && (_MSC_VER <= 1700)
             _finite(val) &&
 #else
-            isfinite(d) && 
-#endif            
+            isfinite(d) &&
+#endif
             (d > numeric_limits<float>::max() || d < -numeric_limits<float>::max()))
         {
             throw RubyException(rb_eTypeError, "value is out of range for a float");
@@ -618,7 +618,11 @@ IceRuby::PrimitiveInfo::marshal(VALUE p, Ice::OutputStream* os, ObjectMap*, bool
     case PrimitiveInfo::KindString:
     {
         string val = getString(p);
-        os->write(val);
+#ifdef HAVE_RUBY_ENCODING_H
+        os->write(val, false); // Bypass string conversion.
+#else
+        os->write(val, true);
+#endif
         break;
     }
     }
@@ -683,7 +687,11 @@ IceRuby::PrimitiveInfo::unmarshal(Ice::InputStream* is, const UnmarshalCallbackP
     case PrimitiveInfo::KindString:
     {
         string str;
-        is->read(str);
+#ifdef HAVE_RUBY_ENCODING_H
+        is->read(str, false); // Bypass string conversion.
+#else
+        is->read(str, true);
+#endif
         val = createString(str);
         break;
     }
@@ -1517,7 +1525,11 @@ IceRuby::SequenceInfo::marshalPrimitiveSequence(const PrimitiveInfoPtr& pi, VALU
         {
             seq[i] = getString(RARRAY_AREF(arr, i));
         }
-        os->write(&seq[0], &seq[0] + seq.size());
+#ifdef HAVE_RUBY_ENCODING_H
+        os->write(&seq[0], &seq[0] + seq.size(), false); // Bypass string conversion.
+#else
+        os->write(&seq[0], &seq[0] + seq.size(), true);
+#endif
         break;
     }
     }
@@ -1643,7 +1655,11 @@ IceRuby::SequenceInfo::unmarshalPrimitiveSequence(const PrimitiveInfoPtr& pi, Ic
     case PrimitiveInfo::KindString:
     {
         Ice::StringSeq seq;
+#ifdef HAVE_RUBY_ENCODING_H
+        is->read(seq, false); // Bypass string conversion.
+#else
         is->read(seq, true);
+#endif
         long sz = static_cast<long>(seq.size());
         result = createArray(sz);
 
@@ -2263,7 +2279,7 @@ IceRuby::ClassInfo::isA(const ClassInfoPtr& info)
     {
         return true;
     }
-    
+
     return base && base->isA(info);
 }
 
@@ -2286,7 +2302,7 @@ IceRuby::ProxyInfo::define(VALUE t, VALUE b, VALUE i)
         const_cast<ProxyInfoPtr&>(base) = ProxyInfoPtr::dynamicCast(getType(b));
         assert(base);
     }
-    
+
     volatile VALUE arr = callRuby(rb_check_array_type, i);
     assert(!NIL_P(arr));
     for(int n = 0; n < RARRAY_LEN(arr); ++n)
@@ -2295,7 +2311,7 @@ IceRuby::ProxyInfo::define(VALUE t, VALUE b, VALUE i)
         assert(iface);
         const_cast<ProxyInfoList&>(interfaces).push_back(iface);
     }
-    
+
     const_cast<VALUE&>(rubyClass) = t;
 }
 
@@ -3124,7 +3140,7 @@ IceRuby_TypeInfo_defineClass(VALUE self, VALUE type, VALUE compactId, VALUE pres
             }
             _compactIdMap.insert(CompactIdMap::value_type(info->compactId, info));
         }
-        
+
         if(type != Qnil && !info->interface)
         {
             rb_define_const(type, "ICE_TYPE", self);

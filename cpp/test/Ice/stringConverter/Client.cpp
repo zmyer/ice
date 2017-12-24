@@ -14,6 +14,8 @@
 #include <iostream>
 #include <locale.h>
 
+DEFINE_TEST("client")
+
 using namespace std;
 
 static bool useLocale = false;
@@ -23,8 +25,9 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
-    Ice::registerIceStringConverter();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerIceStringConverter(false);
 #endif
 
     Ice::InitializationData initData = getTestInitData(argc, argv);

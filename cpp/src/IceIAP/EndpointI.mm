@@ -42,19 +42,15 @@ public:
 
     iAPEndpointFactoryPlugin(const Ice::CommunicatorPtr& com)
     {
-        ProtocolPluginFacadePtr pluginFacade = getProtocolPluginFacade(com);
+        ProtocolPluginFacadePtr f = getProtocolPluginFacade(com);
 
         // iAP transport
-        ProtocolInstancePtr instance = new ProtocolInstance(com, iAPEndpointType, "iap", false);
-        pluginFacade->addEndpointFactory(new IceObjC::iAPEndpointFactory(instance));
+        ProtocolInstancePtr iap = new ProtocolInstance(com, iAPEndpointType, "iap", false);
+        f->addEndpointFactory(new IceObjC::iAPEndpointFactory(iap));
 
         // SSL based on iAP transport
-        EndpointFactoryPtr ssl = pluginFacade->getEndpointFactory(SSLEndpointType);
-        if(ssl)
-        {
-            ProtocolInstancePtr sslinstance = new ProtocolInstance(com, iAPSEndpointType, "iaps", true);
-            pluginFacade->addEndpointFactory(ssl->clone(sslinstance, new IceObjC::iAPEndpointFactory(sslinstance)));
-        }
+        ProtocolInstancePtr iaps = new ProtocolInstance(com, iAPSEndpointType, "iaps", true);
+        f->addEndpointFactory(new UnderlyingEndpointFactory(iaps, SSLEndpointType, iAPEndpointType));
     }
 
     virtual void initialize() {}
@@ -300,7 +296,15 @@ IceObjC::iAPEndpointI::acceptor(const string&) const
 }
 
 vector<EndpointIPtr>
-IceObjC::iAPEndpointI::expand() const
+IceObjC::iAPEndpointI::expandIfWildcard() const
+{
+    vector<EndpointIPtr> endps;
+    endps.push_back(ICE_SHARED_FROM_CONST_THIS(iAPEndpointI));
+    return endps;
+}
+
+vector<EndpointIPtr>
+IceObjC::iAPEndpointI::expandHost(EndpointIPtr&) const
 {
     vector<EndpointIPtr> endps;
     endps.push_back(ICE_SHARED_FROM_CONST_THIS(iAPEndpointI));
@@ -700,7 +704,7 @@ IceObjC::iAPEndpointFactory::destroy()
 }
 
 EndpointFactoryPtr
-IceObjC::iAPEndpointFactory::clone(const ProtocolInstancePtr& instance, const IceInternal::EndpointFactoryPtr&) const
+IceObjC::iAPEndpointFactory::clone(const ProtocolInstancePtr& instance) const
 {
     return new iAPEndpointFactory(instance);
 }

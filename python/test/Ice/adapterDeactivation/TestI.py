@@ -14,10 +14,10 @@ def test(b):
     if not b:
         raise RuntimeError('test assertion failed')
 
-class TestI(Test._TestIntfDisp):
+class TestI(Test.TestIntf):
     def transient(self, current=None):
         communicator = current.adapter.getCommunicator()
-        adapter = communicator.createObjectAdapterWithEndpoints("TransientTestAdapter", "default -p 9999")
+        adapter = communicator.createObjectAdapterWithEndpoints("TransientTestAdapter", "default")
         adapter.activate()
         adapter.destroy()
 

@@ -51,6 +51,17 @@ const toString = function(key, object, objectTable, ident)
     return s;
 };
 
+class ServantError extends Error
+{
+    constructor(cause)
+    {
+        super();
+        this.cause = cause;
+    }
+}
+
+Ice.ServantError = ServantError;
+
 //
 // Ice.Exception
 //
@@ -67,7 +78,17 @@ class Exception extends Error
 
     ice_name()
     {
-        return "Ice::Exception";
+        return this.constructor._id.substr(2);
+    }
+
+    ice_id()
+    {
+        return this.constructor._id;
+    }
+
+    static get _id()
+    {
+        return "::Ice::Exception";
     }
 
     toString()
@@ -83,7 +104,7 @@ class Exception extends Error
         }
 
         this._inToStringAlready = true;
-        let s = this.ice_name();
+        let s = this.ice_id();
         for(let key in this)
         {
             if(key != "_inToStringAlready")
@@ -99,7 +120,7 @@ class Exception extends Error
         this._inToStringAlready = false;
         return s;
     }
-    
+
     static captureStackTrace(object)
     {
         const stack = new Error().stack;
@@ -112,7 +133,7 @@ class Exception extends Error
             Object.defineProperty(object, "stack", {
                 get: function()
                     {
-                        return stack; 
+                        return stack;
                     }
             });
         }
@@ -132,9 +153,9 @@ class LocalException extends Exception
         Exception.captureStackTrace(this);
     }
 
-    ice_name()
+    static get _id()
     {
-        return "Ice::LocalException";
+        return "::Ice::LocalException";
     }
 }
 
@@ -151,9 +172,14 @@ class UserException extends Exception
         Exception.captureStackTrace(this);
     }
 
-    ice_name()
+    static get _id()
     {
-        return "Ice::UserException";
+        return "::Ice::UserException";
+    }
+
+    ice_getSlicedData()
+    {
+        return null;
     }
 
     _write(os)
@@ -252,8 +278,14 @@ const readPreserved = function(is)
     this._slicedData = is.endException(true);
 };
 
+const ice_getSlicedData = function()
+{
+    return this._slicedData;
+}
+
 Ice.Slice.PreservedUserException = function(ex)
 {
+    ex.prototype.ice_getSlicedData = ice_getSlicedData;
     ex.prototype._write = writePreserved;
     ex.prototype._read = readPreserved;
 };

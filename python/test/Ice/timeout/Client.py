@@ -23,9 +23,7 @@ def test(b):
         raise RuntimeError('test assertion failed')
 
 def run(args, communicator):
-    timeout = AllTests.allTests(communicator)
-    timeout.shutdown()
-
+    AllTests.allTests(communicator)
     return True
 
 try:
@@ -35,12 +33,6 @@ try:
     #
     initData = Ice.InitializationData()
     initData.properties = Ice.createProperties(sys.argv)
-
-    #
-    # We need to send messages large enough to cause the transport
-    # buffers to fill up.
-    #
-    initData.properties.setProperty("Ice.MessageSizeMax", "10000");
 
     #
     # For this test, we want to disable retries.

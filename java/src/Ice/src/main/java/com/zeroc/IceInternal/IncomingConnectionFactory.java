@@ -161,15 +161,39 @@ public final class IncomingConnectionFactory extends EventHandler implements Con
                 }
             }
             _connections.clear();
-            _monitor.destroy();
+        }
+
+        //
+        // Must be destroyed outside the synchronization since this might block waiting for
+        // a timer task to complete.
+        //
+        _monitor.destroy();
+    }
+
+    public boolean
+    isLocal(EndpointI endpoint)
+    {
+        if(_publishedEndpoint != null && endpoint.equivalent(_publishedEndpoint))
+        {
+            return true;
+        }
+        synchronized(this)
+        {
+            return endpoint.equivalent(_endpoint);
         }
     }
 
     public EndpointI
     endpoint()
     {
-        // No mutex protection necessary, _endpoint is immutable.
-        return _endpoint;
+        if(_publishedEndpoint != null)
+        {
+            return _publishedEndpoint;
+        }
+        synchronized(this)
+        {
+            return _endpoint;
+        }
     }
 
     public synchronized java.util.LinkedList<ConnectionI>
@@ -416,10 +440,12 @@ public final class IncomingConnectionFactory extends EventHandler implements Con
     }
 
     public
-    IncomingConnectionFactory(Instance instance, EndpointI endpoint, com.zeroc.Ice.ObjectAdapterI adapter)
+    IncomingConnectionFactory(Instance instance, EndpointI endpoint, EndpointI publish,
+                              com.zeroc.Ice.ObjectAdapterI adapter)
     {
         _instance = instance;
         _endpoint = endpoint;
+        _publishedEndpoint = publish;
         _adapter = adapter;
         _warn = _instance.initializationData().properties.getPropertyAsInt("Ice.Warn.Connections") > 0 ? true : false;
         _state = StateHolding;
@@ -500,6 +526,7 @@ public final class IncomingConnectionFactory extends EventHandler implements Con
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void
     finalize()
@@ -708,6 +735,7 @@ public final class IncomingConnectionFactory extends EventHandler implements Con
     private Acceptor _acceptor;
     private Transceiver _transceiver;
     private EndpointI _endpoint;
+    private final EndpointI _publishedEndpoint;
 
     private com.zeroc.Ice.ObjectAdapterI _adapter;
 

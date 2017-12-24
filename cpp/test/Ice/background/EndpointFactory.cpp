@@ -7,6 +7,10 @@
 //
 // **********************************************************************
 
+#ifndef TEST_API_EXPORTS
+#   define TEST_API_EXPORTS
+#endif
+
 #include <Ice/EndpointFactoryManager.h>
 
 #include <EndpointFactory.h>
@@ -56,7 +60,7 @@ EndpointFactory::destroy()
 }
 
 IceInternal::EndpointFactoryPtr
-EndpointFactory::clone(const IceInternal::ProtocolInstancePtr&, const IceInternal::EndpointFactoryPtr&) const
+EndpointFactory::clone(const IceInternal::ProtocolInstancePtr&) const
 {
     return const_cast<EndpointFactory*>(this);
 }

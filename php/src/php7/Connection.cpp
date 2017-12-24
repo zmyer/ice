@@ -644,7 +644,6 @@ IcePHP::connectionInit(void)
     zend_declare_property_bool(sslConnectionInfoClassEntry, STRCAST("verified"), sizeof("verified") - 1, 0,
                                ZEND_ACC_PUBLIC);
 
-
     return true;
 }
 
@@ -763,7 +762,14 @@ IcePHP::createConnectionInfo(zval* zv, const Ice::ConnectionInfoPtr& p)
 
         zval zarr;
         AutoDestroy listDestroyer(&zarr);
-        if(createStringArray(&zarr, info->certs))
+
+        Ice::StringSeq encoded;
+        for(vector<IceSSL::CertificatePtr>::const_iterator i = info->certs.begin(); i != info->certs.end(); ++i)
+        {
+            encoded.push_back((*i)->encode());
+        }
+
+        if(createStringArray(&zarr, encoded))
         {
             add_property_zval(zv, STRCAST("certs"), &zarr);
         }

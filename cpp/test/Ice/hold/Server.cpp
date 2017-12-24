@@ -20,7 +20,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 {
     IceUtil::TimerPtr timer = new IceUtil::Timer();
 
-    communicator->getProperties()->setProperty("TestAdapter1.Endpoints", getTestEndpoint(communicator, 0) + ":udp");
+    communicator->getProperties()->setProperty("TestAdapter1.Endpoints", getTestEndpoint(communicator, 0));
     communicator->getProperties()->setProperty("TestAdapter1.ThreadPool.Size", "5");
     communicator->getProperties()->setProperty("TestAdapter1.ThreadPool.SizeMax", "5");
     communicator->getProperties()->setProperty("TestAdapter1.ThreadPool.SizeWarn", "0");
@@ -28,7 +28,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
     Ice::ObjectAdapterPtr adapter1 = communicator->createObjectAdapter("TestAdapter1");
     adapter1->add(ICE_MAKE_SHARED(HoldI, timer, adapter1), Ice::stringToIdentity("hold"));
 
-    communicator->getProperties()->setProperty("TestAdapter2.Endpoints", getTestEndpoint(communicator, 1) + ":udp");
+    communicator->getProperties()->setProperty("TestAdapter2.Endpoints", getTestEndpoint(communicator, 1));
     communicator->getProperties()->setProperty("TestAdapter2.ThreadPool.Size", "5");
     communicator->getProperties()->setProperty("TestAdapter2.ThreadPool.SizeMax", "5");
     communicator->getProperties()->setProperty("TestAdapter2.ThreadPool.SizeWarn", "0");
@@ -52,12 +52,14 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerIceUDP(true);
 #endif
     try
     {
         Ice::InitializationData initData = getTestInitData(argc, argv);
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         return run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)

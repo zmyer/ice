@@ -701,7 +701,7 @@ public class ServiceManagerI implements ServiceManager
                     //
                     try
                     {
-                        obj = c.newInstance();
+                        obj = c.getDeclaredConstructor().newInstance();
                     }
                     catch(IllegalAccessException ex)
                     {
@@ -1150,7 +1150,6 @@ public class ServiceManagerI implements ServiceManager
             // Ignored
         }
     }
-
 
     private com.zeroc.Ice.Communicator _communicator;
     private boolean _adminEnabled = false;

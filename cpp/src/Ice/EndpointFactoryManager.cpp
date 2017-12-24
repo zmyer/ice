@@ -30,6 +30,15 @@ IceInternal::EndpointFactoryManager::EndpointFactoryManager(const InstancePtr& i
 }
 
 void
+IceInternal::EndpointFactoryManager::initialize() const
+{
+    for(vector<EndpointFactoryPtr>::size_type i = 0; i < _factories.size(); i++)
+    {
+        _factories[i]->initialize();
+    }
+}
+
+void
 IceInternal::EndpointFactoryManager::add(const EndpointFactoryPtr& factory)
 {
     IceUtil::Mutex::Lock sync(*this); // TODO: Necessary?
@@ -72,16 +81,12 @@ IceInternal::EndpointFactoryManager::create(const string& str, bool oaEndpoint) 
     bool b = IceUtilInternal::splitString(str, " \t\n\r", v);
     if(!b)
     {
-        EndpointParseException ex(__FILE__, __LINE__);
-        ex.str = "mismatched quote";
-        throw ex;
+        throw EndpointParseException(__FILE__, __LINE__, "mismatched quote");
     }
 
     if(v.empty())
     {
-        EndpointParseException ex(__FILE__, __LINE__);
-        ex.str = "value has no non-whitespace characters";
-        throw ex;
+        throw EndpointParseException(__FILE__, __LINE__, "value has no non-whitespace characters");
     }
 
     string protocol = v.front();
@@ -114,9 +119,8 @@ IceInternal::EndpointFactoryManager::create(const string& str, bool oaEndpoint) 
         EndpointIPtr e = factory->create(v, oaEndpoint);
         if(!v.empty())
         {
-            EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "unrecognized argument `" + v.front() + "' in endpoint `" + str + "'";
-            throw ex;
+            throw EndpointParseException(__FILE__, __LINE__, "unrecognized argument `" + v.front() +
+                                         "' in endpoint `" + str + "'");
         }
         return e;
 #else
@@ -144,9 +148,8 @@ IceInternal::EndpointFactoryManager::create(const string& str, bool oaEndpoint) 
         EndpointIPtr ue = ICE_MAKE_SHARED(OpaqueEndpointI, v);
         if(!v.empty())
         {
-            EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "unrecognized argument `" + v.front() + "' in endpoint `" + str + "'";
-            throw ex;
+            throw EndpointParseException(__FILE__, __LINE__, "unrecognized argument `" + v.front() + "' in endpoint `" +
+                                         str + "'");
         }
         factory = get(ue->type());
         if(factory)
@@ -188,7 +191,13 @@ IceInternal::EndpointFactoryManager::read(InputStream* s) const
     {
         e = factory->read(s);
     }
-    else
+    //
+    // If the factory failed to read the endpoint, return an opaque endpoint. This can
+    // occur if for example the factory delegates to another factory and this factory
+    // isn't available. In this case, the factory needs to make sure the stream position
+    // is preserved for reading the opaque endpoint.
+    //
+    if(!e)
     {
         e = ICE_MAKE_SHARED(OpaqueEndpointI, type, s);
     }

@@ -264,7 +264,7 @@ public class Client : TestCommon.Application
             Console.Out.Write("testing SessionHelper connect... ");
             Console.Out.Flush();
             _factory.setRouterHost(host);
-            _factory.setPort(getTestPort(10));
+            _factory.setPort(getTestPort(50));
             _factory.setProtocol(protocol);
             _session = _factory.connect("userid", "abc123");
             while(true)
@@ -360,14 +360,7 @@ public class Client : TestCommon.Application
             Console.Out.WriteLine("ok");
 
             Console.Out.Write("testing SessionHelper session after destroy... ");
-            try
-            {
-                _session.session();
-                test(false);
-            }
-            catch(Glacier2.SessionNotExistException)
-            {
-            }
+            test(_session.session() == null);
             Console.Out.WriteLine("ok");
 
             Console.Out.Write("testing SessionHelper communicator after destroy... ");
@@ -383,7 +376,6 @@ public class Client : TestCommon.Application
             }
             Console.Out.WriteLine("ok");
 
-
             Console.Out.Write("uninstalling router with communicator... ");
             Console.Out.Flush();
             communicator().setDefaultRouter(null);
@@ -392,10 +384,9 @@ public class Client : TestCommon.Application
             Ice.ObjectPrx processBase;
             {
                 Console.Out.Write("testing stringToProxy for process object... ");
-                processBase = communicator().stringToProxy("Glacier2/admin -f Process:" + getTestEndpoint(11));
+                processBase = communicator().stringToProxy("Glacier2/admin -f Process:" + getTestEndpoint(51));
                 Console.Out.WriteLine("ok");
             }
-
 
             Ice.ProcessPrx process;
             {
@@ -425,7 +416,7 @@ public class Client : TestCommon.Application
             Console.Out.Flush();
 
             _factory.setRouterHost(host);
-            _factory.setPort(getTestPort(10));
+            _factory.setPort(getTestPort(50));
             _factory.setProtocol(protocol);
             _session = _factory.connect("userid", "abc123");
             while(true)
@@ -481,7 +472,7 @@ public class Client : TestCommon.Application
         _initData = base.getInitData(ref args);
         _initData.properties.setProperty("Ice.Warn.Connections", "0");
         _initData.properties.setProperty("Ice.Default.Router", "Glacier2/router:" +
-                                         getTestEndpoint(_initData.properties, 10));
+                                         getTestEndpoint(_initData.properties, 50));
         _initData.dispatcher = delegate(Action action, Ice.Connection connection)
         {
             action();

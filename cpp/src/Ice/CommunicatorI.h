@@ -103,14 +103,13 @@ public:
 
     virtual ValueFactoryManagerPtr getValueFactoryManager() const;
 
-    virtual void flushBatchRequests(CompressBatch);
-
 #ifdef ICE_CPP11_MAPPING
     virtual ::std::function<void()>
     flushBatchRequestsAsync(CompressBatch,
                             ::std::function<void(::std::exception_ptr)>,
                             ::std::function<void(bool)> = nullptr);
 #else
+    virtual void flushBatchRequests(CompressBatch);
     virtual AsyncResultPtr begin_flushBatchRequests(CompressBatch);
     virtual AsyncResultPtr begin_flushBatchRequests(CompressBatch, const CallbackPtr&, const LocalObjectPtr& = 0);
     virtual AsyncResultPtr begin_flushBatchRequests(CompressBatch,
@@ -141,9 +140,9 @@ private:
     // Certain initialization tasks need to be completed after the
     // constructor.
     //
-    void finishSetup(int&, char*[]);
+    void finishSetup(int&, const char*[]);
 
-    friend ICE_API CommunicatorPtr initialize(int&, char*[], const InitializationData&, Int);
+    friend ICE_API CommunicatorPtr initialize(int&, const char*[], const InitializationData&, Int);
     friend ICE_API CommunicatorPtr initialize(StringSeq&, const InitializationData&, Int);
     friend ICE_API CommunicatorPtr initialize(const InitializationData&, Int);
     friend ICE_API ::IceInternal::InstancePtr IceInternal::getInstance(const ::Ice::CommunicatorPtr&);

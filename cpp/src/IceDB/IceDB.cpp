@@ -144,7 +144,6 @@ BadEnvException::ice_throw() const
     throw *this;
 }
 
-
 Env::Env(const string& path, MDB_dbi maxDbs, size_t mapSize, unsigned int maxReaders)
 {
     int rc = mdb_env_create(&_menv);
@@ -486,10 +485,9 @@ CursorBase::renew(const ReadOnlyTxn& txn)
     }
 }
 
-
 //
 // On Windows, we use a default LMDB map size of 10MB, whereas on other platforms
-// (Linux, OS X), we use a default of 100MB.
+// (Linux, macOS), we use a default of 100MB.
 //
 // On Windows, LMDB does not use sparse files and allocates immediately the file
 // with the given (max) size. This is why we need a fairly small default map size

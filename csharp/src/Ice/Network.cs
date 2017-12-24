@@ -127,7 +127,7 @@ namespace IceInternal
 
         public static bool notConnected(SocketException ex)
         {
-            // BUGFIX: SocketError.InvalidArgument because shutdown() under OS X returns EINVAL
+            // BUGFIX: SocketError.InvalidArgument because shutdown() under macOS returns EINVAL
             // if the server side is gone.
             // BUGFIX: shutdown() under Vista might return SocketError.ConnectionReset
             SocketError error = socketErrorCode(ex);
@@ -234,7 +234,6 @@ namespace IceInternal
             {
                 throw new Ice.SocketException(ex);
             }
-
 
             if(!udp)
             {
@@ -445,7 +444,7 @@ namespace IceInternal
                     socket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.MulticastInterface, ifaceIndex);
                 }
             }
-            catch(SocketException ex)
+            catch(Exception ex)
             {
                 closeSocketNoThrow(socket);
                 throw new Ice.SocketException(ex);
@@ -457,7 +456,7 @@ namespace IceInternal
             try
             {
                 var indexes = new HashSet<int>();
-                foreach(string intf in getInterfacesForMulticast(iface, group))
+                foreach(string intf in getInterfacesForMulticast(iface, getProtocolSupport(group)))
                 {
                     int index = getInterfaceIndex(intf, group.AddressFamily);
                     if(!indexes.Contains(index))
@@ -687,6 +686,11 @@ namespace IceInternal
             setBlock(fd, fd.Blocking);
         }
 
+        public static int getProtocolSupport(IPAddress addr)
+        {
+            return addr.AddressFamily == AddressFamily.InterNetwork ? EnableIPv4 : EnableIPv6;
+        }
+
         public static EndPoint getAddressForServer(string host, int port, int protocol, bool preferIPv6)
         {
             if(host.Length == 0)
@@ -720,7 +724,6 @@ namespace IceInternal
                 }
                 return addresses;
             }
-
 
             int retry = 5;
 
@@ -951,11 +954,10 @@ namespace IceInternal
             return hosts;
         }
 
-        public static List<string> getInterfacesForMulticast(string intf, IPAddress group)
+        public static List<string> getInterfacesForMulticast(string intf, int protocol)
         {
             List<string> interfaces = new List<string>();
             bool ipv4Wildcard = false;
-            int protocol = group.AddressFamily == AddressFamily.InterNetwork ? EnableIPv4 : EnableIPv6;
             if(isWildcard(intf, out ipv4Wildcard))
             {
                 IPAddress[] addrs = getLocalAddresses(ipv4Wildcard ? EnableIPv4 : protocol, true);

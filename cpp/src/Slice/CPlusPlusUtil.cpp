@@ -24,12 +24,6 @@ using namespace IceUtilInternal;
 namespace
 {
 
-string
-condString(bool ok, const string& str)
-{
-    return ok ? str : "";
-}
-
 string toTemplateArg(const string& arg)
 {
     if(arg.empty())
@@ -67,7 +61,6 @@ toOptional(const string& s, int typeCtx)
     return result;
 }
 
-
 string
 stringTypeToString(const TypePtr& type, const StringList& metaData, int typeCtx)
 {
@@ -87,7 +80,7 @@ stringTypeToString(const TypePtr& type, const StringList& metaData, int typeCtx)
 }
 
 string
-sequenceTypeToString(const SequencePtr& seq, const StringList& metaData, int typeCtx)
+sequenceTypeToString(const SequencePtr& seq, const string& scope, const StringList& metaData, int typeCtx)
 {
     string seqType = findMetaData(metaData, typeCtx);
     if(!seqType.empty())
@@ -99,7 +92,7 @@ sequenceTypeToString(const SequencePtr& seq, const StringList& metaData, int typ
             {
                 if(builtin && builtin->kind() == Builtin::KindByte)
                 {
-                    string s = typeToString(seq->type());
+                    string s = typeToString(seq->type(), scope);
                     return "::std::pair<const " + s + "*, const " + s + "*>";
                 }
                 else if(builtin &&
@@ -107,18 +100,19 @@ sequenceTypeToString(const SequencePtr& seq, const StringList& metaData, int typ
                         builtin->kind() != Builtin::KindObject &&
                         builtin->kind() != Builtin::KindObjectProxy)
                 {
-                    string s = toTemplateArg(typeToString(builtin));
+                    string s = toTemplateArg(typeToString(builtin, scope));
                     return "::std::pair< ::IceUtil::ScopedArray<" + s + ">, " +
                         "::std::pair<const " + s + "*, const " + s + "*> >";
                 }
                 else
                 {
-                    string s = toTemplateArg(typeToString(seq->type(), seq->typeMetaData(),
+                    string s = toTemplateArg(typeToString(seq->type(), scope, seq->typeMetaData(),
                                                           inWstringModule(seq) ? TypeContextUseWstring : 0));
                     return "::std::vector<" + s + '>';
                 }
             }
-            string s = typeToString(seq->type(), seq->typeMetaData(), typeCtx | (inWstringModule(seq) ? TypeContextUseWstring : 0));
+            string s = typeToString(seq->type(), scope, seq->typeMetaData(),
+                                    typeCtx | (inWstringModule(seq) ? TypeContextUseWstring : 0));
             return "::std::pair<const " + s + "*, const " + s + "*>";
         }
         else if(seqType.find("%range") == 0)
@@ -130,12 +124,14 @@ sequenceTypeToString(const SequencePtr& seq, const StringList& metaData, int typ
             }
             else
             {
-                s = fixKwd(seq->scoped());
+                s = getAbsolute(fixKwd(seq->scoped()), scope);
             }
+
             if(typeCtx & TypeContextAMIPrivateEnd)
             {
                 return s;
             }
+
             if(s[0] == ':')
             {
                 s = " " + s;
@@ -149,29 +145,29 @@ sequenceTypeToString(const SequencePtr& seq, const StringList& metaData, int typ
     }
     else
     {
-        return fixKwd(seq->scoped());
+        return getAbsolute(fixKwd(seq->scoped()), scope);
     }
 }
 
 string
-dictionaryTypeToString(const DictionaryPtr& dict, const StringList& metaData, int typeCtx)
+dictionaryTypeToString(const DictionaryPtr& dict, const string& scope, const StringList& metaData, int typeCtx)
 {
-    string dictType = findMetaData(metaData, typeCtx);
-    if(!dictType.empty())
+    const string dictType = findMetaData(metaData, typeCtx);
+    if(dictType.empty())
     {
-        return dictType;
+        return getAbsolute(fixKwd(dict->scoped()), scope);
     }
     else
     {
-        return fixKwd(dict->scoped());
+        return dictType;
     }
 }
 
 void
-writeParamAllocateCode(Output& out, const TypePtr& type, bool optional, const string& fixedName,
+writeParamAllocateCode(Output& out, const TypePtr& type, bool optional, const string& scope, const string& fixedName,
                        const StringList& metaData, int typeCtx, bool endArg)
 {
-    string s = typeToString(type, metaData, typeCtx);
+    string s = typeToString(type, scope, metaData, typeCtx);
     if(optional)
     {
         s = toOptional(s, typeCtx);
@@ -199,7 +195,7 @@ writeParamAllocateCode(Output& out, const TypePtr& type, bool optional, const st
         string s;
         if(seqType == "%array")
         {
-            s = typeToString(seq, metaData, TypeContextAMIPrivateEnd);
+            s = typeToString(seq, scope, metaData, TypeContextAMIPrivateEnd);
         }
         else if(seqType.find("%range") == 0)
         {
@@ -208,7 +204,7 @@ writeParamAllocateCode(Output& out, const TypePtr& type, bool optional, const st
             {
                 md.push_back("cpp:type:" + seqType.substr(strlen("%range:")));
             }
-            s = typeToString(seq, md, 0);
+            s = typeToString(seq, scope, md, 0);
         }
 
         if(!s.empty())
@@ -273,7 +269,8 @@ writeParamEndCode(Output& out, const TypePtr& type, bool optional, const string&
                     out << nl << "if(!" << escapedParamName << "->empty())";
                     out << sb;
                     out << nl << paramName << "->first" << " = &(*" << escapedParamName << ")[0];";
-                    out << nl << paramName << "->second" << " = " << paramName << "->first + " << escapedParamName << "->size();";
+                    out << nl << paramName << "->second" << " = " << paramName << "->first + " << escapedParamName
+                        << "->size();";
                     out << eb;
                     out << nl << "else";
                     out << sb;
@@ -286,7 +283,8 @@ writeParamEndCode(Output& out, const TypePtr& type, bool optional, const string&
                     out << nl << "if(!" << escapedParamName << ".empty())";
                     out << sb;
                     out << nl << paramName << ".first" << " = &" << escapedParamName << "[0];";
-                    out << nl << paramName << ".second" << " = " << paramName << ".first + " << escapedParamName << ".size();";
+                    out << nl << paramName << ".second" << " = " << paramName << ".first + " << escapedParamName
+                        << ".size();";
                     out << eb;
                     out << nl << "else";
                     out << sb;
@@ -317,7 +315,8 @@ writeParamEndCode(Output& out, const TypePtr& type, bool optional, const string&
 
 void
 writeMarshalUnmarshalParams(Output& out, const ParamDeclList& params, const OperationPtr& op, bool marshal,
-                            bool prepend, int typeCtx, const string& customStream = "", const string& retP = "", const string& obj = "")
+                            bool prepend, int typeCtx, const string& customStream = "", const string& retP = "",
+                            const string& obj = "")
 {
     string prefix = prepend ? paramPrefix : "";
     string returnValueS = retP.empty() ? string("ret") : retP;
@@ -348,7 +347,6 @@ writeMarshalUnmarshalParams(Output& out, const ParamDeclList& params, const Oper
         }
     }
 
-
     if(!requiredParams.empty() || (op && op->returnType() && !op->returnIsOptional()))
     {
         if(cpp11)
@@ -377,16 +375,16 @@ writeMarshalUnmarshalParams(Output& out, const ParamDeclList& params, const Oper
         {
             for(ParamDeclList::const_iterator p = requiredParams.begin(); p != requiredParams.end(); ++p)
             {
-                writeMarshalUnmarshalCode(out, (*p)->type(), false, 0, fixKwd(prefix + (*p)->name()), marshal, (*p)->getMetaData(),
-                                          typeCtx, customStream, true, obj);
+                writeMarshalUnmarshalCode(out, (*p)->type(), false, 0, fixKwd(prefix + (*p)->name()), marshal,
+                                          (*p)->getMetaData(), typeCtx, customStream, true, obj);
             }
 
             if(op && op->returnType())
             {
                 if(!op->returnIsOptional())
                 {
-                    writeMarshalUnmarshalCode(out, op->returnType(), false, 0, returnValueS, marshal, op->getMetaData(), typeCtx,
-                                              customStream, true, obj);
+                    writeMarshalUnmarshalCode(out, op->returnType(), false, 0, returnValueS, marshal, op->getMetaData(),
+                                              typeCtx, customStream, true, obj);
                 }
             }
         }
@@ -432,16 +430,16 @@ writeMarshalUnmarshalParams(Output& out, const ParamDeclList& params, const Oper
                 {
                     if(checkReturnType && op->returnTag() < (*p)->tag())
                     {
-                        os << condString(insertComma, ", ") << op->returnTag();
+                        os << (insertComma ? ", " : "") << op->returnTag();
                         checkReturnType = false;
                         insertComma = true;
                     }
-                    os << condString(insertComma, ", ") << (*p)->tag();
+                    os << (insertComma ? ", " : "") << (*p)->tag();
                     insertComma = true;
                 }
                 if(checkReturnType)
                 {
-                    os << condString(insertComma, ", ") << op->returnTag();
+                    os << (insertComma ? ", " : "") << op->returnTag();
                 }
                 os << '}';
                 out << os.str();
@@ -490,8 +488,8 @@ writeMarshalUnmarshalParams(Output& out, const ParamDeclList& params, const Oper
             }
             if(checkReturnType)
             {
-                writeMarshalUnmarshalCode(out, op->returnType(), true, op->returnTag(), returnValueS, marshal, op->getMetaData(),
-                                          typeCtx, customStream, true, obj);
+                writeMarshalUnmarshalCode(out, op->returnType(), true, op->returnTag(), returnValueS, marshal,
+                                          op->getMetaData(), typeCtx, customStream, true, obj);
             }
         }
     }
@@ -512,7 +510,6 @@ Slice::ToIfdef::operator()(char c)
         return c;
     }
 }
-
 
 void
 Slice::printHeader(Output& out)
@@ -613,7 +610,31 @@ Slice::isMovable(const TypePtr& type)
 }
 
 string
-Slice::typeToString(const TypePtr& type, const StringList& metaData, int typeCtx)
+Slice::getAbsolute(const std::string& type, const std::string& scope)
+{
+    if(type.find("::") != string::npos)
+    {
+        string prefix;
+        if(type.find("const ") == 0)
+        {
+            prefix += "const ";
+        }
+
+        if(type.find("::std::shared_ptr<", prefix.size()) == prefix.size())
+        {
+            prefix += "::std::shared_ptr<";
+        }
+
+        if(type.find(scope, prefix.size()) == prefix.size())
+        {
+            return prefix + type.substr(prefix.size() + scope.size());
+        }
+    }
+    return type;
+}
+
+string
+Slice::typeToString(const TypePtr& type, const string& scope, const StringList& metaData, int typeCtx)
 {
     bool cpp11 = (typeCtx & TypeContextCpp11) != 0;
 
@@ -649,6 +670,20 @@ Slice::typeToString(const TypePtr& type, const StringList& metaData, int typeCtx
         "::std::shared_ptr<::Ice::Value>"
     };
 
+    if((typeCtx & TypeContextLocal) != 0)
+    {
+        for(StringList::const_iterator i = metaData.begin(); i != metaData.end(); ++i)
+        {
+            const string cppType = "cpp:type:";
+            const string meta = *i;
+
+            if(meta.find(cppType) == 0)
+            {
+                return meta.substr(cppType.size());
+            }
+        }
+    }
+
     BuiltinPtr builtin = BuiltinPtr::dynamicCast(type);
     if(builtin)
     {
@@ -656,23 +691,20 @@ Slice::typeToString(const TypePtr& type, const StringList& metaData, int typeCtx
         {
             return stringTypeToString(type, metaData, typeCtx);
         }
-        else
+        else if(cpp11)
         {
-            if(cpp11)
+            if(builtin->kind() == Builtin::KindObject && !(typeCtx & TypeContextLocal))
             {
-                if(builtin->kind() == Builtin::KindObject && !(typeCtx & TypeContextLocal))
-                {
-                    return "::std::shared_ptr<::Ice::Value>";
-                }
-                else
-                {
-                    return cpp11BuiltinTable[builtin->kind()];
-                }
+                return getAbsolute(cpp11BuiltinTable[Builtin::KindValue], scope);
             }
             else
             {
-                return builtinTable[builtin->kind()];
+                return getAbsolute(cpp11BuiltinTable[builtin->kind()], scope);
             }
+        }
+        else
+        {
+            return getAbsolute(builtinTable[builtin->kind()], scope);
         }
     }
 
@@ -683,20 +715,20 @@ Slice::typeToString(const TypePtr& type, const StringList& metaData, int typeCtx
         {
             if(cl->definition() && cl->definition()->isDelegate())
             {
-                return classDefToDelegateString(cl->definition());
+                return getAbsolute(fixKwd(cl->scoped()), scope);
             }
             else if(cl->isInterface() && !cl->isLocal())
             {
-                return "std::shared_ptr<::Ice::Value>";
+                return getAbsolute(cpp11BuiltinTable[Builtin::KindValue], scope);
             }
             else
             {
-                return "::std::shared_ptr<" + cl->scoped() + ">";
+                return "::std::shared_ptr<" + getAbsolute(cl->scoped(), scope) + ">";
             }
         }
         else
         {
-            return cl->scoped() + "Ptr";
+            return getAbsolute(cl->scoped() + "Ptr", scope);
         }
     }
 
@@ -708,9 +740,12 @@ Slice::typeToString(const TypePtr& type, const StringList& metaData, int typeCtx
         //
         if(!cpp11 && findMetaData(st->getMetaData()) == "%class")
         {
-            return fixKwd(st->scoped() + "Ptr");
+            return getAbsolute(fixKwd(st->scoped() + "Ptr"), scope);
         }
-        return fixKwd(st->scoped());
+        else
+        {
+            return getAbsolute(fixKwd(st->scoped()), scope);
+        }
     }
 
     ProxyPtr proxy = ProxyPtr::dynamicCast(type);
@@ -725,61 +760,56 @@ Slice::typeToString(const TypePtr& type, const StringList& metaData, int typeCtx
             //
             if(def && !def->isInterface() && def->allOperations().empty())
             {
-                return "::std::shared_ptr<::Ice::ObjectPrx>";
+                return getAbsolute(cpp11BuiltinTable[Builtin::KindObjectProxy], scope);
             }
             else
             {
-                return "::std::shared_ptr<" + fixKwd(proxy->_class()->scoped() + "Prx") + ">";
+                return "::std::shared_ptr<" + getAbsolute(fixKwd(proxy->_class()->scoped() + "Prx"), scope) + ">";
             }
         }
         else
         {
-            return fixKwd(proxy->_class()->scoped() + "Prx");
+            return getAbsolute(fixKwd(proxy->_class()->scoped() + "Prx"), scope);
         }
-    }
-
-    SequencePtr seq = SequencePtr::dynamicCast(type);
-    if(seq)
-    {
-        return sequenceTypeToString(seq, metaData, typeCtx);
-    }
-
-    DictionaryPtr dict = DictionaryPtr::dynamicCast(type);
-    if(dict)
-    {
-        return dictionaryTypeToString(dict, metaData, typeCtx);
-    }
-
-    ContainedPtr contained = ContainedPtr::dynamicCast(type);
-    if(contained)
-    {
-        return fixKwd(contained->scoped());
     }
 
     EnumPtr en = EnumPtr::dynamicCast(type);
     if(en)
     {
-        return fixKwd(en->scoped());
+        return getAbsolute(fixKwd(en->scoped()), scope);
+    }
+
+    SequencePtr seq = SequencePtr::dynamicCast(type);
+    if(seq)
+    {
+        return sequenceTypeToString(seq, scope, metaData, typeCtx);
+    }
+
+    DictionaryPtr dict = DictionaryPtr::dynamicCast(type);
+    if(dict)
+    {
+        return dictionaryTypeToString(dict, scope, metaData, typeCtx);
     }
 
     return "???";
 }
 
 string
-Slice::typeToString(const TypePtr& type, bool optional, const StringList& metaData, int typeCtx)
+Slice::typeToString(const TypePtr& type, bool optional, const string& scope, const StringList& metaData, int typeCtx)
 {
     if(optional)
     {
-        return toOptional(typeToString(type, metaData, typeCtx), typeCtx);
+        return toOptional(typeToString(type, scope, metaData, typeCtx), typeCtx);
     }
     else
     {
-        return typeToString(type, metaData, typeCtx);
+        return typeToString(type, scope, metaData, typeCtx);
     }
 }
 
 string
-Slice::returnTypeToString(const TypePtr& type, bool optional, const StringList& metaData, int typeCtx)
+Slice::returnTypeToString(const TypePtr& type, bool optional, const string& scope, const StringList& metaData,
+                          int typeCtx)
 {
     if(!type)
     {
@@ -788,14 +818,15 @@ Slice::returnTypeToString(const TypePtr& type, bool optional, const StringList& 
 
     if(optional)
     {
-        return toOptional(typeToString(type, metaData, typeCtx), typeCtx);
+        return toOptional(typeToString(type, scope, metaData, typeCtx), typeCtx);
     }
 
-    return typeToString(type, metaData, typeCtx);
+    return typeToString(type, scope, metaData, typeCtx);
 }
 
 string
-Slice::inputTypeToString(const TypePtr& type, bool optional, const StringList& metaData, int typeCtx)
+Slice::inputTypeToString(const TypePtr& type, bool optional, const string& scope, const StringList& metaData,
+                         int typeCtx)
 {
     bool cpp11 = (typeCtx & TypeContextCpp11) != 0;
 
@@ -835,7 +866,7 @@ Slice::inputTypeToString(const TypePtr& type, bool optional, const StringList& m
 
     if(optional)
     {
-        return "const " + toOptional(typeToString(type, metaData, typeCtx), typeCtx) + '&';
+        return "const " + toOptional(typeToString(type, scope, metaData, typeCtx), typeCtx) + '&';
     }
 
     BuiltinPtr builtin = BuiltinPtr::dynamicCast(type);
@@ -845,23 +876,20 @@ Slice::inputTypeToString(const TypePtr& type, bool optional, const StringList& m
         {
             return string("const ") + stringTypeToString(type, metaData, typeCtx) + '&';
         }
-        else
+        else if(cpp11)
         {
-            if(cpp11)
+            if(builtin->kind() == Builtin::KindObject && !(typeCtx & TypeContextLocal))
             {
-                if(builtin->kind() == Builtin::KindObject && !(typeCtx & TypeContextLocal))
-                {
-                    return "const ::std::shared_ptr<::Ice::Value>&";
-                }
-                else
-                {
-                    return cpp11InputBuiltinTable[builtin->kind()];
-                }
+                return getAbsolute(cpp11InputBuiltinTable[Builtin::KindValue], scope);
             }
             else
             {
-                return cpp98InputBuiltinTable[builtin->kind()];
+                return getAbsolute(cpp11InputBuiltinTable[builtin->kind()], scope);
             }
+        }
+        else
+        {
+            return getAbsolute(cpp98InputBuiltinTable[builtin->kind()], scope);
         }
     }
 
@@ -872,20 +900,20 @@ Slice::inputTypeToString(const TypePtr& type, bool optional, const StringList& m
         {
             if(cl->definition() && cl->definition()->isDelegate())
             {
-                return classDefToDelegateString(cl->definition(), typeCtx);
+                return getAbsolute(fixKwd(cl->scoped()), scope);
             }
             else if(cl->isInterface() && !cl->isLocal())
             {
-                return "const ::std::shared_ptr<::Ice::Value>&";
+                return getAbsolute(cpp11InputBuiltinTable[Builtin::KindValue], scope);
             }
             else
             {
-                return "const ::std::shared_ptr<" + fixKwd(cl->scoped()) + ">&";
+                return "const ::std::shared_ptr<" + getAbsolute(fixKwd(cl->scoped()), scope) + ">&";
             }
         }
         else
         {
-            return "const " + fixKwd(cl->scoped() + "Ptr&");
+            return "const " + getAbsolute(fixKwd(cl->scoped() + "Ptr&"), scope);
         }
     }
 
@@ -894,17 +922,17 @@ Slice::inputTypeToString(const TypePtr& type, bool optional, const StringList& m
     {
         if(cpp11)
         {
-            return "const " + fixKwd(st->scoped()) + "&";
+            return "const " + getAbsolute(fixKwd(st->scoped()), scope) + "&";
         }
         else
         {
             if(findMetaData(st->getMetaData()) == "%class")
             {
-                return "const " + fixKwd(st->scoped() + "Ptr&");
+                return "const " + getAbsolute(fixKwd(st->scoped() + "Ptr"), scope) + "&";
             }
             else
             {
-                return "const " + fixKwd(st->scoped()) + "&";
+                return "const " + getAbsolute(fixKwd(st->scoped()), scope) + "&";
             }
         }
     }
@@ -917,48 +945,43 @@ Slice::inputTypeToString(const TypePtr& type, bool optional, const StringList& m
             ClassDefPtr def = proxy->_class()->definition();
             if(def && !def->isInterface() && def->allOperations().empty())
             {
-                return "const ::std::shared_ptr<::Ice::ObjectPrx>&";
+                return getAbsolute(cpp11InputBuiltinTable[Builtin::KindObjectProxy], scope);
             }
             else
             {
-                return "const ::std::shared_ptr<" + fixKwd(proxy->_class()->scoped() + "Prx") + ">&";
+                return "const ::std::shared_ptr<" + getAbsolute(fixKwd(proxy->_class()->scoped() + "Prx"), scope) + ">&";
             }
         }
         else
         {
-            return "const " + fixKwd(proxy->_class()->scoped() + "Prx&");
+            return "const " + getAbsolute(fixKwd(proxy->_class()->scoped() + "Prx"), scope) + "&";
         }
     }
 
     EnumPtr en = EnumPtr::dynamicCast(type);
     if(en)
     {
-        return fixKwd(en->scoped());
+        return getAbsolute(fixKwd(en->scoped()), scope);
     }
 
     SequencePtr seq = SequencePtr::dynamicCast(type);
     if(seq)
     {
-        return "const " + sequenceTypeToString(seq, metaData, typeCtx) + "&";
+        return "const " + sequenceTypeToString(seq, scope, metaData, typeCtx) + "&";
     }
 
     DictionaryPtr dict = DictionaryPtr::dynamicCast(type);
     if(dict)
     {
-        return "const " + dictionaryTypeToString(dict, metaData, typeCtx) + "&";
-    }
-
-    ContainedPtr contained = ContainedPtr::dynamicCast(type);
-    if(contained)
-    {
-        return "const " + fixKwd(contained->scoped()) + "&";
+        return "const " + dictionaryTypeToString(dict, scope, metaData, typeCtx) + "&";
     }
 
     return "???";
 }
 
 string
-Slice::outputTypeToString(const TypePtr& type, bool optional, const StringList& metaData, int typeCtx)
+Slice::outputTypeToString(const TypePtr& type, bool optional, const string& scope, const StringList& metaData,
+                          int typeCtx)
 {
     bool cpp11 = (typeCtx & TypeContextCpp11) != 0;
 
@@ -996,7 +1019,7 @@ Slice::outputTypeToString(const TypePtr& type, bool optional, const StringList& 
 
     if(optional)
     {
-        return toOptional(typeToString(type, metaData, typeCtx), typeCtx) + '&';
+        return toOptional(typeToString(type, scope, metaData, typeCtx), typeCtx) + '&';
     }
 
     BuiltinPtr builtin = BuiltinPtr::dynamicCast(type);
@@ -1006,23 +1029,20 @@ Slice::outputTypeToString(const TypePtr& type, bool optional, const StringList& 
         {
             return stringTypeToString(type, metaData, typeCtx) + "&";
         }
-        else
+        else if(cpp11)
         {
-            if(cpp11)
+            if(builtin->kind() == Builtin::KindObject && !(typeCtx & TypeContextLocal))
             {
-                if(builtin->kind() == Builtin::KindObject && !(typeCtx & TypeContextLocal))
-                {
-                    return "::std::shared_ptr<::Ice::Value>";
-                }
-                else
-                {
-                    return cpp11OutputBuiltinTable[builtin->kind()];
-                }
+                return getAbsolute(cpp11OutputBuiltinTable[Builtin::KindValue], scope);
             }
             else
             {
-                return outputBuiltinTable[builtin->kind()];
+                return getAbsolute(cpp11OutputBuiltinTable[builtin->kind()], scope);
             }
+        }
+        else
+        {
+            return getAbsolute(outputBuiltinTable[builtin->kind()], scope);
         }
     }
 
@@ -1033,20 +1053,20 @@ Slice::outputTypeToString(const TypePtr& type, bool optional, const StringList& 
         {
             if(cl->definition() && cl->definition()->isDelegate())
             {
-                return classDefToDelegateString(cl->definition(), typeCtx) + "&";
+                return getAbsolute(fixKwd(cl->scoped()), scope) + "&";
             }
             else if(cl->isInterface() && !cl->isLocal())
             {
-                return "::std::shared_ptr<::Ice::Value>&";
+                return getAbsolute(cpp11OutputBuiltinTable[Builtin::KindValue], scope);
             }
             else
             {
-                return "::std::shared_ptr<" + fixKwd(cl->scoped()) + ">&";
+                return "::std::shared_ptr<" + getAbsolute(fixKwd(cl->scoped()), scope) + ">&";
             }
         }
         else
         {
-            return fixKwd(cl->scoped() + "Ptr&");
+            return getAbsolute(fixKwd(cl->scoped() + "Ptr&"), scope);
         }
     }
 
@@ -1055,11 +1075,11 @@ Slice::outputTypeToString(const TypePtr& type, bool optional, const StringList& 
     {
         if(!cpp11 && findMetaData(st->getMetaData()) == "%class")
         {
-            return fixKwd(st->scoped() + "Ptr&");
+            return getAbsolute(fixKwd(st->scoped() + "Ptr&"), scope);
         }
         else
         {
-            return fixKwd(st->scoped()) + "&";
+            return getAbsolute(fixKwd(st->scoped()), scope) + "&";
         }
     }
 
@@ -1075,35 +1095,35 @@ Slice::outputTypeToString(const TypePtr& type, bool optional, const StringList& 
             //
             if(def && !def->isInterface() && def->allOperations().empty())
             {
-                return "::std::shared_ptr<::Ice::ObjectPrx>";
+                return getAbsolute(cpp11OutputBuiltinTable[Builtin::KindObjectProxy], scope);
             }
             else
             {
-                return "::std::shared_ptr<" + fixKwd(proxy->_class()->scoped() + "Prx") + ">&";
+                return "::std::shared_ptr<" + getAbsolute(fixKwd(proxy->_class()->scoped() + "Prx"), scope) + ">&";
             }
         }
         else
         {
-            return fixKwd(proxy->_class()->scoped() + "Prx&");
+            return getAbsolute(fixKwd(proxy->_class()->scoped() + "Prx&"), scope);
         }
+    }
+
+    EnumPtr en = EnumPtr::dynamicCast(type);
+    if(en)
+    {
+        return getAbsolute(fixKwd(en->scoped()), scope) + "&";
     }
 
     SequencePtr seq = SequencePtr::dynamicCast(type);
     if(seq)
     {
-        return sequenceTypeToString(seq, metaData, typeCtx) + "&";
+        return sequenceTypeToString(seq, scope, metaData, typeCtx) + "&";
     }
 
     DictionaryPtr dict = DictionaryPtr::dynamicCast(type);
     if(dict)
     {
-        return dictionaryTypeToString(dict, metaData, typeCtx) + "&";
-    }
-
-    ContainedPtr contained = ContainedPtr::dynamicCast(type);
-    if(contained)
-    {
-        return fixKwd(contained->scoped()) + "&";
+        return dictionaryTypeToString(dict, scope, metaData, typeCtx) + "&";
     }
 
     return "???";
@@ -1177,14 +1197,14 @@ lookupKwd(const string& name)
     //
     static const string keywordList[] =
     {
-        "alignas", "alignof", "and", "and_eq", "asm", "auto", "bit_and", "bit_or", "bool", "break", 
-        "case", "catch", "char", "char16_t", "char32_t", "class", "compl", "const", "const_exptr", "const_cast", "continue", 
-        "decltype", "default", "delete", "do", "double", "dynamic_cast", 
-        "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend", 
+        "alignas", "alignof", "and", "and_eq", "asm", "auto", "bit_and", "bit_or", "bool", "break",
+        "case", "catch", "char", "char16_t", "char32_t", "class", "compl", "const", "const_exptr", "const_cast", "continue",
+        "decltype", "default", "delete", "do", "double", "dynamic_cast",
+        "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend",
         "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq",
-        "operator", "or", "or_eq", "private", "protected", "public", "register", "reinterpret_cast", "return", 
-        "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", 
-        "template", "this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename", 
+        "operator", "or", "or_eq", "private", "protected", "public", "register", "reinterpret_cast", "return",
+        "short", "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch",
+        "template", "this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename",
         "union", "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
     };
     bool found =  binary_search(&keywordList[0],
@@ -1254,8 +1274,8 @@ Slice::fixKwd(const string& name)
 
 void
 Slice::writeMarshalUnmarshalCode(Output& out, const TypePtr& type, bool optional, int tag, const string& param,
-                                 bool marshal, const StringList& metaData, int typeCtx, const string& customStream, bool pointer,
-                                 const string& obj)
+                                 bool marshal, const StringList& metaData, int typeCtx, const string& customStream,
+                                 bool pointer, const string& obj)
 {
     string objPrefix = obj.empty() ? obj : obj + ".";
 
@@ -1340,8 +1360,8 @@ Slice::writeUnmarshalCode(Output& out, const ParamDeclList& params, const Operat
 }
 
 void
-Slice::writeAllocateCode(Output& out, const ParamDeclList& params, const OperationPtr& op, bool prepend, int typeCtx,
-                         const string& customRet)
+Slice::writeAllocateCode(Output& out, const ParamDeclList& params, const OperationPtr& op, bool prepend,
+                         const string& clScope, int typeCtx, const string& customRet)
 {
     string prefix = prepend ? paramPrefix : "";
     string returnValueS = customRet;
@@ -1352,16 +1372,16 @@ Slice::writeAllocateCode(Output& out, const ParamDeclList& params, const Operati
 
     for(ParamDeclList::const_iterator p = params.begin(); p != params.end(); ++p)
     {
-        writeParamAllocateCode(out, (*p)->type(), (*p)->optional(), fixKwd(prefix + (*p)->name()), (*p)->getMetaData(),
-                               typeCtx, getEndArg((*p)->type(), (*p)->getMetaData(), (*p)->name()) != (*p)->name());
+        writeParamAllocateCode(out, (*p)->type(), (*p)->optional(), clScope, fixKwd(prefix + (*p)->name()),
+                               (*p)->getMetaData(), typeCtx, getEndArg((*p)->type(), (*p)->getMetaData(),
+                                                                       (*p)->name()) != (*p)->name());
     }
 
     if(op && op->returnType())
     {
-        writeParamAllocateCode(out, op->returnType(), op->returnIsOptional(), returnValueS, op->getMetaData(), typeCtx,
-                               getEndArg(op->returnType(), op->getMetaData(), returnValueS) != returnValueS);
+        writeParamAllocateCode(out, op->returnType(), op->returnIsOptional(), clScope, returnValueS, op->getMetaData(),
+                               typeCtx, getEndArg(op->returnType(), op->getMetaData(), returnValueS) != returnValueS);
     }
-
 }
 
 string
@@ -1605,7 +1625,7 @@ Slice::writeStreamHelpers(Output& out,
 }
 
 void
-Slice::writeIceTuple(::IceUtilInternal::Output& out, DataMemberList dataMembers, int typeCtx)
+Slice::writeIceTuple(::IceUtilInternal::Output& out, const string& scope, DataMemberList dataMembers, int typeCtx)
 {
     out << sp << nl << "std::tuple<";
     for(DataMemberList::const_iterator q = dataMembers.begin(); q != dataMembers.end(); ++q)
@@ -1615,7 +1635,8 @@ Slice::writeIceTuple(::IceUtilInternal::Output& out, DataMemberList dataMembers,
             out << ", ";
         }
         out << "const ";
-        out << typeToString((*q)->type(), (*q)->optional(), (*q)->getMetaData(), typeCtx | TypeContextCpp11) << "&";
+        out << typeToString((*q)->type(), (*q)->optional(), scope, (*q)->getMetaData(), typeCtx | TypeContextCpp11)
+            << "&";
     }
     out << "> ice_tuple() const";
 
@@ -1767,7 +1788,6 @@ Slice::inWstringModule(const SequencePtr& seq)
     return false;
 }
 
-
 string
 Slice::getDataMemberRef(const DataMemberPtr& p)
 {
@@ -1785,36 +1805,4 @@ Slice::getDataMemberRef(const DataMemberPtr& p)
     {
         return "(*" + name + ")";
     }
-}
-
-string
-Slice::classDefToDelegateString(const ClassDefPtr& cl, int typeCtx)
-{
-    assert(cl->isDelegate());
-
-    // A delegate only has one operation
-    OperationPtr op = cl->allOperations().front();
-
-    TypePtr ret = op->returnType();
-    string retS = returnTypeToString(ret, op->returnIsOptional(), op->getMetaData(), typeCtx);
-
-    string t = "::std::function<" + retS + "(";
-
-    ParamDeclList paramList = cl->allOperations().front()->parameters();
-    for(ParamDeclList::iterator q = paramList.begin(); q != paramList.end(); ++q)
-    {
-        if((*q)->isOutParam())
-        {
-            t += outputTypeToString((*q)->type(), (*q)->optional(), (*q)->getMetaData(), typeCtx);
-        }
-        else
-        {
-            t += inputTypeToString((*q)->type(), (*q)->optional(), (*q)->getMetaData(), typeCtx);
-        }
-
-        t += distance(q, paramList.end()) == 1  ? "" : ", ";
-    }
-
-    t += ")>";
-    return t;
 }

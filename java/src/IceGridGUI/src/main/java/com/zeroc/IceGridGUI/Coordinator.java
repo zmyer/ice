@@ -11,6 +11,10 @@ package com.zeroc.IceGridGUI;
 
 import java.lang.reflect.Constructor;
 import java.net.URI;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.prefs.Preferences;
 import java.util.prefs.BackingStoreException;
 import java.util.Enumeration;
@@ -619,10 +623,10 @@ public class Coordinator
         }
 
         @Override
-        public com.zeroc.Ice.ObjectPrx
+        public com.zeroc.Ice.Router.GetClientProxyResult
         getClientProxy(com.zeroc.Ice.Current current)
         {
-            return _clientProxy;
+            return new com.zeroc.Ice.Router.GetClientProxyResult(_clientProxy, java.util.Optional.of(false));
         }
 
         @Override
@@ -1240,8 +1244,7 @@ public class Coordinator
     void
     login(final SessionKeeper sessionKeeper,
           final SessionKeeper.ConnectionInfo info,
-          final JDialog parent,
-          final Cursor oldCursor)
+          final JDialog parent)
     {
         //
         // Keep certificates arround for connection retry
@@ -1251,8 +1254,7 @@ public class Coordinator
 
         destroyCommunicator();
 
-        com.zeroc.Ice.InitializationData initData = _initData;
-        initData = initData.clone();
+        com.zeroc.Ice.InitializationData initData = _initData.clone();
         initData.properties = initData.properties._clone();
         initData.properties.setProperty("Ice.Plugin.IceSSL", "com.zeroc.IceSSL.PluginFactory");
         initData.properties.setProperty("IceSSL.VerifyPeer", "0");
@@ -1267,7 +1269,7 @@ public class Coordinator
             {
                 JOptionPane.showMessageDialog(parent, e.toString(), "Failed to access data directory",
                                               JOptionPane.ERROR_MESSAGE);
-                parent.setCursor(oldCursor);
+                _sessionKeeper.loginFailed();
                 return;
             }
             if(info.getKeyPassword() != null)
@@ -1293,7 +1295,7 @@ public class Coordinator
                                           e.toString(),
                                           "Communicator initialization failed",
                                           JOptionPane.ERROR_MESSAGE);
-            parent.setCursor(oldCursor);
+            _sessionKeeper.loginFailed();
             return;
         }
 
@@ -1331,7 +1333,7 @@ public class Coordinator
 
             class AcceptInvalidCertDialog implements Runnable
             {
-                public TrustDecision show(com.zeroc.IceSSL.NativeConnectionInfo info, boolean validDate,
+                public TrustDecision show(com.zeroc.IceSSL.ConnectionInfo info, boolean validDate,
                                           boolean validAlternateName, boolean trustedCA)
                 {
                     _info = info;
@@ -1377,7 +1379,7 @@ public class Coordinator
                     }
                 }
 
-                private com.zeroc.IceSSL.NativeConnectionInfo _info;
+                private com.zeroc.IceSSL.ConnectionInfo _info;
                 private boolean _validDate;
                 private boolean _validAlternateName;
                 private boolean _trustedCA;
@@ -1385,14 +1387,14 @@ public class Coordinator
             }
 
             @Override
-            public boolean verify(com.zeroc.IceSSL.NativeConnectionInfo info)
+            public boolean verify(com.zeroc.IceSSL.ConnectionInfo info)
             {
-                if(!(info.nativeCerts[0] instanceof X509Certificate))
+                if(!(info.certs[0] instanceof X509Certificate))
                 {
                     return false;
                 }
 
-                X509Certificate cert = (X509Certificate) info.nativeCerts[0];
+                X509Certificate cert = (X509Certificate) info.certs[0];
                 byte[] encoded;
                 try
                 {
@@ -1585,7 +1587,7 @@ public class Coordinator
 
                 if(decision == TrustDecision.YesThisTime)
                 {
-                    _transientCert = (X509Certificate) info.nativeCerts[0];
+                    _transientCert = (X509Certificate) info.certs[0];
                     return true;
                 }
                 else if(decision == TrustDecision.YesAlways)
@@ -1602,7 +1604,7 @@ public class Coordinator
                                 break;
                             }
                         }
-                        _trustedServerKeyStore.setCertificateEntry(CN, info.nativeCerts[0]);
+                        _trustedServerKeyStore.setCertificateEntry(CN, info.certs[0]);
                         _trustedServerKeyStore.store(new FileOutputStream(getDataDirectory() + "/ServerCerts.jks"),
                                                      new char[]{});
                         sessionKeeper.certificateManager(parent).load();
@@ -1655,7 +1657,7 @@ public class Coordinator
                                                      JOptionPane.showMessageDialog(parent, ex.toString(),
                                                                                    "Error creating certificate verifier",
                                                                                    JOptionPane.ERROR_MESSAGE);
-                                                     parent.setCursor(oldCursor);
+                                                     _sessionKeeper.loginFailed();
                                                  });
                     break;
                 }
@@ -1709,18 +1711,17 @@ public class Coordinator
                 _newApplicationWithDefaultTemplates.setEnabled(true);
                 _acquireExclusiveWriteAccess.setEnabled(true);
                 _mainPane.setSelectedComponent(_liveDeploymentPane);
-                _sessionKeeper.loginSuccess(parent, oldCursor, _sessionTimeout, _acmTimeout, _session, info);
+                _sessionKeeper.loginSuccess(parent, _sessionTimeout, _acmTimeout, _session, info);
             }
 
             synchronized public void loginFailed()
             {
-                parent.setCursor(oldCursor);
+                _sessionKeeper.loginFailed();
                 _failed = true;
             }
 
             synchronized public void permissionDenied(String msg)
             {
-                parent.setCursor(oldCursor);
                 _failed = true;
                 _sessionKeeper.permissionDenied(parent, info, msg);
             }
@@ -1739,7 +1740,7 @@ public class Coordinator
         if(!info.getDirect())
         {
             final ConnectionCallback cb = new ConnectionCallback();
-            new Thread(() ->
+            getExecutor().submit(() ->
                        {
                            try
                            {
@@ -1866,7 +1867,7 @@ public class Coordinator
                                                           });
                                return;
                            }
-                       }).start();
+                       });
         }
         else
         {
@@ -1920,7 +1921,7 @@ public class Coordinator
                 return;
             }
 
-            new Thread(() ->
+            getExecutor().submit(() ->
                        {
                            synchronized(Coordinator.this)
                            {
@@ -2134,7 +2135,7 @@ public class Coordinator
 
                                SwingUtilities.invokeLater(() -> cb.loginSuccess());
                            }
-                       }).start();
+                       });
         }
     }
 
@@ -2845,7 +2846,6 @@ public class Coordinator
         _saveToRegistry.setEnabled(false);
         _saveToRegistry.putValue(Action.SHORT_DESCRIPTION, "Save to registry (servers may restart)");
 
-
         _saveToRegistryWithoutRestart = new AbstractAction("Save to Registry (No server restart)")
             {
                 @Override
@@ -3106,20 +3106,11 @@ public class Coordinator
         _mainPane = new MainPane(this);
         _mainFrame.getContentPane().add(_mainPane, BorderLayout.CENTER);
 
-        java.util.concurrent.ScheduledThreadPoolExecutor executor =
-            new java.util.concurrent.ScheduledThreadPoolExecutor(1,
-                                                                 new java.util.concurrent.ThreadFactory()
-                                                                 {
-                                                                     @Override
-                                                                     public Thread newThread(Runnable r)
-                                                                     {
-                                                                         Thread t = new Thread(r);
-                                                                         t.setName("Pinger");
-                                                                         return t;
-                                                                     }
-                                                                 });
+        ScheduledThreadPoolExecutor executor =
+            new ScheduledThreadPoolExecutor(1, (Runnable r) -> new Thread(r, "Pinger"));
         executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-        _executor = executor;
+        _scheduledExecutor = executor;
+        _executor = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r));
     }
 
     public IGraphView createGraphView()
@@ -3338,8 +3329,8 @@ public class Coordinator
         destroyIceGridAdmin();
         destroyCommunicator();
 
-        _executor.shutdown();
-        _executor = null;
+        _scheduledExecutor.shutdown();
+        _scheduledExecutor = null;
 
         Runtime.getRuntime().removeShutdownHook(_shutdownHook);
         _mainFrame.dispose();
@@ -3567,7 +3558,12 @@ public class Coordinator
         return _graphViews.toArray(new IGraphView[_graphViews.size()]);
     }
 
-    public java.util.concurrent.ScheduledExecutorService getExecutor()
+    public ScheduledExecutorService getScheduledExecutor()
+    {
+        return _scheduledExecutor;
+    }
+
+    public ExecutorService getExecutor()
     {
         return _executor;
     }
@@ -3604,7 +3600,7 @@ public class Coordinator
 
     static class UntrustedCertificateDialog extends JDialog
     {
-        public UntrustedCertificateDialog(java.awt.Window owner, com.zeroc.IceSSL.NativeConnectionInfo info,
+        public UntrustedCertificateDialog(java.awt.Window owner, com.zeroc.IceSSL.ConnectionInfo info,
                                           boolean validDate, boolean validAlternateName, boolean trustedCA)
             throws java.security.GeneralSecurityException, java.io.IOException,
             javax.naming.InvalidNameException
@@ -3615,7 +3611,7 @@ public class Coordinator
             Container contentPane = getContentPane();
             contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
 
-            X509Certificate cert = (X509Certificate)info.nativeCerts[0];
+            X509Certificate cert = (X509Certificate)info.certs[0];
             {
                 DefaultFormBuilder builder = new DefaultFormBuilder(new FormLayout("pref", "pref"));
                 builder.border(Borders.DIALOG);
@@ -3843,5 +3839,6 @@ public class Coordinator
 
     private java.util.List<IGraphView> _graphViews = new java.util.ArrayList<>();
 
-    private java.util.concurrent.ScheduledExecutorService _executor;
+    private ScheduledExecutorService _scheduledExecutor;
+    private ExecutorService _executor;
 }

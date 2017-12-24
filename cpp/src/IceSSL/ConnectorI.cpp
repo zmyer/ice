@@ -10,13 +10,9 @@
 #include <IceSSL/ConnectorI.h>
 #include <IceSSL/Instance.h>
 
-#include <IceSSL/OpenSSLTransceiverI.h>
-#include <IceSSL/SecureTransportTransceiverI.h>
-#include <IceSSL/SChannelTransceiverI.h>
-#include <IceSSL/UWPTransceiverI.h>
-
 #include <IceSSL/EndpointI.h>
 #include <IceSSL/Util.h>
+#include <IceSSL/SSLEngine.h>
 #include <Ice/Communicator.h>
 #include <Ice/LocalException.h>
 #include <Ice/StreamSocket.h>
@@ -35,12 +31,10 @@ IceSSL::ConnectorI::connect()
     //
     if(!_instance->initialized())
     {
-        PluginInitializationException ex(__FILE__, __LINE__);
-        ex.reason = "IceSSL: plug-in is not initialized";
-        throw ex;
+        throw PluginInitializationException(__FILE__, __LINE__, "IceSSL: plug-in is not initialized");
     }
 
-    return new TransceiverI(_instance, _delegate->connect(), _host, false);
+    return _instance->engine()->createTransceiver(_instance, _delegate->connect(), _host, false);
 }
 
 Short

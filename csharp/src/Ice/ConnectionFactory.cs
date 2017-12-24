@@ -139,8 +139,13 @@ namespace IceInternal
                     Debug.Assert(_connections.Count == 0);
                     Debug.Assert(_connectionsByEndpoint.Count == 0);
                 }
-                _monitor.destroy();
             }
+
+            //
+            // Must be destroyed outside the synchronization since this might block waiting for
+            // a timer task to execute.
+            //
+            _monitor.destroy();
         }
 
         public void create(EndpointI[] endpts, bool hasMore, Ice.EndpointSelectionType selType,
@@ -687,7 +692,7 @@ namespace IceInternal
         private void handleConnectionException(Ice.LocalException ex, bool hasMore)
         {
             TraceLevels traceLevels = _instance.traceLevels();
-            if(traceLevels.retry >= 2)
+            if(traceLevels.network >= 2)
             {
                 StringBuilder s = new StringBuilder();
                 s.Append("connection to endpoint failed");
@@ -707,7 +712,7 @@ namespace IceInternal
                     }
                 }
                 s.Append(ex);
-                _instance.initializationData().logger.trace(traceLevels.retryCat, s.ToString());
+                _instance.initializationData().logger.trace(traceLevels.networkCat, s.ToString());
             }
         }
 
@@ -767,7 +772,7 @@ namespace IceInternal
         internal void handleException(Ice.LocalException ex, bool hasMore)
         {
             TraceLevels traceLevels = _instance.traceLevels();
-            if(traceLevels.retry >= 2)
+            if(traceLevels.network >= 2)
             {
                 StringBuilder s = new StringBuilder();
                 s.Append("couldn't resolve endpoint host");
@@ -787,7 +792,7 @@ namespace IceInternal
                     }
                 }
                 s.Append(ex);
-                _instance.initializationData().logger.trace(traceLevels.retryCat, s.ToString());
+                _instance.initializationData().logger.trace(traceLevels.networkCat, s.ToString());
             }
         }
 
@@ -1261,14 +1266,37 @@ namespace IceInternal
                     }
                 }
                 _connections.Clear();
-                _monitor.destroy();
+            }
+
+            //
+            // Must be destroyed outside the synchronization since this might block waiting for
+            // a timer task to execute.
+            //
+            _monitor.destroy();
+        }
+
+        public bool isLocal(EndpointI endpoint)
+        {
+            if(_publishedEndpoint != null && endpoint.equivalent(_publishedEndpoint))
+            {
+                return true;
+            }
+            lock(this)
+            {
+                return endpoint.equivalent(_endpoint);
             }
         }
 
         public EndpointI endpoint()
         {
-            // No mutex protection necessary, _endpoint is immutable.
-            return _endpoint;
+            if(_publishedEndpoint != null)
+            {
+                return _publishedEndpoint;
+            }
+            lock(this)
+            {
+                return _endpoint;
+            }
         }
 
         public ICollection<Ice.ConnectionI> connections()
@@ -1528,10 +1556,12 @@ namespace IceInternal
             }
         }
 
-        public IncomingConnectionFactory(Instance instance, EndpointI endpoint, Ice.ObjectAdapterI adapter)
+        public IncomingConnectionFactory(Instance instance, EndpointI endpoint, EndpointI publish,
+                                         Ice.ObjectAdapterI adapter)
         {
             _instance = instance;
             _endpoint = endpoint;
+            _publishedEndpoint = publish;
             _adapter = adapter;
             _warn = _instance.initializationData().properties.getPropertyAsInt("Ice.Warn.Connections") > 0;
             _connections = new HashSet<Ice.ConnectionI>();
@@ -1788,6 +1818,7 @@ namespace IceInternal
         private Acceptor _acceptor;
         private readonly Transceiver _transceiver;
         private EndpointI _endpoint;
+        private readonly EndpointI _publishedEndpoint;
 
         private Ice.ObjectAdapterI _adapter;
 

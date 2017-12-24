@@ -15,6 +15,8 @@ import java.util.Stack;
 import java.util.HashMap;
 import java.util.Date;
 import java.util.TimeZone;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.awt.datatransfer.DataFlavor;
@@ -315,15 +317,8 @@ public class GraphView extends JFrame implements MetricsFieldContext, Coordinato
                 @Override
                 public String getToolTipText(java.awt.event.MouseEvent e)
                 {
-                    if(convertColumnIndexToModel(columnAtPoint(e.getPoint())) == 6)
-                    {
-                        return _legendModel.getRows(new int[]{rowAtPoint(e.getPoint())})[0].cell.getField().
-                            getColumnToolTip();
-                    }
-                    else
-                    {
-                        return null;
-                    }
+                    return _legendModel.getRows(new int[]{rowAtPoint(e.getPoint())})[0].cell.getField().
+                        getColumnToolTip();
                 }
             };
 
@@ -476,7 +471,7 @@ public class GraphView extends JFrame implements MetricsFieldContext, Coordinato
         //
         JComboBox<Double> scales = new JComboBox<>(_scales);
         scales.setRenderer(new DecimalRenderer(scales.getRenderer()));
-        _legendTable.getColumnModel().getColumn(7).setCellEditor(new DefaultCellEditor(scales));
+        _legendTable.getColumnModel().getColumn(ScaleColumnNumber).setCellEditor(new DefaultCellEditor(scales));
 
         //
         // Set default renderer and editor for Color.class column.
@@ -1005,7 +1000,7 @@ public class GraphView extends JFrame implements MetricsFieldContext, Coordinato
     {
         if(_refreshFuture == null)
         {
-            _refreshFuture = _coordinator.getExecutor().scheduleAtFixedRate(() ->
+            _refreshFuture = _coordinator.getScheduledExecutor().scheduleAtFixedRate(() ->
                 {
                     java.util.Set<MetricsViewInfo> metrics = null;
                     synchronized(GraphView.this)
@@ -1702,7 +1697,6 @@ public class GraphView extends JFrame implements MetricsFieldContext, Coordinato
                                                               "Metrics Name", "Metrics Id", "Metrics Field", "Scale",
                                                               "Last", "Average", "Minimum", "Maximum", "Color"};
 
-
     //
     // The metrics view being graph
     //
@@ -1763,20 +1757,17 @@ public class GraphView extends JFrame implements MetricsFieldContext, Coordinato
                                                   10000000.0d,
                                                   100000000.0d,
                                                   1000000000.0d};
+    //
+    // This s
+    private static final int ScaleColumnNumber = 6;
 
     private final java.util.concurrent.Semaphore _sem = new java.util.concurrent.Semaphore(0);
-    private final java.util.concurrent.ExecutorService _queue = java.util.concurrent.Executors.newSingleThreadExecutor(
-        new java.util.concurrent.ThreadFactory()
-        {
-            @Override
-            public Thread newThread(Runnable r)
-            {
-                Thread t = new Thread(r);
-                t.setDaemon(true);
-                t.setName("GraphView-Thread");
-                return t;
-            }
-        });
+    private final ExecutorService _queue = Executors.newSingleThreadExecutor((Runnable r) ->
+                                                                             {
+                                                                                 Thread t = new Thread(r, "GraphView-Thread");
+                                                                                 t.setDaemon(true);
+                                                                                 return t;
+                                                                             });
     private final Preferences _preferences;
 
     private final static DataFormat LocalObjectMimeType = new DataFormat("application/x-java-jvm-local-objectref");

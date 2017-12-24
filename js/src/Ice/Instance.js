@@ -355,15 +355,14 @@ class Instance
                                             new ACMConfig(this._initData.properties, this._initData.logger,
                                                             "Ice.ACM", new ACMConfig()));
 
-
             const toStringModeStr = this._initData.properties.getPropertyWithDefault("Ice.ToStringMode", "Unicode");
             if(toStringModeStr === "ASCII")
             {
-                _toStringMode = Ice.ToStringMode.ASCII;
+                this._toStringMode = Ice.ToStringMode.ASCII;
             }
             else if(toStringModeStr === "Compat")
             {
-                _toStringMode = Ice.ToStringMode.Compat;
+                this._toStringMode = Ice.ToStringMode.Compat;
             }
             else if(toStringModeStr !== "Unicode")
             {

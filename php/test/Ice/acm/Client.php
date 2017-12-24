@@ -45,11 +45,10 @@ function testSetACM($communicator, $com)
     $initData->properties->setProperty("Ice.ACM.Client.Timeout", "15");
     $initData->properties->setProperty("Ice.ACM.Client.Close", "4");
     $initData->properties->setProperty("Ice.ACM.Client.Heartbeat", "2");
-    
-    $testCommunicator = $NS ? eval("return Ice\\initialize(\$initData);") : 
+
+    $testCommunicator = $NS ? eval("return Ice\\initialize(\$initData);") :
                               eval("return Ice_initialize(\$initData);");
-    
-    
+
     $proxy = $testCommunicator->stringToProxy($adapter->getTestIntf()->ice_toString())->ice_uncheckedCast(
         "::Test::TestIntf");
     $proxy->ice_getConnection();
@@ -68,7 +67,9 @@ function testSetACM($communicator, $com)
     test($acm->close == $CloseOnIdleForceful);
     test($acm->heartbeat == $HeartbeatOnIdle);
 
-    $proxy->ice_getCachedConnection()->setACM(Ice_Unset, Ice_Unset, Ice_Unset);
+    $none = $NS ? constant("Ice\\None") : constant("Ice_Unset");
+
+    $proxy->ice_getCachedConnection()->setACM($none, $none, $none);
     $acm = $proxy->ice_getCachedConnection()->getACM();
     test($acm->timeout == 15);
     test($acm->close == $CloseOnIdleForceful);
@@ -132,7 +133,7 @@ function allTests($communicator)
     $com->shutdown();
 }
 
-$communicator = $NS ? eval("return Ice\\initialize(\$argv);") : 
+$communicator = $NS ? eval("return Ice\\initialize(\$argv);") :
                       eval("return Ice_initialize(\$argv);");
 allTests($communicator);
 $communicator->destroy();

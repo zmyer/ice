@@ -750,7 +750,14 @@ IcePHP::createConnectionInfo(zval* zv, const Ice::ConnectionInfoPtr& p TSRMLS_DC
         zval* zarr;
         MAKE_STD_ZVAL(zarr);
         AutoDestroy listDestroyer(zarr);
-        if(createStringArray(zarr, info->certs TSRMLS_CC))
+
+        Ice::StringSeq encoded;
+        for(vector<IceSSL::CertificatePtr>::const_iterator i = info->certs.begin(); i != info->certs.end(); ++i)
+        {
+            encoded.push_back((*i)->encode());
+        }
+
+        if(createStringArray(zarr, encoded TSRMLS_CC))
         {
             add_property_zval(zv, STRCAST("certs"), zarr);
         }

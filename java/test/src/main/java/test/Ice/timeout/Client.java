@@ -16,8 +16,7 @@ public class Client extends test.Util.Application
     @Override
     public int run(String[] args)
     {
-        TimeoutPrx timeout = AllTests.allTests(this);
-        timeout.shutdown();
+        AllTests.allTests(this);
         return 0;
     }
 
@@ -26,12 +25,6 @@ public class Client extends test.Util.Application
     {
         com.zeroc.Ice.InitializationData initData = super.getInitData(args, rArgs);
         initData.properties.setProperty("Ice.Package.Test", "test.Ice.timeout");
-
-        //
-        // We need to send messages large enough to cause the transport
-        // buffers to fill up.
-        //
-        initData.properties.setProperty("Ice.MessageSizeMax", "20000");
 
         //
         // For this test, we want to disable retries.

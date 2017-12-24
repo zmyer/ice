@@ -24,12 +24,16 @@
 using namespace std;
 using namespace Test;
 
+namespace
+{
+
 class AbstractBaseI : public AbstractBase
 {
 public:
 
     virtual void op(const Ice::Current&)
-    {}
+    {
+    }
 };
 
 void
@@ -59,6 +63,56 @@ testUOE(const Ice::CommunicatorPtr& communicator)
     {
         test(false);
     }
+}
+
+void clear(const CPtr&);
+
+void
+clear(const BPtr& b)
+{
+#ifdef ICE_CPP11_MAPPING
+    // No GC with the C++11 mapping
+    if(dynamic_pointer_cast<B>(b->theA))
+    {
+        auto tmp = b->theA;
+        b->theA = nullptr;
+        clear(dynamic_pointer_cast<B>(tmp));
+    }
+    if(b->theB)
+    {
+        auto tmp = b->theB;
+        b->theB = nullptr;
+        clear(dynamic_pointer_cast<B>(tmp));
+    }
+    b->theC = nullptr;
+#endif
+}
+
+void
+clear(const CPtr& c)
+{
+#ifdef ICE_CPP11_MAPPING
+    // No GC with the C++11 mapping
+    clear(c->theB);
+    c->theB = nullptr;
+#endif
+}
+
+void
+clear(const DPtr& d)
+{
+#ifdef ICE_CPP11_MAPPING
+    // No GC with the C++11 mapping
+    if(dynamic_pointer_cast<B>(d->theA))
+    {
+        clear(dynamic_pointer_cast<B>(d->theA));
+    }
+    d->theA = nullptr;
+    clear(d->theB);
+    d->theB = nullptr;
+#endif
+}
+
 }
 
 InitialPrxPtr
@@ -194,6 +248,11 @@ allTests(const Ice::CommunicatorPtr& communicator)
     // More tests possible for b2 and d, but I think this is already sufficient.
     test(b2->theA == b2);
     test(d->theC == ICE_NULLPTR);
+
+    clear(b1);
+    clear(b2);
+    clear(c);
+    clear(d);
     cout << "ok" << endl;
 
     cout << "getting B1, B2, C, and D all at once... " << flush;
@@ -248,6 +307,10 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(d->theB->postUnmarshalInvoked);
     test(d->theB->theC->preMarshalInvoked);
     test(d->theB->theC->postUnmarshalInvoked);
+    clear(b1);
+    clear(b2);
+    clear(c);
+    clear(d);
     cout << "ok" << endl;
 
     cout << "testing protected members... " << flush;
@@ -323,6 +386,38 @@ allTests(const Ice::CommunicatorPtr& communicator)
     test(retS.size() == 1 && outS.size() == 1);
     cout << "ok" << endl;
 
+    cout << "testing recursive type... " << flush;
+    RecursivePtr top = ICE_MAKE_SHARED(Recursive);
+    RecursivePtr p = top;
+    int depth = 0;
+    try
+    {
+        for(; depth <= 2000; ++depth)
+        {
+            p->v = ICE_MAKE_SHARED(Recursive);
+            p = p->v;
+            if((depth < 10 && (depth % 10) == 0) ||
+               (depth < 1000 && (depth % 100) == 0) ||
+               (depth < 10000 && (depth % 1000) == 0) ||
+               (depth % 10000) == 0)
+            {
+                initial->setRecursive(top);
+            }
+        }
+        test(!initial->supportsClassGraphDepthMax());
+    }
+    catch(const Ice::UnknownLocalException&)
+    {
+        // Expected marshal exception from the server (max class graph depth reached)
+        test(depth == 100); // The default is 100.
+    }
+    catch(const Ice::UnknownException&)
+    {
+        // Expected stack overflow from the server (Java only)
+    }
+    initial->setRecursive(ICE_MAKE_SHARED(Recursive));
+    cout << "ok" << endl;
+
     cout << "testing compact ID..." << flush;
     try
     {
@@ -336,12 +431,14 @@ allTests(const Ice::CommunicatorPtr& communicator)
     cout << "testing marshaled results..." << flush;
     b1 = initial->getMB();
     test(b1 && b1->theB == b1);
+    clear(b1);
 #ifdef ICE_CPP11_MAPPING
     b1 = initial->getAMDMBAsync().get();
 #else
     b1 = initial->end_getAMDMB(initial->begin_getAMDMB());
 #endif
     test(b1 && b1->theB == b1);
+    clear(b1);
     cout << "ok" << endl;
 
     cout << "testing UnexpectedObjectException... " << flush;

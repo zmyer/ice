@@ -46,6 +46,11 @@ run(int argc, char* argv[], const Ice::CommunicatorPtr& communicator)
 int
 main(int argc, char* argv[])
 {
+#ifdef ICE_STATIC_LIBS
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerIceLocatorDiscovery(false);
+#endif
     int status;
 
     Ice::CommunicatorPtr communicator;

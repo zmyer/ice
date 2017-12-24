@@ -7,6 +7,10 @@
 //
 // **********************************************************************
 
+#ifndef TEST_API_EXPORTS
+#   define TEST_API_EXPORTS
+#endif
+
 #include <Transceiver.h>
 
 using namespace std;
@@ -265,4 +269,3 @@ Transceiver::Transceiver(const IceInternal::TransceiverPtr& transceiver) :
     _readBufferPos = _readBuffer.b.begin();
     _readBuffer.i = _readBuffer.b.begin();
 }
-

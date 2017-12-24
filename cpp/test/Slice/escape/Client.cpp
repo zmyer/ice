@@ -67,7 +67,7 @@ public:
     virtual void caseAsync(int,
                            ::std::function<void(int)>,
                            ::std::function<void(::std::exception_ptr)>,
-                           const ::Ice::Current&) 
+                           const ::Ice::Current&)
     {
     }
 #else
@@ -198,7 +198,7 @@ main(int argc, char* argv[])
 {
     try
     {
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv);
+        Ice::CommunicatorHolder ich(argc, argv);
         return run(ich.communicator());
     }
     catch(const Ice::Exception& ex)

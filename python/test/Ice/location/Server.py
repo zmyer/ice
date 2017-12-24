@@ -19,7 +19,7 @@ if not slice_dir:
 Ice.loadSlice("'-I" + slice_dir + "' Test.ice")
 import Test
 
-class ServerLocatorRegistry(Test._TestLocatorRegistryDisp):
+class ServerLocatorRegistry(Test.TestLocatorRegistry):
     def __init__(self):
         self._adapters = {}
         self._objects = {}
@@ -56,7 +56,7 @@ class ServerLocatorRegistry(Test._TestLocatorRegistryDisp):
             raise Ice.ObjectNotFoundException()
         return self._objects[id]
 
-class ServerLocator(Test._TestLocatorDisp):
+class ServerLocator(Test.TestLocator):
 
     def __init__(self, registry, registryPrx):
         self._registry = registry
@@ -77,15 +77,14 @@ class ServerLocator(Test._TestLocatorDisp):
     def getRequestCount(self, current=None):
         return self._requestCount
 
-class ServerManagerI(Test._ServerManagerDisp):
+class ServerManagerI(Test.ServerManager):
     def __init__(self, registry, initData):
         self._registry = registry
         self._communicators = []
         self._initData = initData
-        self._initData.properties.setProperty("TestAdapter.Endpoints", "default")
+        self._nextPort = 1
         self._initData.properties.setProperty("TestAdapter.AdapterId", "TestAdapter")
         self._initData.properties.setProperty("TestAdapter.ReplicaGroupId", "ReplicatedAdapter")
-        self._initData.properties.setProperty("TestAdapter2.Endpoints", "default")
         self._initData.properties.setProperty("TestAdapter2.AdapterId", "TestAdapter2")
 
     def startServer(self, current=None):
@@ -100,32 +99,55 @@ class ServerManagerI(Test._ServerManagerDisp):
         #
         serverCommunicator = Ice.initialize(data=initData)
         self._communicators.append(serverCommunicator)
-        adapter = serverCommunicator.createObjectAdapter("TestAdapter")
 
-        adapter2 = serverCommunicator.createObjectAdapter("TestAdapter2")
+        def getTestEndpoint():
+            self._nextPort += 1
+            return "default -p {}".format(12010 + self._nextPort)
 
-        locator = serverCommunicator.stringToProxy("locator:default -p 12010")
-        adapter.setLocator(Ice.LocatorPrx.uncheckedCast(locator))
-        adapter2.setLocator(Ice.LocatorPrx.uncheckedCast(locator))
+        nRetry = 10
+        while --nRetry > 0:
+            adapter = None
+            adapter2 = None
+            try:
+                serverCommunicator.getProperties().setProperty("TestAdapter.Endpoints", getTestEndpoint())
+                serverCommunicator.getProperties().setProperty("TestAdapter2.Endpoints", getTestEndpoint())
 
-        object = TestI(adapter, adapter2, self._registry)
-        self._registry.addObject(adapter.add(object, Ice.stringToIdentity("test")))
-        self._registry.addObject(adapter.add(object, Ice.stringToIdentity("test2")))
-        adapter.add(object, Ice.stringToIdentity("test3"))
+                adapter = serverCommunicator.createObjectAdapter("TestAdapter")
+                adapter2 = serverCommunicator.createObjectAdapter("TestAdapter2")
 
-        adapter.activate()
-        adapter2.activate()
+                locator = serverCommunicator.stringToProxy("locator:default -p 12010")
+                adapter.setLocator(Ice.LocatorPrx.uncheckedCast(locator))
+                adapter2.setLocator(Ice.LocatorPrx.uncheckedCast(locator))
+
+                object = TestI(adapter, adapter2, self._registry)
+                self._registry.addObject(adapter.add(object, Ice.stringToIdentity("test")))
+                self._registry.addObject(adapter.add(object, Ice.stringToIdentity("test2")))
+                adapter.add(object, Ice.stringToIdentity("test3"))
+
+                adapter.activate()
+                adapter2.activate()
+                break
+            except Ice.SocketException as ex:
+                if nRetry == 0:
+                    raise ex
+
+                # Retry, if OA creation fails with EADDRINUSE (this can occur when running with JS web
+                # browser clients if the driver uses ports in the same range as this test, ICE-8148)
+                if adapter:
+                    adapter.destroy()
+                if adapter2:
+                    adapter2.destroy()
 
     def shutdown(self, current=None):
         for i in self._communicators:
             i.destroy()
         current.adapter.getCommunicator().shutdown()
 
-class HelloI(Test._HelloDisp):
+class HelloI(Test.Hello):
     def sayHello(self, current=None):
         pass
 
-class TestI(Test._TestIntfDisp):
+class TestI(Test.TestIntf):
     def __init__(self, adapter, adapter2, registry):
         self._adapter1 = adapter
         self._adapter2 = adapter2
@@ -156,7 +178,7 @@ def run(args, communicator, initData):
     #
     properties = communicator.getProperties()
     properties.setProperty("Ice.ThreadPool.Server.Size", "2")
-    properties.setProperty("ServerManager.Endpoints", "default -p 12010:udp")
+    properties.setProperty("ServerManager.Endpoints", "default -p 12010")
 
     adapter = communicator.createObjectAdapter("ServerManager")
 

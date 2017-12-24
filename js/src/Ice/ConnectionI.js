@@ -327,7 +327,7 @@ class ConnectionI
            (acm.heartbeat != Ice.ACMHeartbeat.HeartbeatOff && this._writeStream.isEmpty() &&
            now >= (this._acmLastActivity + acm.timeout / 4)))
         {
-            if(acm.heartbeat != Ice.ACMHeartbeat.HeartbeatOnInvocation || this._dispatchCount > 0)
+            if(acm.heartbeat != Ice.ACMHeartbeat.HeartbeatOnDispatch || this._dispatchCount > 0)
             {
                 this.sendHeartbeatNow(); // Send heartbeat if idle in the last timeout / 2 period.
             }
@@ -489,6 +489,10 @@ class ConnectionI
 
     setHeartbeatCallback(callback)
     {
+        if(this._state >= StateClosed)
+        {
+            return;
+        }
         this._heartbeatCallback = callback;
     }
 
@@ -667,11 +671,10 @@ class ConnectionI
 
         if(this._adapter !== null)
         {
+            //
+            // The OA's servant manager is immutable.
+            //
             this._servantManager = this._adapter.getServantManager();
-            if(this._servantManager === null)
-            {
-                this._adapter = null;
-            }
         }
         else
         {
@@ -758,7 +761,7 @@ class ConnectionI
                     if(magic0 !== Protocol.magic[0] || magic1 !== Protocol.magic[1] ||
                        magic2 !== Protocol.magic[2] || magic3 !== Protocol.magic[3])
                     {
-                        throw new Ice.BadMagicException("", Ice.Buffer.createNative([magic0, magic1, magic2, magic3]));
+                        throw new Ice.BadMagicException("", new Uint8Array([magic0, magic1, magic2, magic3]));
                     }
 
                     this._readProtocol._read(this._readStream);
@@ -1729,9 +1732,10 @@ class ConnectionI
             }
             return AsyncStatus.Sent;
         }
+
         message.doAdopt();
 
-        this._writeStream.swap(stream);
+        this._writeStream.swap(message.stream);
         this._sendStreams.push(message);
         this.scheduleTimeout(SocketOperation.Write, this._endpoint.timeout());
 
@@ -1930,9 +1934,18 @@ class ConnectionI
             {
                 this.invokeException(ex, invokeNum);
             }
+            else if(ex instanceof Ice.ServantError)
+            {
+                // Ignore
+            }
             else
             {
-                throw ex;
+                //
+                // An Error was raised outside of servant code (i.e., by Ice code).
+                // Attempt to log the error and clean up.
+                //
+                this._logger.error("unexpected exception:\n" + ex.toString());
+                this.invokeException(new Ice.UnknownException(ex), invokeNum);
             }
         }
     }

@@ -91,8 +91,8 @@ slice_error(const char* s)
 //
 // Other tokens.
 //
-%token ICE_SCOPE_DELIMITER
 %token ICE_IDENTIFIER
+%token ICE_SCOPED_IDENTIFIER
 %token ICE_STRING_LITERAL
 %token ICE_INTEGER_LITERAL
 %token ICE_FLOATING_POINT_LITERAL
@@ -108,11 +108,21 @@ slice_error(const char* s)
 
 %%
 
-
 // ----------------------------------------------------------------------
 start
 // ----------------------------------------------------------------------
 : definitions
+{
+}
+;
+
+// ----------------------------------------------------------------------
+opt_semicolon
+// ----------------------------------------------------------------------
+: ';'
+{
+}
+|
 {
 }
 ;
@@ -160,16 +170,7 @@ definitions
         contained->setMetaData(metaData->v);
     }
 }
-';' definitions
-| error ';'
-{
-    yyerrok;
-}
 definitions
-| meta_data definition
-{
-    unit->error("`;' missing after definition");
-}
 |
 {
 }
@@ -182,53 +183,98 @@ definition
 {
     assert($1 == 0 || ModulePtr::dynamicCast($1));
 }
+opt_semicolon
 | class_decl
 {
     assert($1 == 0 || ClassDeclPtr::dynamicCast($1));
+}
+';'
+| class_decl
+{
+    unit->error("`;' missing after class forward declaration");
 }
 | class_def
 {
     assert($1 == 0 || ClassDefPtr::dynamicCast($1));
 }
+opt_semicolon
 | interface_decl
 {
     assert($1 == 0 || ClassDeclPtr::dynamicCast($1));
+}
+';'
+| interface_decl
+{
+    unit->error("`;' missing after interface forward declaration");
 }
 | interface_def
 {
     assert($1 == 0 || ClassDefPtr::dynamicCast($1));
 }
+opt_semicolon
 | exception_decl
 {
     assert($1 == 0);
+}
+';'
+| exception_decl
+{
+    unit->error("`;' missing after exception forward declaration");
 }
 | exception_def
 {
     assert($1 == 0 || ExceptionPtr::dynamicCast($1));
 }
+opt_semicolon
 | struct_decl
 {
     assert($1 == 0);
+}
+';'
+| struct_decl
+{
+    unit->error("`;' missing after struct forward declaration");
 }
 | struct_def
 {
     assert($1 == 0 || StructPtr::dynamicCast($1));
 }
+opt_semicolon
 | sequence_def
 {
     assert($1 == 0 || SequencePtr::dynamicCast($1));
+}
+';'
+| sequence_def
+{
+    unit->error("`;' missing after sequence definition");
 }
 | dictionary_def
 {
     assert($1 == 0 || DictionaryPtr::dynamicCast($1));
 }
+';'
+| dictionary_def
+{
+    unit->error("`;' missing after dictionary definition");
+}
 | enum_def
 {
     assert($1 == 0 || EnumPtr::dynamicCast($1));
 }
+opt_semicolon
 | const_def
 {
     assert($1 == 0 || ConstPtr::dynamicCast($1));
+}
+';'
+| const_def
+{
+    unit->error("`;' missing after const definition");
+}
+| error ';'
+{
+    yyerrok;
 }
 ;
 
@@ -410,7 +456,7 @@ optional
             // Found
             cl.push_back(enumerators.front());
             scoped->v = enumerators.front()->scoped();
-            unit->warning(Deprecated, string("referencing enumerator `") + scoped->v 
+            unit->warning(Deprecated, string("referencing enumerator `") + scoped->v
                           + "' without its enumeration's scope is deprecated");
         }
         else if(enumerators.size() > 1)
@@ -428,7 +474,7 @@ optional
                 {
                     os << " or";
                 }
-                
+
                 os << " `" << (*p)->scoped() << "'";
             }
             unit->error(os.str());
@@ -661,7 +707,7 @@ class_id
     {
         unit->error("invalid compact id for class: value is out of range");
     }
-    else 
+    else
     {
         string typeId = unit->getTypeId(static_cast<int>(id));
         if(!typeId.empty() && !unit->ignRedefs())
@@ -690,7 +736,7 @@ class_id
             // Found
             cl.push_back(enumerators.front());
             scoped->v = enumerators.front()->scoped();
-            unit->warning(Deprecated, string("referencing enumerator `") + scoped->v 
+            unit->warning(Deprecated, string("referencing enumerator `") + scoped->v
                           + "' without its enumeration's scope is deprecated");
         }
         else if(enumerators.size() > 1)
@@ -708,7 +754,7 @@ class_id
                 {
                     os << " or";
                 }
-                
+
                 os << " `" << (*p)->scoped() << "'";
             }
             unit->error(os.str());
@@ -762,7 +808,7 @@ class_id
     {
         unit->error("invalid compact id for class: id must be a positive integer");
     }
-    else 
+    else
     {
         string typeId = unit->getTypeId(id);
         if(!typeId.empty() && !unit->ignRedefs())
@@ -1595,7 +1641,7 @@ enum_def
     $$ = $3;
 }
 |
-local_qualifier ICE_ENUM 
+local_qualifier ICE_ENUM
 {
     unit->error("missing enumeration name");
     BoolTokPtr local = BoolTokPtr::dynamicCast($1);
@@ -1839,19 +1885,8 @@ scoped_name
 : ICE_IDENTIFIER
 {
 }
-| ICE_SCOPE_DELIMITER ICE_IDENTIFIER
+| ICE_SCOPED_IDENTIFIER
 {
-    StringTokPtr ident = StringTokPtr::dynamicCast($2);
-    ident->v = "::" + ident->v;
-    $$ = ident;
-}
-| scoped_name ICE_SCOPE_DELIMITER ICE_IDENTIFIER
-{
-    StringTokPtr scoped = StringTokPtr::dynamicCast($1);
-    StringTokPtr ident = StringTokPtr::dynamicCast($3);
-    scoped->v += "::";
-    scoped->v += ident->v;
-    $$ = scoped;
 }
 ;
 

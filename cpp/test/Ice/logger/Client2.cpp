@@ -10,7 +10,6 @@
 #include <Ice/Ice.h>
 #include <TestCommon.h>
 
-
 using namespace std;
 
 namespace
@@ -33,7 +32,8 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
 #endif
 
 #ifdef _WIN32

@@ -13,26 +13,26 @@ def test(b):
     if not b:
         raise RuntimeError('test assertion failed')
 
-class MyDerivedClassI(Test._MyDerivedClassDisp):
+class MyDerivedClassI(Test.MyDerivedClass):
     def __init__(self):
         self.lock = threading.Lock()
         self.opByteSOnewayCount = 0
 
     def ice_isA(self, id, current=None):
         test(current.mode == Ice.OperationMode.Nonmutating)
-        return Test._MyDerivedClassDisp.ice_isA(self, id, current)
+        return Test.MyDerivedClass.ice_isA(self, id, current)
 
     def ice_ping(self, current=None):
         test(current.mode == Ice.OperationMode.Nonmutating)
-        Test._MyDerivedClassDisp.ice_ping(self, current)
+        Test.MyDerivedClass.ice_ping(self, current)
 
     def ice_ids(self, current=None):
         test(current.mode == Ice.OperationMode.Nonmutating)
-        return Test._MyDerivedClassDisp.ice_ids(self, current)
+        return Test.MyDerivedClass.ice_ids(self, current)
 
     def ice_id(self, current=None):
         test(current.mode == Ice.OperationMode.Nonmutating)
-        return Test._MyDerivedClassDisp.ice_id(self, current)
+        return Test.MyDerivedClass.ice_id(self, current)
 
     def shutdown(self, current=None):
         current.adapter.getCommunicator().shutdown()
@@ -82,7 +82,7 @@ class MyDerivedClassI(Test._MyDerivedClassDisp):
         p3 = p1[0:]
         p3.extend(p2)
         r = p1[0:]
-        r.reverse();
+        r.reverse()
         return (r, p3)
 
     def opShortIntLongS(self, p1, p2, p3, current=None):
@@ -307,7 +307,7 @@ class MyDerivedClassI(Test._MyDerivedClassDisp):
         return current.ctx
 
     def opDoubleMarshaling(self, p1, p2, current=None):
-        d = 1278312346.0 / 13.0;
+        d = 1278312346.0 / 13.0
         test(p1 == d)
         for i in p2:
             test(i == d)
@@ -370,19 +370,19 @@ class MyDerivedClassI(Test._MyDerivedClassDisp):
         return self.opStringLiterals(current)
 
     def opMStruct1(self, current):
-        return Test.Structure();
+        return Test.MyClass.OpMStruct1MarshaledResult(Test.Structure(), current)
 
     def opMStruct2(self, p1, current):
-        return (p1, p1);
+        return Test.MyClass.OpMStruct2MarshaledResult((p1, p1), current)
 
     def opMSeq1(self, current):
-        return ()
+        return Test.MyClass.OpMSeq1MarshaledResult((), current)
 
     def opMSeq2(self, p1, current):
-        return (p1, p1);
+        return Test.MyClass.OpMSeq2MarshaledResult((p1, p1), current)
 
     def opMDict1(self, current):
-        return {};
+        return Test.MyClass.OpMDict1MarshaledResult({}, current)
 
     def opMDict2(self, p1, current):
-        return (p1, p1);
+        return Test.MyClass.OpMDict2MarshaledResult((p1, p1), current)

@@ -12,8 +12,19 @@
 #include <Test.h>
 #include <Configuration.h>
 
+#ifdef _MSC_VER
+#   pragma comment(lib, ICE_LIBNAME("testtransport"))
+#endif
+
 using namespace std;
 using namespace Test;
+
+extern "C"
+{
+
+Ice::Plugin* createTestTransport(const Ice::CommunicatorPtr&, const std::string&, const Ice::StringSeq&);
+
+};
 
 int
 run(int, char**, const Ice::CommunicatorPtr& communicator)
@@ -27,9 +38,14 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
 int
 main(int argc, char* argv[])
 {
+#ifdef ICE_STATIC_LIBS
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerPluginFactory("Test", createTestTransport, false);
+#endif
+
     int status;
     Ice::CommunicatorPtr communicator;
-
     try
     {
         Ice::InitializationData initData = getTestInitData(argc, argv);

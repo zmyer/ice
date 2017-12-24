@@ -122,7 +122,7 @@ namespace Ice
             base(prefix)
         {
             _file = file;
-            _writer = new StreamWriter(new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.None));
+            _writer = new StreamWriter(new FileStream(file, FileMode.Append, FileAccess.Write, FileShare.ReadWrite));
         }
 
         public override Logger cloneWithPrefix(string prefix)
@@ -134,6 +134,11 @@ namespace Ice
         {
             _writer.WriteLine(message);
             _writer.Flush();
+        }
+
+        public void destroy()
+        {
+            _writer.Close();
         }
 
         private string _file;

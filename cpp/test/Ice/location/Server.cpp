@@ -26,7 +26,7 @@ run(int, char**, const Ice::CommunicatorPtr& communicator, const Ice::Initializa
     //
     Ice::PropertiesPtr properties = communicator->getProperties();
     properties->setProperty("Ice.ThreadPool.Server.Size", "2");
-    properties->setProperty("ServerManager.Endpoints", getTestEndpoint(communicator, 0) + ":udp");
+    properties->setProperty("ServerManager.Endpoints", getTestEndpoint(communicator, 0));
 
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("ServerManager");
 
@@ -58,12 +58,14 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerIceUDP(true);
 #endif
     try
     {
         Ice::InitializationData initData = getTestInitData(argc, argv);
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         assert(initData.properties != ich->getProperties());
         return run(argc, argv, ich.communicator(), initData);
     }

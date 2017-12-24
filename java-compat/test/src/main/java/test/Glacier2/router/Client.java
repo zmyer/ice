@@ -17,7 +17,6 @@ import test.Glacier2.router.Test.CallbackPrxHelper;
 import test.Glacier2.router.Test.CallbackReceiverPrx;
 import test.Glacier2.router.Test.CallbackReceiverPrxHelper;
 
-
 public class Client extends test.Util.Application
 {
     private static void
@@ -38,7 +37,7 @@ public class Client extends test.Util.Application
         {
             out.print("testing stringToProxy for router... ");
             out.flush();
-            routerBase = communicator().stringToProxy("Glacier2/router:" + getTestEndpoint(10));
+            routerBase = communicator().stringToProxy("Glacier2/router:" + getTestEndpoint(50));
             out.println("ok");
         }
 
@@ -56,7 +55,7 @@ public class Client extends test.Util.Application
             out.print("testing router finder... ");
             out.flush();
             Ice.RouterFinderPrx finder = Ice.RouterFinderPrxHelper.uncheckedCast(
-                communicator().stringToProxy("Ice/RouterFinder:" + getTestEndpoint(10)));
+                communicator().stringToProxy("Ice/RouterFinder:" + getTestEndpoint(50)));
             test(finder.getRouter().ice_getIdentity().equals(router.ice_getIdentity()));
             out.println("ok");
         }
@@ -407,6 +406,7 @@ public class Client extends test.Util.Application
                 }
                 else
                 {
+                    System.err.println(ex);
                     test(false);
                 }
             }
@@ -425,7 +425,7 @@ public class Client extends test.Util.Application
 
             {
                 out.print("testing stringToProxy for process object... ");
-                processBase = communicator().stringToProxy("Glacier2/admin -f Process:" + getTestEndpoint(11));
+                processBase = communicator().stringToProxy("Glacier2/admin -f Process:" + getTestEndpoint(51));
                 out.println("ok");
             }
 

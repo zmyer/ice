@@ -13,9 +13,13 @@
 #include <Ice/Initialize.h>
 #include <IceUtil/Mutex.h>
 #include <IceUtil/Cond.h>
+#include <IceUtil/CtrlCHandler.h>
 
 namespace Ice
 {
+
+using IceUtil::CtrlCHandler;
+using IceUtil::CtrlCHandlerCallback;
 
 #ifdef ICE_CPP11_MAPPING
 enum class SignalPolicy : unsigned char
@@ -24,37 +28,42 @@ enum SignalPolicy
 #endif
 { HandleSignals, NoSignalHandling };
 
-class ICE_API Application : private IceUtil::noncopyable
+class ICE_API Application
 {
 public:
 
     Application(SignalPolicy = ICE_ENUM(SignalPolicy, HandleSignals));
-    virtual ~Application();
 
-    //
-    // This main() must be called by the global main(). main()
-    // initializes the Communicator, calls run() as a template method,
-    // and destroys the Communicator upon return from run(). It
-    // thereby handles all exceptions properly, i.e., error messages
-    // are printed if exceptions propagate to main(), and the
-    // Communicator is always destroyed, regardless of exceptions.
-    //
-    int main(int, char*[], const Ice::InitializationData& = Ice::InitializationData());
-    int main(int, char*[], const char*);
-
-    int main(int, char* const [], const Ice::InitializationData& = Ice::InitializationData());
-    int main(int, char* const [], const char*);
-
-#ifdef _WIN32
-
-    int main(int, wchar_t*[], const Ice::InitializationData& = Ice::InitializationData());
-    int main(int, wchar_t*[], const char*);
-
+#ifdef ICE_CPP11_MAPPING
+    Application(const Application&) = delete;
+    Application& operator=(const Application&) = delete;
 #endif
 
-    int main(const StringSeq&, const Ice::InitializationData& = Ice::InitializationData());
-    int main(const StringSeq&, const char*);
+    virtual ~Application();
 
+    // This main() must be called by the global main(). main()
+    // initializes the Communicator, calls run() and destroys the
+    // the Communicator upon return from run(). It handles all
+    // exceptions properly, i.e., error message are printed if
+    // exceptions propagate to main(), and the Communicator is always
+    // destroyed, regardless of exceptions.
+    //
+    int main(int, const char* const[], const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
+    int main(int, const char* const[], ICE_CONFIG_FILE_STRING, int = ICE_INT_VERSION);
+
+#ifdef _WIN32
+    int main(int, const wchar_t* const[], const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
+    int main(int, const wchar_t* const[], ICE_CONFIG_FILE_STRING, int = ICE_INT_VERSION);
+#endif
+
+    int main(const StringSeq&, const InitializationData& = InitializationData(), int = ICE_INT_VERSION);
+    int main(const StringSeq&, ICE_CONFIG_FILE_STRING, int = ICE_INT_VERSION);
+
+    //
+    // run is given a copy of the remaining argc/argv arguments,
+    // after the communicator initialization in the caller (main)
+    // has removed all Ice-related arguments.
+    //
     virtual int run(int, char*[]) = 0;
 
     //
@@ -114,7 +123,7 @@ public:
 
 protected:
 
-    virtual int doMain(int, char*[], const Ice::InitializationData&);
+    virtual int doMain(int, char*[], const InitializationData&, Int);
 
     //
     // _mutex and _condVar are used to synchronize the main thread and
@@ -124,21 +133,23 @@ protected:
     static IceUtil::Cond _condVar;
 
     //
-    // Variables than can change while run() and communicator->destroy() are running!
+    // Variables than can change while run() and communicator->destroy()
+    //  are running!
     //
     static bool _callbackInProgress;
     static bool _destroyed;
     static bool _interrupted;
 
     //
-    // Variables that are immutable during run() and until communicator->destroy() has returned;
-    // before and after run(), and once communicator->destroy() has returned, we assume that
+    // Variables that are immutable during run() and until
+    // communicator->destroy() has returned, before and after run(), and
+    // once communicator->destroy() has returned, we assume that
     // only the main thread and CtrlCHandler threads are running.
     //
     static std::string _appName;
-    static Ice::CommunicatorPtr _communicator;
-    static Ice::SignalPolicy _signalPolicy;
-    static Ice::Application* _application;
+    static CommunicatorPtr _communicator;
+    static SignalPolicy _signalPolicy;
+    static Application* _application;
 
 private:
 
@@ -146,6 +157,15 @@ private:
     static void destroyOnInterruptCallback(int);
     static void shutdownOnInterruptCallback(int);
     static void callbackOnInterruptCallback(int);
+
+#ifndef ICE_CPP11_MAPPING
+    //
+    // Not defined, make Application non-copyable
+    //
+    Application(const Application&);
+    Application& operator=(const Application&);
+#endif
+
 };
 
 }

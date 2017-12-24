@@ -10,7 +10,7 @@
 #include <Glacier2/Application.h>
 #include <Ice/Ice.h>
 #include <IceUtil/IceUtil.h>
-#include <IceUtil/ArgVector.h>
+#include <Ice/ArgVector.h>
 
 using namespace std;
 using namespace Ice;
@@ -18,7 +18,6 @@ using namespace Ice;
 Ice::ObjectAdapterPtr Glacier2::Application::_adapter;
 Glacier2::RouterPrxPtr Glacier2::Application::_router;
 Glacier2::SessionPrxPtr Glacier2::Application::_session;
-bool Glacier2::Application::_createdSession = false;
 string Glacier2::Application::_category;
 
 namespace
@@ -59,13 +58,17 @@ Glacier2::RestartSessionException::ice_clone() const
 }
 #endif
 
+Glacier2::Application::Application(SignalPolicy signalPolicy) :
+    Ice::Application(signalPolicy)
+{
+}
+
 Ice::ObjectAdapterPtr
 Glacier2::Application::objectAdapter()
 {
     if(!_router)
     {
-        SessionNotExistException ex;
-        throw ex;
+        throw SessionNotExistException();
     }
 
     IceUtil::Mutex::Lock lock(_mutex);
@@ -92,19 +95,41 @@ Glacier2::Application::createCallbackIdentity(const string& name)
     return id;
 }
 
+void
+Glacier2::Application::sessionDestroyed()
+{
+}
+
+void
+Glacier2::Application::restart()
+{
+    throw RestartSessionException();
+}
+
+Glacier2::RouterPrxPtr
+Glacier2::Application::router()
+{
+    return _router;
+}
+
+Glacier2::SessionPrxPtr
+Glacier2::Application::session()
+{
+    return _session;
+}
+
 std::string
 Glacier2::Application::categoryForClient()
 {
     if(!_router)
     {
-        SessionNotExistException ex;
-        throw ex;
+        throw SessionNotExistException();
     }
     return _category;
 }
 
 int
-Glacier2::Application::doMain(int argc, char* argv[], const Ice::InitializationData& initData)
+Glacier2::Application::doMain(int argc, char* argv[], const Ice::InitializationData& initData, int version)
 {
     // Set the default properties for all Glacier2 applications.
     initData.properties->setProperty("Ice.RetryIntervals", "-1");
@@ -122,14 +147,14 @@ Glacier2::Application::doMain(int argc, char* argv[], const Ice::InitializationD
         id.properties = id.properties->clone();
         Ice::StringSeq args = Ice::argsToStringSeq(argc, argv);
 
-        restart = doMain(args, id, ret);
+        restart = doMain(args, id, ret, version);
     }
     while(restart);
     return ret;
 }
 
 bool
-Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationData& initData, int& status)
+Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationData& initData, int& status, int version)
 {
     //
     // Reset internal state variables from Ice.Application. The
@@ -140,11 +165,12 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
     _interrupted = false;
 
     bool restart = false;
+    bool sessionCreated = false;
     status = 0;
 
     try
     {
-        _communicator = Ice::initialize(args, initData);
+        _communicator = Ice::initialize(args, initData, version);
         _router = ICE_UNCHECKED_CAST(Glacier2::RouterPrx, communicator()->getDefaultRouter());
 
         if(!_router)
@@ -167,7 +193,7 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
             try
             {
                 _session = createSession();
-                _createdSession = true;
+                sessionCreated = true;
             }
             catch(const Ice::LocalException& ex)
             {
@@ -176,7 +202,7 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
                 status = 1;
             }
 
-            if(_createdSession)
+            if(sessionCreated)
             {
                 Ice::Int acmTimeout = 0;
                 try
@@ -197,11 +223,10 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
                     assert(connection);
                     connection->setACM(acmTimeout, IceUtil::None, ICE_ENUM(ACMHeartbeat, HeartbeatAlways));
 #ifdef ICE_CPP11_MAPPING
-                    auto app = this;
                     connection->setCloseCallback(
-                        [app](Ice::ConnectionPtr)
+                        [this](Ice::ConnectionPtr)
                         {
-                            app->sessionDestroyed();
+                            sessionDestroyed();
                         });
 #else
                     connection->setCloseCallback(ICE_MAKE_SHARED(CloseCallbackI, this));
@@ -209,7 +234,7 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
                 }
 
                 _category = _router->getCategoryForClient();
-                IceUtilInternal::ArgVector a(args);
+                IceInternal::ArgVector a(args);
                 status = runWithSession(a.argc, a.argv);
             }
         }
@@ -315,7 +340,7 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
         _application = 0;
     }
 
-    if(_createdSession && _router)
+    if(sessionCreated && _router)
     {
         try
         {
@@ -352,7 +377,6 @@ Glacier2::Application::doMain(Ice::StringSeq& args, const Ice::InitializationDat
     _adapter = 0;
     _router = 0;
     _session = 0;
-    _createdSession = false;
     _category.clear();
 
     return restart;

@@ -18,11 +18,11 @@ namespace IceInternal
     {
         void init(OutgoingAsyncBase og);
 
-        bool handleSent(bool done, bool alreadySent);
-        bool handleException(Ice.Exception ex);
-        bool handleResponse(bool ok, OutgoingAsyncBase og);
+        bool handleSent(bool done, bool alreadySent, OutgoingAsyncBase og);
+        bool handleException(Ice.Exception ex, OutgoingAsyncBase og);
+        bool handleResponse(bool userThread, bool ok, OutgoingAsyncBase og);
 
-        void handleInvokeSent(bool sentSynchronously, OutgoingAsyncBase og);
+        void handleInvokeSent(bool sentSynchronously, bool done, bool alreadySent, OutgoingAsyncBase og);
         void handleInvokeException(Ice.Exception ex, OutgoingAsyncBase og);
         void handleInvokeResponse(bool ok, OutgoingAsyncBase og);
     }
@@ -83,7 +83,7 @@ namespace IceInternal
         {
             try
             {
-                _completionCallback.handleInvokeSent(sentSynchronously_, this);
+                _completionCallback.handleInvokeSent(sentSynchronously_, _doneInSent, _alreadySent, this);
             }
             catch(System.Exception ex)
             {
@@ -137,7 +137,7 @@ namespace IceInternal
                 }
                 catch(Ice.Exception ex)
                 {
-                    if(_completionCallback.handleException(ex))
+                    if(_completionCallback.handleException(ex, this))
                     {
                         _completionCallback.handleInvokeException(ex, this);
                     }
@@ -219,12 +219,17 @@ namespace IceInternal
             return is_;
         }
 
+        public virtual void throwUserException()
+        {
+        }
+
         public virtual void cacheMessageBuffers()
         {
         }
 
-        public virtual void throwUserException()
+        public bool isSynchronous()
         {
+            return synchronous_;
         }
 
         protected OutgoingAsyncBase(Instance instance, OutgoingAsyncCompletionCallback completionCallback,
@@ -232,7 +237,9 @@ namespace IceInternal
         {
             instance_ = instance;
             sentSynchronously_ = false;
+            synchronous_ = false;
             _doneInSent = false;
+            _alreadySent = false;
             state_ = 0;
             os_ = os ?? new Ice.OutputStream(instance, Ice.Util.currentProtocolEncoding);
             is_ = iss ?? new Ice.InputStream(instance, Ice.Util.currentProtocolEncoding);
@@ -247,7 +254,7 @@ namespace IceInternal
         {
             lock(this)
             {
-                bool alreadySent = (state_ & StateSent) > 0;
+                _alreadySent = (state_ & StateSent) > 0;
                 state_ |= StateSent;
                 if(done)
                 {
@@ -269,7 +276,7 @@ namespace IceInternal
                     cacheMessageBuffers();
                 }
 
-                bool invoke = _completionCallback.handleSent(done, alreadySent);
+                bool invoke = _completionCallback.handleSent(done, _alreadySent, this);
                 if(!invoke && _doneInSent && observer_ != null)
                 {
                     observer_.detach();
@@ -296,7 +303,7 @@ namespace IceInternal
                 {
                     observer_.failed(ex.ice_id());
                 }
-                bool invoke = _completionCallback.handleException(ex);
+                bool invoke = _completionCallback.handleException(ex, this);
                 if(!invoke && observer_ != null)
                 {
                     observer_.detach();
@@ -305,7 +312,7 @@ namespace IceInternal
                 return invoke;
             }
         }
-        protected virtual bool responseImpl(bool ok)
+        protected virtual bool responseImpl(bool userThread, bool ok, bool invoke)
         {
             lock(this)
             {
@@ -316,15 +323,14 @@ namespace IceInternal
 
                 _cancellationHandler = null;
 
-                bool invoke;
                 try
                 {
-                    invoke = _completionCallback.handleResponse(ok, this);
+                    invoke &= _completionCallback.handleResponse(userThread, ok, this);
                 }
                 catch(Ice.Exception ex)
                 {
                     _ex = ex;
-                    invoke = _completionCallback.handleException(ex);
+                    invoke = _completionCallback.handleException(ex, this);
                 }
                 if(!invoke && observer_ != null)
                 {
@@ -377,6 +383,7 @@ namespace IceInternal
         protected Instance instance_;
         protected Ice.Connection cachedConnection_;
         protected bool sentSynchronously_;
+        protected bool synchronous_;
         protected int state_;
 
         protected Ice.Instrumentation.InvocationObserver observer_;
@@ -386,6 +393,7 @@ namespace IceInternal
         protected Ice.InputStream is_;
 
         private bool _doneInSent;
+        private bool _alreadySent;
         private Ice.Exception _ex;
         private Ice.LocalException _cancellationException;
         private CancellationHandler _cancellationHandler;
@@ -623,13 +631,13 @@ namespace IceInternal
             return base.exceptionImpl(ex);
         }
 
-        protected override bool responseImpl(bool ok)
+        protected override bool responseImpl(bool userThread, bool ok, bool invoke)
         {
             if(proxy_.iceReference().getInvocationTimeout() != -1)
             {
                 instance_.timer().cancel(this);
             }
-            return base.responseImpl(ok);
+            return base.responseImpl(userThread, ok, invoke);
         }
 
         public void runTimerTask()
@@ -665,13 +673,11 @@ namespace IceInternal
             synchronous_ = false;
         }
 
-        public void prepare(string operation, Ice.OperationMode mode, Dictionary<string, string> context,
-                            bool synchronous)
+        public void prepare(string operation, Ice.OperationMode mode, Dictionary<string, string> context)
         {
             Protocol.checkSupportedProtocol(Protocol.getCompatibleProtocol(proxy_.iceReference().getProtocol()));
 
             mode_ = mode;
-            synchronous_ = synchronous;
 
             observer_ = ObserverHelper.get(proxy_, operation, context);
 
@@ -887,7 +893,7 @@ namespace IceInternal
                     }
                 }
 
-                return responseImpl(replyStatus == ReplyStatus.replyOK);
+                return responseImpl(false, replyStatus == ReplyStatus.replyOK, true);
             }
             catch(Ice.Exception ex)
             {
@@ -928,15 +934,16 @@ namespace IceInternal
             base.abort(ex);
         }
 
-        public void invoke(string operation)
+        protected void invoke(string operation, bool synchronous)
         {
+            synchronous_ = synchronous;
             Reference.Mode mode = proxy_.iceReference().getMode();
             if(mode == Reference.Mode.ModeBatchOneway || mode == Reference.Mode.ModeBatchDatagram)
             {
                 sentSynchronously_ = true;
                 proxy_.iceGetBatchRequestQueue().finishBatchRequest(os_, proxy_, operation);
-                responseImpl(true);
-                return; // Don't call sent/completed callback for batch AMI requests
+                responseImpl(true, true, false); // Don't call sent/completed callback for batch AMI requests
+                return;
             }
 
             //
@@ -956,7 +963,7 @@ namespace IceInternal
         {
             try
             {
-                prepare(operation, mode, context, synchronous);
+                prepare(operation, mode, context);
                 if(write != null)
                 {
                     os_.startEncapsulation(encoding_, format);
@@ -967,7 +974,7 @@ namespace IceInternal
                 {
                     os_.writeEmptyEncapsulation(encoding_);
                 }
-                invoke(operation);
+                invoke(operation, synchronous);
             }
             catch(Ice.Exception ex)
             {
@@ -1021,7 +1028,6 @@ namespace IceInternal
 
         protected readonly Ice.EncodingVersion encoding_;
         protected System.Action<Ice.UserException> userException_;
-        protected bool synchronous_;
     }
 
     public class OutgoingAsyncT<T> : OutgoingAsync
@@ -1136,9 +1142,10 @@ namespace IceInternal
             return handler.invokeAsyncRequest(this, _batchRequestNum, false);
         }
 
-        public void invoke(string operation)
+        public void invoke(string operation, bool synchronous)
         {
             Protocol.checkSupportedProtocol(Protocol.getCompatibleProtocol(proxy_.iceReference().getProtocol()));
+            synchronous_ = synchronous;
             observer_ = ObserverHelper.get(proxy_, operation, null);
             bool compress; // Not used for proxy flush batch requests.
             _batchRequestNum = proxy_.iceGetBatchRequestQueue().swap(os_, out compress);
@@ -1161,7 +1168,7 @@ namespace IceInternal
         public override int invokeRemote(Ice.ConnectionI connection, bool compress, bool response)
         {
             cachedConnection_ = connection;
-            if(responseImpl(true))
+            if(responseImpl(false, true, true))
             {
                 invokeResponseAsync();
             }
@@ -1170,7 +1177,7 @@ namespace IceInternal
 
         public override int invokeCollocated(CollocatedRequestHandler handler)
         {
-            if(responseImpl(true))
+            if(responseImpl(false, true, true))
             {
                 invokeResponseAsync();
             }
@@ -1182,8 +1189,9 @@ namespace IceInternal
             return cachedConnection_;
         }
 
-        public void invoke(string operation)
+        public void invoke(string operation, bool synchronous)
         {
+            synchronous_ = synchronous;
             observer_ = ObserverHelper.get(proxy_, operation, null);
             invokeImpl(true); // userThread = true
         }
@@ -1199,8 +1207,9 @@ namespace IceInternal
             _connection = connection;
         }
 
-        public void invoke(string operation, Ice.CompressBatch compressBatch)
+        public void invoke(string operation, Ice.CompressBatch compressBatch, bool synchronous)
         {
+            synchronous_ = synchronous;
             observer_ = ObserverHelper.get(instance_, operation);
             try
             {
@@ -1367,8 +1376,9 @@ namespace IceInternal
             }
         }
 
-        public void invoke(string operation, Ice.CompressBatch compressBatch)
+        public void invoke(string operation, Ice.CompressBatch compressBatch, bool synchronous)
         {
+            synchronous_ = synchronous;
             _observer = ObserverHelper.get(instance_, operation);
             if(_observer != null)
             {
@@ -1412,7 +1422,7 @@ namespace IceInternal
     {
         public TaskCompletionCallback(System.IProgress<bool> progress, CancellationToken cancellationToken)
         {
-            _progress = progress;
+            progress_ = progress;
             _cancellationToken = cancellationToken;
         }
 
@@ -1424,40 +1434,76 @@ namespace IceInternal
             }
         }
 
-        public virtual bool handleSent(bool done, bool alreadySent)
+        public bool handleSent(bool done, bool alreadySent, OutgoingAsyncBase og)
         {
+            if(done && og.isSynchronous())
+            {
+                Debug.Assert(progress_ == null);
+                handleInvokeSent(false, done, alreadySent, og);
+                return false;
+            }
+            return done || progress_ != null && !alreadySent; // Invoke the sent callback only if not already invoked.
+        }
+
+        public bool handleException(Ice.Exception ex, OutgoingAsyncBase og)
+        {
+            //
+            // If this is a synchronous call, we can notify the task from this thread to avoid
+            // the thread context switch. We know there aren't any continuations setup with the
+            // task.
+            //
+            if(og.isSynchronous())
+            {
+                handleInvokeException(ex, og);
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        public bool handleResponse(bool userThread, bool ok, OutgoingAsyncBase og)
+        {
+            //
+            // If called from the user thread (only the case for batch requests) or if this
+            // is a synchronous call, we can notify the task from this thread to avoid the
+            // thread context switch. We know there aren't any continuations setup with the
+            // task.
+            //
+            if(userThread || og.isSynchronous())
+            {
+                handleInvokeResponse(ok, og);
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        public virtual void handleInvokeSent(bool sentSynchronously, bool done, bool alreadySent, OutgoingAsyncBase og)
+        {
+            if(progress_ != null && !alreadySent)
+            {
+               progress_.Report(sentSynchronously);
+            }
             if(done)
             {
                 SetResult(default(T));
             }
-            return _progress != null && !alreadySent; // Invoke the sent callback only if not already invoked.
-        }
-
-        public bool handleException(Ice.Exception ex)
-        {
-            SetException(ex);
-            return false;
-        }
-
-        public abstract bool handleResponse(bool ok, OutgoingAsyncBase og);
-
-        public void handleInvokeSent(bool sentSynchronously, OutgoingAsyncBase og)
-        {
-            _progress.Report(sentSynchronously);
         }
 
         public void handleInvokeException(Ice.Exception ex, OutgoingAsyncBase og)
         {
-            Debug.Assert(false);
+            SetException(ex);
         }
 
-        public void handleInvokeResponse(bool ok, OutgoingAsyncBase og)
-        {
-            Debug.Assert(false);
-        }
+        abstract public void handleInvokeResponse(bool ok, OutgoingAsyncBase og);
 
         private readonly CancellationToken _cancellationToken;
-        private readonly System.IProgress<bool> _progress;
+
+        protected readonly System.IProgress<bool> progress_;
     }
 
     public class OperationTaskCompletionCallback<T> : TaskCompletionCallback<T>
@@ -1467,24 +1513,23 @@ namespace IceInternal
         {
         }
 
-        public override bool handleResponse(bool ok, OutgoingAsyncBase og)
+        public override void handleInvokeResponse(bool ok, OutgoingAsyncBase og)
         {
             SetResult(((OutgoingAsyncT<T>)og).getResult(ok));
-            return false;
         }
     }
 
     public class FlushBatchTaskCompletionCallback : TaskCompletionCallback<object>
     {
-        public FlushBatchTaskCompletionCallback(System.IProgress<bool> progress, CancellationToken cancellationToken) :
+        public FlushBatchTaskCompletionCallback(System.IProgress<bool> progress = null,
+                                                CancellationToken cancellationToken = new CancellationToken()) :
             base(progress, cancellationToken)
         {
         }
 
-        public override bool handleResponse(bool ok, OutgoingAsyncBase og)
+        public override void handleInvokeResponse(bool ok, OutgoingAsyncBase og)
         {
             SetResult(null);
-            return false;
         }
     }
 
@@ -1501,7 +1546,7 @@ namespace IceInternal
             outgoing_ = outgoing;
         }
 
-        public bool handleSent(bool done, bool alreadySent)
+        public bool handleSent(bool done, bool alreadySent, OutgoingAsyncBase og)
         {
             lock(this)
             {
@@ -1523,7 +1568,7 @@ namespace IceInternal
             }
         }
 
-        public bool handleException(Ice.Exception ex)
+        public bool handleException(Ice.Exception ex, OutgoingAsyncBase og)
         {
             lock(this)
             {
@@ -1538,7 +1583,7 @@ namespace IceInternal
             }
         }
 
-        public bool handleResponse(bool ok, OutgoingAsyncBase og)
+        public bool handleResponse(bool userThread, bool ok, OutgoingAsyncBase og)
         {
             lock(this)
             {
@@ -1556,7 +1601,7 @@ namespace IceInternal
             }
         }
 
-        public void handleInvokeSent(bool sentSynchronously, OutgoingAsyncBase og)
+        public void handleInvokeSent(bool sentSynchronously, bool done, bool alreadySent, OutgoingAsyncBase og)
         {
             sentCallback_(this);
         }

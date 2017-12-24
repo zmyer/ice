@@ -17,7 +17,7 @@ import Test
 def usage(n):
     sys.stderr.write("Usage: " + n + " port\n")
 
-class TestI(Test._TestIntfDisp):
+class TestI(Test.TestIntf):
     def shutdown(self, current=None):
         current.adapter.getCommunicator().shutdown()
 
@@ -50,7 +50,7 @@ def run(args, communicator):
         usage(args[0])
         return False
 
-    endpts = "default -p " + str(port) + ":udp"
+    endpts = "default -p " + str(port)
     communicator.getProperties().setProperty("TestAdapter.Endpoints", endpts)
     adapter = communicator.createObjectAdapter("TestAdapter")
     object = TestI()

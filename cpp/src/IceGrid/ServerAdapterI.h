@@ -24,13 +24,13 @@ class ServerI;
 class ServerAdapterI : public Adapter, public IceUtil::Mutex
 {
 public:
-    
+
     ServerAdapterI(const NodeIPtr&, ServerI*, const std::string&, const AdapterPrx&, const std::string&, bool);
     virtual ~ServerAdapterI();
 
     virtual void activate_async(const AMD_Adapter_activatePtr& cb, const Ice::Current&);
-    virtual Ice::ObjectPrx getDirectProxy(const Ice::Current& = Ice::noExplicitCurrent) const;
-    virtual void setDirectProxy(const ::Ice::ObjectPrx&, const ::Ice::Current& = Ice::noExplicitCurrent);
+    virtual Ice::ObjectPrx getDirectProxy(const Ice::Current&) const;
+    virtual void setDirectProxy(const ::Ice::ObjectPrx&, const ::Ice::Current&);
     void destroy();
     void updateEnabled();
     void clear();

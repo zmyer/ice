@@ -1513,7 +1513,6 @@ adapterSetLocator(ObjectAdapterObject* self, PyObject* args)
     return Py_None;
 }
 
-
 #ifdef WIN32
 extern "C"
 #endif
@@ -1675,7 +1674,6 @@ adapterSetPublishedEndpoints(ObjectAdapterObject* self, PyObject* args)
     Py_INCREF(Py_None);
     return Py_None;
 }
-
 
 static PyMethodDef AdapterMethods[] =
 {
@@ -1878,7 +1876,7 @@ IcePy::unwrapObjectAdapter(PyObject* obj)
 #endif
     assert(wrapperType);
     assert(PyObject_IsInstance(obj, wrapperType));
-    PyObjectHandle impl = PyObject_GetAttrString(obj, STRCAST("_impl"));
+    PyObjectHandle impl = getAttr(obj, "_impl", false);
     assert(impl.get());
     return getObjectAdapter(impl.get());
 }

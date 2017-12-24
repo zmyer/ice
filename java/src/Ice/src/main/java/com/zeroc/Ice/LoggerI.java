@@ -108,7 +108,6 @@ public class LoggerI implements Logger
         write(s, true);
     }
 
-    
     @Override
     public String
     getPrefix()
@@ -146,6 +145,21 @@ public class LoggerI implements Logger
             try
             {
                 _out.write(message.toString().getBytes());
+            }
+            catch(java.io.IOException ex)
+            {
+            }
+        }
+    }
+
+    public void
+    destroy()
+    {
+        if(_file.length() > 0)
+        {
+            try
+            {
+                _out.close();
             }
             catch(java.io.IOException ex)
             {

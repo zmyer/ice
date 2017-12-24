@@ -10,8 +10,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Test;
-
 
 class LoggerI : Ice.Logger
 {
@@ -122,7 +122,7 @@ abstract class TestCase
         Ice.InitializationData initData = new Ice.InitializationData();
         initData.properties = _com.ice_getCommunicator().getProperties().ice_clone_();
         initData.logger = _logger;
-        initData.properties.setProperty("Ice.ACM.Timeout", "1");
+        initData.properties.setProperty("Ice.ACM.Timeout", "2");
         if(_clientACMTimeout >= 0)
         {
             initData.properties.setProperty("Ice.ACM.Client.Timeout", _clientACMTimeout.ToString());
@@ -207,10 +207,10 @@ abstract class TestCase
             long now = IceInternal.Time.currentMonotonicTimeMillis();
             while(!_closed)
             {
-                Monitor.Wait(this, 1000);
-                if(IceInternal.Time.currentMonotonicTimeMillis() - now > 1000)
+                Monitor.Wait(this, 2000);
+                if(IceInternal.Time.currentMonotonicTimeMillis() - now > 2000)
                 {
-                    System.Diagnostics.Debug.Assert(false); // Waited for more than 1s for close, something's wrong.
+                    System.Diagnostics.Debug.Assert(false); // Waited for more than 2s for close, something's wrong.
                     throw new System.Exception();
                 }
             }
@@ -259,15 +259,16 @@ public class AllTests : TestCommon.AllTests
     {
         public InvocationHeartbeatTest(RemoteCommunicatorPrx com) : base("invocation heartbeat", com)
         {
+            setServerACM(1, -1, -1); // Faster ACM to make sure we receive enough ACM heartbeats
         }
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
-            proxy.sleep(2);
+            proxy.sleep(4);
 
             lock(this)
             {
-                test(_heartbeat >= 2);
+                test(_heartbeat >= 6);
             }
         }
     }
@@ -304,7 +305,7 @@ public class AllTests : TestCommon.AllTests
     {
         public InvocationNoHeartbeatTest(RemoteCommunicatorPrx com) : base("invocation with no heartbeat", com)
         {
-            setServerACM(1, 2, 0); // Disable heartbeat on invocations
+            setServerACM(2, 2, 0); // Disable heartbeat on invocations
         }
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
@@ -343,7 +344,7 @@ public class AllTests : TestCommon.AllTests
         {
             // No close on invocation, the call should succeed this
             // time.
-            proxy.sleep(2);
+            proxy.sleep(3);
 
             lock(this)
             {
@@ -362,7 +363,7 @@ public class AllTests : TestCommon.AllTests
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
-            Thread.Sleep(1500); // Idle for 1.5 second
+            Thread.Sleep(3000); // Idle for 3 seconds
 
             waitForClosed();
             lock(this)
@@ -381,7 +382,7 @@ public class AllTests : TestCommon.AllTests
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
-            Thread.Sleep(1500); // Idle for 1.5 second
+            Thread.Sleep(3000); // Idle for 3 seconds
 
             lock(this)
             {
@@ -406,7 +407,7 @@ public class AllTests : TestCommon.AllTests
             // the close is graceful or forceful.
             //
             adapter.hold();
-            Thread.Sleep(1500); // Idle for 1.5 second
+            Thread.Sleep(3000); // Idle for 3 seconds
 
             lock(this)
             {
@@ -415,7 +416,7 @@ public class AllTests : TestCommon.AllTests
             }
 
             adapter.activate();
-            Thread.Sleep(500);
+            Thread.Sleep(1000);
 
             waitForClosed();
         }
@@ -432,7 +433,7 @@ public class AllTests : TestCommon.AllTests
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
             adapter.hold();
-            Thread.Sleep(1500); // Idle for 1.5 second
+            Thread.Sleep(3000); // Idle for 3 seconds
 
             waitForClosed();
             lock(this)
@@ -451,7 +452,7 @@ public class AllTests : TestCommon.AllTests
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
-            Thread.Sleep(2000);
+            Thread.Sleep(3000);
 
             lock(this)
             {
@@ -469,10 +470,10 @@ public class AllTests : TestCommon.AllTests
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
-            for(int i = 0; i < 12; i++)
+            for(int i = 0; i < 10; i++)
             {
                 proxy.ice_ping();
-                Thread.Sleep(200);
+                Thread.Sleep(300);
             }
 
             lock(this)
@@ -515,28 +516,51 @@ public class AllTests : TestCommon.AllTests
 
         public override void runTestCase(RemoteObjectAdapterPrx adapter, TestIntfPrx proxy)
         {
+            Ice.Connection con = proxy.ice_getCachedConnection();
+
             Ice.ACM acm;
-            acm = proxy.ice_getCachedConnection().getACM();
+            acm = con.getACM();
             test(acm.timeout == 15);
             test(acm.close == Ice.ACMClose.CloseOnIdleForceful);
             test(acm.heartbeat == Ice.ACMHeartbeat.HeartbeatOff);
 
-            proxy.ice_getCachedConnection().setACM(Ice.Util.None, Ice.Util.None, Ice.Util.None);
-            acm = proxy.ice_getCachedConnection().getACM();
+            con.setACM(Ice.Util.None, Ice.Util.None, Ice.Util.None);
+            acm = con.getACM();
             test(acm.timeout == 15);
             test(acm.close == Ice.ACMClose.CloseOnIdleForceful);
             test(acm.heartbeat == Ice.ACMHeartbeat.HeartbeatOff);
 
-            proxy.ice_getCachedConnection().setACM(1,
+            con.setACM(1,
                                                    Ice.ACMClose.CloseOnInvocationAndIdle,
                                                    Ice.ACMHeartbeat.HeartbeatAlways);
-            acm = proxy.ice_getCachedConnection().getACM();
+            acm = con.getACM();
             test(acm.timeout == 1);
             test(acm.close == Ice.ACMClose.CloseOnInvocationAndIdle);
             test(acm.heartbeat == Ice.ACMHeartbeat.HeartbeatAlways);
 
             proxy.startHeartbeatCount();
             proxy.waitForHeartbeatCount(2);
+
+            var t1 = new TaskCompletionSource<object>();
+            con.setCloseCallback(_ => { t1.SetResult(null); });
+
+            con.close(Ice.ConnectionClose.Gracefully);
+            test(t1.Task.Result == null);
+
+            try
+            {
+                con.throwException();
+                test(false);
+            }
+            catch(Ice.ConnectionManuallyClosedException)
+            {
+            }
+
+            var t2 = new TaskCompletionSource<object>();
+            con.setCloseCallback(_ => { t2.SetResult(null); });
+            test(t2.Task.Result == null);
+
+            con.setHeartbeatCallback(_ => { test(false); });
         }
     }
 

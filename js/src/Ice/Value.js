@@ -31,6 +31,11 @@ Ice.Value = class
     {
     }
 
+    ice_getSlicedData()
+    {
+        return null;
+    }
+
     _iceWrite(os)
     {
         os.startValue(null);
@@ -172,36 +177,35 @@ function readPreserved(is)
     is.startValue();
     readImpl(this, is, this._iceMostDerivedType());
     this._iceSlicedData = is.endValue(true);
-};
+}
 
+function ice_getSlicedData()
+{
+    return this._iceSlicedData;
+}
 
 const Slice = Ice.Slice;
-
-Slice.PreservedObject = function(obj)
-{
-    obj.prototype._iceWrite = writePreserved;
-    obj.prototype._iceRead = readPreserved;
-};
 
 Slice.defineValue = function(valueType, id, preserved, compactId = 0)
 {
     valueType.prototype.ice_id = function()
     {
         return id;
-    }
+    };
 
     valueType.prototype._iceMostDerivedType = function()
     {
         return valueType;
-    }
+    };
 
     valueType.ice_staticId = function()
     {
         return id;
-    }
+    };
 
     if(preserved)
     {
+        valueType.prototype.ice_getSlicedData = ice_getSlicedData;
         valueType.prototype._iceWrite = writePreserved;
         valueType.prototype._iceRead = readPreserved;
     }
@@ -210,7 +214,7 @@ Slice.defineValue = function(valueType, id, preserved, compactId = 0)
     {
         Ice.CompactIdRegistry.set(compactId, id);
     }
-}
+};
 Slice.defineValue(Ice.Value, "::Ice::Object");
 
 module.exports.Ice = Ice;

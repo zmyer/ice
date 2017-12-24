@@ -134,20 +134,22 @@ allTests(const CommunicatorPtr& communicator)
 
     cout << "ok" << endl;
 
-    string endpoint;
+    ostringstream endpoint;
     if(communicator->getProperties()->getProperty("Ice.IPv6") == "1")
     {
-#ifdef __APPLE__
-        endpoint = "udp -h \"ff15::1:1\" -p 12020 --interface \"::1\"";
-#else
-        endpoint = "udp -h \"ff15::1:1\" -p 12020";
+        endpoint << "udp -h \"ff15::1:1\" -p " << getTestPort(communicator->getProperties(), 10);
+#if defined(__APPLE__) || defined(_WIN32)
+        endpoint << " --interface \"::1\""; // Use loopback to prevent other machines to answer. the multicast requests.
 #endif
     }
     else
     {
-        endpoint = "udp -h 239.255.1.1 -p 12020";
+        endpoint << "udp -h 239.255.1.1 -p " << getTestPort(communicator->getProperties(), 10);
+#if defined(__APPLE__) || defined(_WIN32)
+        endpoint << " --interface 127.0.0.1"; // Use loopback to prevent other machines to answer.
+#endif
     }
-    base = communicator->stringToProxy("test -d:" + endpoint);
+    base = communicator->stringToProxy("test -d:" + endpoint.str());
     TestIntfPrxPtr objMcast = ICE_UNCHECKED_CAST(TestIntfPrx, base);
 #if (!defined(__APPLE__) || (defined(__APPLE__) && !TARGET_OS_IPHONE))
     cout << "testing udp multicast... " << flush;
@@ -201,7 +203,7 @@ allTests(const CommunicatorPtr& communicator)
 
     //
     // Sending the replies back on the multicast UDP connection doesn't work for most
-    // platform (it works for OS X Leopard but not Snow Leopard, doesn't work on SLES,
+    // platform (it works for macOS Leopard but not Snow Leopard, doesn't work on SLES,
     // Windows...). For Windows, see UdpTransceiver constructor for the details. So
     // we don't run this test.
     //

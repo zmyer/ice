@@ -9,7 +9,7 @@
 
 #pragma once
 
-[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICEPATCH2_API", "objc:header-dir:objc"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICEPATCH2_API", "objc:header-dir:objc", "python:pkgdir:IcePatch2"]]
 [["cpp:include:IcePatch2/Config.h"]]
 
 #include <IcePatch2/FileInfo.ice>
@@ -44,7 +44,7 @@ sequence<Ice::ByteSeq> ByteSeqSeq;
  **/
 exception PartitionOutOfRangeException
 {
-};
+}
 
 /**
  *
@@ -59,7 +59,7 @@ exception FileAccessException
      *
      **/
     string reason;
-};
+}
 
 /**
  *
@@ -69,7 +69,7 @@ exception FileAccessException
  **/
 exception FileSizeRangeException extends FileAccessException
 {
-};
+}
 
 /**
  *
@@ -81,7 +81,7 @@ interface FileServer
     /**
      *
      * Return file information for the specified partition.
-     * 
+     *
      * <p class="Deprecated"> This operation is deprecated and only present for
      * compatibility with old Ice clients (older than version 3.6).
      *
@@ -96,7 +96,7 @@ interface FileServer
     ["deprecate:getFileInfoSeq() is deprecated, use getLargeFileInfoSeq() instead.",
      "nonmutating", "cpp:const"] idempotent FileInfoSeq getFileInfoSeq(int partition)
         throws PartitionOutOfRangeException, FileSizeRangeException;
-        
+
     /**
      *
      * Returns file information for the specified partition.
@@ -156,10 +156,10 @@ interface FileServer
      *
      **/
     ["deprecate:getFileCompressed() is deprecated, use getLargeFileCompressed() instead.",
-     "amd", "nonmutating", "cpp:const", "cpp:array"] 
+     "amd", "nonmutating", "cpp:const", "cpp:array"]
     idempotent Ice::ByteSeq getFileCompressed(string path, int pos, int num)
         throws FileAccessException, FileSizeRangeException;
-        
+
     /**
      *
      * Read the specified file. This operation may only return fewer bytes than requested
@@ -177,9 +177,9 @@ interface FileServer
      * @throws FileAccessException If an error occurred while trying to read the file.
      *
      **/
-    ["amd", "nonmutating", "cpp:const", "cpp:array"] 
+    ["amd", "nonmutating", "cpp:const", "cpp:array"]
     idempotent Ice::ByteSeq getLargeFileCompressed(string path, long pos, int num)
         throws FileAccessException;
-};
+}
 
-};
+}

@@ -9,57 +9,48 @@
 
 (function(module, require, exports)
 {
-    var Ice = require("ice").Ice;
-    var Test = require("Test").Test;
-    var Class = Ice.Class;
+    const Ice = require("ice").Ice;
+    const Test = require("Test").Test;
 
-    var test = function(b)
+    function test(value)
     {
-        if(!b)
+        if(!value)
         {
             throw new Error("test failed");
         }
-    };
+    }
 
-    class AMDThrowerI extends Test._ThrowerDisp
+    class AMDThrowerI extends Test.Thrower
     {
-        shutdown(current)
+        async shutdown(current)
         {
             current.adapter.getCommunicator().shutdown();
-            return Promise.resolve();
         }
 
-        supportsUndeclaredExceptions(current)
+        async supportsUndeclaredExceptions(current)
         {
-            return Promise.resolve(true);
+            return true;
         }
 
-        supportsAssertException(current)
+        async supportsAssertException(current)
         {
-            return Promise.resolve(false);
+            return false;
         }
 
-        throwAasA(a, current)
+        async throwAasA(a, current)
         {
-            var ex = new Test.A();
-            ex.aMem = a;
-            return Promise.reject(ex);
+            throw new Test.A(a);
         }
 
-        throwAorDasAorD(a, current)
+        async throwAorDasAorD(a, current)
         {
-            var ex;
             if(a > 0)
             {
-                ex = new Test.A();
-                ex.aMem = a;
-                return Promise.reject(ex);
+                throw new Test.A(a);
             }
             else
             {
-                ex = new Test.D();
-                ex.dMem = a;
-                return Promise.reject(ex);
+                throw new Test.D(a);
             }
         }
 
@@ -68,12 +59,9 @@
             return this.throwBasB(a, b, current);
         }
 
-        throwBasB(a, b, current)
+        async throwBasB(a, b, current)
         {
-            var ex = new Test.B();
-            ex.aMem = a;
-            ex.bMem = b;
-            return Promise.reject(ex);
+            throw new Test.B(a, b);
         }
 
         throwCasA(a, b, c, current)
@@ -86,73 +74,59 @@
             return this.throwCasC(a, b, c, current);
         }
 
-        throwCasC(a, b, c, current)
+        async throwCasC(a, b, c, current)
         {
-            var ex = new Test.C();
-            ex.aMem = a;
-            ex.bMem = b;
-            ex.cMem = c;
-            return Promise.reject(ex);
+            throw new Test.C(a, b, c);
         }
 
-        throwUndeclaredA(a, current)
+        async throwUndeclaredA(a, current)
         {
-            var ex = new Test.A();
-            ex.aMem = a;
-            return Promise.reject(ex);
+            throw new Test.A(a);
         }
 
-        throwUndeclaredB(a, b, current)
+        async throwUndeclaredB(a, b, current)
         {
-            var ex = new Test.B();
-            ex.aMem = a;
-            ex.bMem = b;
-            return Promise.reject(ex);
+            throw new Test.B(a, b);
         }
 
-        throwUndeclaredC(a, b, c, current)
+        async throwUndeclaredC(a, b, c, current)
         {
-            var ex = new Test.C();
-            ex.aMem = a;
-            ex.bMem = b;
-            ex.cMem = c;
-            return Promise.reject(ex);
+            throw new Test.C(a, b, c);
         }
 
-        throwLocalException(current)
+        async throwLocalException(current)
         {
-            return Promise.reject(new Ice.TimeoutException());
+            throw new Ice.TimeoutException();
         }
 
-        throwLocalExceptionIdempotent(current)
+        async throwLocalExceptionIdempotent(current)
         {
-            return Promise.reject(new Ice.TimeoutException());
+            throw new Ice.TimeoutException();
         }
 
-        throwNonIceException(current)
+        async throwNonIceException(current)
         {
-            return Promise.reject(new Error());
+            throw new Error();
         }
 
-        throwAssertException(current)
+        async throwAssertException(current)
         {
             test(false);
         }
 
-        throwMemoryLimitException(seq, current)
+        async throwMemoryLimitException(seq, current)
         {
-            return Promise.resolve(Ice.Buffer.createNative(1024 * 20)); // 20KB is over the configured 10KB message size max.
+            return new Uint8Array(1024 * 20); // 20KB is over the configured 10KB message size max.
         }
 
-        throwAfterResponse(current)
+        async throwAfterResponse(current)
         {
-            return Promise.resolve();
             //throw new Error();
         }
 
-        throwAfterException(current)
+        async throwAfterException(current)
         {
-            return Promise.reject(new Test.A());
+            throw new Test.A();
             //throw new Error();
         }
     }

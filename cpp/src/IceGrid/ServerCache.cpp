@@ -73,7 +73,6 @@ namespace IceGrid
         const ServerEntryPtr _entry;
     };
 
-
 }
 
 CheckUpdateResult::CheckUpdateResult(const string& server,
@@ -163,9 +162,7 @@ ServerCache::get(const string& id) const
     ServerEntryPtr entry = getImpl(id);
     if(!entry)
     {
-        ServerNotExistException ex;
-        ex.id = id;
-        throw ex;
+        throw ServerNotExistException(id);
     }
     return entry;
 }
@@ -1137,7 +1134,6 @@ ServerEntry::allocated(const SessionIPtr& session)
         _session = session;
         _load->sessionId = session->getId();
     }
-
 
     Glacier2::IdentitySetPrx identitySet = session->getGlacier2IdentitySet();
     Glacier2::StringSetPrx adapterIdSet = session->getGlacier2AdapterIdSet();

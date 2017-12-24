@@ -165,15 +165,39 @@ public final class IncomingConnectionFactory extends EventHandler implements Ice
                 }
             }
             _connections.clear();
-            _monitor.destroy();
+        }
+
+        //
+        // Must be destroyed outside the synchronization since this might block waiting for
+        // a timer task to complete.
+        //
+        _monitor.destroy();
+    }
+
+    public boolean
+    isLocal(EndpointI endpoint)
+    {
+        if(_publishedEndpoint != null && endpoint.equivalent(_publishedEndpoint))
+        {
+            return true;
+        }
+        synchronized(this)
+        {
+            return endpoint.equivalent(_endpoint);
         }
     }
 
     public EndpointI
     endpoint()
     {
-        // No mutex protection necessary, _endpoint is immutable.
-        return _endpoint;
+        if(_publishedEndpoint != null)
+        {
+            return _publishedEndpoint;
+        }
+        synchronized(this)
+        {
+            return _endpoint;
+        }
     }
 
     public synchronized java.util.LinkedList<Ice.ConnectionI>
@@ -420,10 +444,11 @@ public final class IncomingConnectionFactory extends EventHandler implements Ice
     }
 
     public
-    IncomingConnectionFactory(Instance instance, EndpointI endpoint, Ice.ObjectAdapterI adapter)
+    IncomingConnectionFactory(Instance instance, EndpointI endpoint, EndpointI publish, Ice.ObjectAdapterI adapter)
     {
         _instance = instance;
         _endpoint = endpoint;
+        _publishedEndpoint = publish;
         _adapter = adapter;
         _warn = _instance.initializationData().properties.getPropertyAsInt("Ice.Warn.Connections") > 0 ? true : false;
         _state = StateHolding;
@@ -504,6 +529,7 @@ public final class IncomingConnectionFactory extends EventHandler implements Ice
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void
     finalize()
@@ -718,6 +744,7 @@ public final class IncomingConnectionFactory extends EventHandler implements Ice
     private Acceptor _acceptor;
     private Transceiver _transceiver;
     private EndpointI _endpoint;
+    private final EndpointI _publishedEndpoint;
 
     private Ice.ObjectAdapterI _adapter;
 

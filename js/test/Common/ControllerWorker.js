@@ -9,71 +9,71 @@
 
 /* global
     self : false,
-    runTest : false
+    runTest : false,
+    _server : false,
+    _serveramd : false,
+    _test : false
 */
-var process = { argv : [] };
 
-let out =
+process = { argv : [] };
+
+class Output
 {
-    write: function(msg)
+    static write(message)
     {
-        self.postMessage({type:"write", message:msg});
-    },
-    writeLine: function(msg)
-    {
-        self.postMessage({type:"writeLine", message:msg});
+        self.postMessage({type:"write", message:message});
     }
-};
 
-self.onmessage = function(e)
-{
-    try
+    static writeLine(message)
     {
-        for(let script in e.data.scripts)
-        {
-            self.importScripts(e.data.scripts[script]);
-        }
+        self.postMessage({type:"writeLine", message:message});
+    }
+}
 
-        class Logger extends Ice.Logger
+self.onmessage = async (e) =>
+    {
+        try
         {
-            constructor(out)
+            for(let script of e.data.scripts)
             {
-                super()
-                this._out = out
+                self.importScripts(script);
             }
 
-            write(message, indent)
+            class Logger extends Ice.Logger
             {
-                if(indent)
+                write(message, indent)
                 {
-                    message = message.replace(/\n/g, "\n   ");
+                    if(indent)
+                    {
+                        message = message.replace(/\n/g, "\n   ");
+                    }
+                    Output.writeLine(message);
                 }
-                out.writeLine(message);
             }
-        }
 
-        let promise
-        let initData = new Ice.InitializationData();
-        initData.logger = new Logger(out);
-        initData.properties = Ice.createProperties(e.data.args);
-        process.argv = e.data.args;
-        if(e.data.exe === "ClientBidir")
-        {
-            promise = _testBidir(out, initData);
-        }
-        else
-        {
-            promise = _test(out, initData);
-        }
-        promise.then(function() {
+            let promise;
+            let initData = new Ice.InitializationData();
+            initData.properties = Ice.createProperties(e.data.args);
+            initData.logger = new Logger();
+            process.argv = e.data.args;
+            if(e.data.exe === "Server" || e.data.exe === "ServerAMD")
+            {
+                let ready = new Ice.Promise();
+                let test = e.data.exe === "Server" ? _server : _serveramd;
+                promise = test(Output, initData, ready);
+                await ready;
+                self.postMessage({type:"ready"});
+            }
+            else
+            {
+                promise = _test(Output, initData);
+            }
+
+            await promise;
             self.postMessage({ type: "finished" });
-        },
-        function(ex) {
+        }
+        catch(ex)
+        {
             self.postMessage({ type: "finished", exception:ex.toString() });
-        });
-    }
-    catch(ex)
-    {
-        self.postMessage({ type: "finished", exception:ex.toString() });
-    }
-};
+        }
+    };

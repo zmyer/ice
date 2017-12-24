@@ -17,9 +17,10 @@ module Test
 //
 interface Echo
 {
+    void setConnection();
     void startBatch();
     void flushBatch();
     void shutdown();
-};
+}
 
-};
+}

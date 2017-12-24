@@ -118,7 +118,6 @@ Ice::PropertiesI::getPropertyAsListWithDefault(const string& key, const StringSe
     }
 }
 
-
 PropertyDict
 Ice::PropertiesI::getPropertiesForPrefix(const string& prefix)
 {
@@ -309,9 +308,8 @@ Ice::PropertiesI::load(const std::string& file)
         LONG err;
         if((err = RegOpenKeyExW(HKEY_LOCAL_MACHINE, keyName.c_str(), 0, KEY_QUERY_VALUE, &iceKey)) != ERROR_SUCCESS)
         {
-            InitializationException ex(__FILE__, __LINE__);
-            ex.reason = "could not open Windows registry key `" + file + "':\n" + IceUtilInternal::errorToString(err);
-            throw ex;
+            throw InitializationException(__FILE__, __LINE__, "could not open Windows registry key `" + file + "':\n" +
+                                          IceUtilInternal::errorToString(err));
         }
 
         DWORD maxNameSize; // Size in characters not including terminating null character.
@@ -323,10 +321,8 @@ Ice::PropertiesI::load(const std::string& file)
                                   ICE_NULLPTR, ICE_NULLPTR);
             if(err != ERROR_SUCCESS)
             {
-                InitializationException ex(__FILE__, __LINE__);
-                ex.reason = "could not open Windows registry key `" + file + "':\n";
-                ex.reason += IceUtilInternal::errorToString(err);
-                throw ex;
+                throw InitializationException(__FILE__, __LINE__, "could not open Windows registry key `" + file + "':\n" +
+                                              IceUtilInternal::errorToString(err));
             }
 
             for(DWORD i = 0; i < numValues; ++i)
@@ -404,10 +400,7 @@ Ice::PropertiesI::load(const std::string& file)
         ifstream in(IceUtilInternal::streamFilename(file).c_str());
         if(!in)
         {
-            FileException ex(__FILE__, __LINE__);
-            ex.path = file;
-            ex.error = getSystemErrno();
-            throw ex;
+            throw FileException(__FILE__, __LINE__, getSystemErrno(), file);
         }
 
         string line;

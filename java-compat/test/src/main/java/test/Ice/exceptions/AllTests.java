@@ -1,5 +1,6 @@
 // **********************************************************************
 //
+// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.
 //
 // This copy of Ice is licensed to you under the terms described in the
 // ICE_LICENSE file included in this distribution.
@@ -737,7 +738,7 @@ public class AllTests
                 // Expected
             }
 
-            communicator.getProperties().setProperty("TestAdapter0.Endpoints", "default");
+            communicator.getProperties().setProperty("TestAdapter0.Endpoints", "tcp -h *");
             first = communicator.createObjectAdapter("TestAdapter0");
             try
             {
@@ -764,7 +765,7 @@ public class AllTests
 
         {
             out.print("testing servant registration exceptions... ");
-            communicator.getProperties().setProperty("TestAdapter1.Endpoints", "default");
+            communicator.getProperties().setProperty("TestAdapter1.Endpoints", "tcp -h *");
             Ice.ObjectAdapter adapter = communicator.createObjectAdapter("TestAdapter1");
             Ice.Object obj = new EmptyI();
             adapter.add(obj, Ice.Util.stringToIdentity("x"));
@@ -810,7 +811,7 @@ public class AllTests
 
         {
             out.print("testing servant locator registration exceptions... ");
-            communicator.getProperties().setProperty("TestAdapter2.Endpoints", "default");
+            communicator.getProperties().setProperty("TestAdapter2.Endpoints", "tcp -h *");
             Ice.ObjectAdapter adapter = communicator.createObjectAdapter("TestAdapter2");
             Ice.ServantLocator loc = new ServantLocatorI();
             adapter.addServantLocator(loc, "x");
@@ -1131,6 +1132,10 @@ public class AllTests
             catch(Ice.ConnectionLostException ex)
             {
             }
+            catch(Ice.UnknownLocalException ex)
+            {
+                // Expected with JS bidir server
+            }
             catch(Ice.SocketException ex)
             {
                 // This can be raised if the connection is closed during the client's call to write().
@@ -1141,24 +1146,31 @@ public class AllTests
                 test(false);
             }
 
-            ThrowerPrx thrower2 = ThrowerPrxHelper.uncheckedCast(
-                communicator.stringToProxy("thrower:" + app.getTestEndpoint(1)));
             try
             {
-                thrower2.throwMemoryLimitException(new byte[2 * 1024 * 1024]); // 2MB (no limits)
+                ThrowerPrx thrower2 = ThrowerPrxHelper.uncheckedCast(
+                    communicator.stringToProxy("thrower:" + app.getTestEndpoint(1)));
+                try
+                {
+                    thrower2.throwMemoryLimitException(new byte[2 * 1024 * 1024]); // 2MB (no limits)
+                }
+                catch(Ice.MemoryLimitException ex)
+                {
+                }
+                ThrowerPrx thrower3 = ThrowerPrxHelper.uncheckedCast(
+                    communicator.stringToProxy("thrower:" + app.getTestEndpoint(2)));
+                try
+                {
+                    thrower3.throwMemoryLimitException(new byte[1024]); // 1KB limit
+                    test(false);
+                }
+                catch(Ice.ConnectionLostException ex)
+                {
+                }
             }
-            catch(Ice.MemoryLimitException ex)
+            catch(Ice.ConnectionRefusedException ex)
             {
-            }
-            ThrowerPrx thrower3 = ThrowerPrxHelper.uncheckedCast(
-                communicator.stringToProxy("thrower:" + app.getTestEndpoint(2)));
-            try
-            {
-                thrower3.throwMemoryLimitException(new byte[1024]); // 1KB limit
-                test(false);
-            }
-            catch(Ice.ConnectionLostException ex)
-            {
+                // Expected with JS bidir server
             }
 
             out.println("ok");

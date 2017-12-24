@@ -883,7 +883,7 @@ CodeVisitor::visitStructStart(const StructPtr& p)
     {
         if(r != memberList.begin())
         {
-            _out << ", ";
+            _out << ",";
         }
         _out.inc();
         _out << nl << "array('" << r->fixedName << "', ";
@@ -1398,7 +1398,7 @@ CodeVisitor::writeConstructorParams(const MemberInfoList& members)
         }
         else if(member->optional())
         {
-            _out << "Ice_Unset";
+            _out << (_ns ? scopedToName("::Ice::None", _ns) : "Ice_Unset");
         }
         else
         {
@@ -1502,22 +1502,40 @@ generate(const UnitPtr& un, bool all, bool checksum, bool ns, const vector<strin
             {
                 out << "namespace"; // Global namespace.
                 out << sb;
-            }
-            for(ChecksumMap::const_iterator p = checksums.begin(); p != checksums.end(); ++p)
-            {
-                out << nl << "$Ice_sliceChecksums[\"" << p->first << "\"] = \"";
-                ostringstream str;
-                str.flags(ios_base::hex);
-                str.fill('0');
-                for(vector<unsigned char>::const_iterator q = p->second.begin(); q != p->second.end(); ++q)
+                out << "new Ice\\SliceChecksumInit(array(";
+                for(ChecksumMap::const_iterator p = checksums.begin(); p != checksums.end();)
                 {
-                    str << static_cast<int>(*q);
+                    out << nl << "\"" << p->first << "\" => \"";
+                    ostringstream str;
+                    str.flags(ios_base::hex);
+                    str.fill('0');
+                    for(vector<unsigned char>::const_iterator q = p->second.begin(); q != p->second.end(); ++q)
+                    {
+                        str << static_cast<int>(*q);
+                    }
+                    out << str.str() << "\"";
+                    if(++p != checksums.end())
+                    {
+                        out << ",";
+                    }
                 }
-                out << str.str() << "\";";
-            }
-            if(ns)
-            {
+                out << "));";
                 out << eb;
+            }
+            else
+            {
+                for(ChecksumMap::const_iterator p = checksums.begin(); p != checksums.end(); ++p)
+                {
+                    out << nl << "$Ice_sliceChecksums[\"" << p->first << "\"] = \"";
+                    ostringstream str;
+                    str.flags(ios_base::hex);
+                    str.fill('0');
+                    for(vector<unsigned char>::const_iterator q = p->second.begin(); q != p->second.end(); ++q)
+                    {
+                        str << static_cast<int>(*q);
+                    }
+                    out << str.str() << "\";";
+                }
             }
         }
     }
@@ -1531,7 +1549,7 @@ printHeader(IceUtilInternal::Output& out)
     static const char* header =
         "// **********************************************************************\n"
         "//\n"
-        "// Copyright (c) 2003-2016 ZeroC, Inc. All rights reserved.\n"
+        "// Copyright (c) 2003-2017 ZeroC, Inc. All rights reserved.\n"
         "//\n"
         "// This copy of Ice is licensed to you under the terms described in the\n"
         "// ICE_LICENSE file included in this distribution.\n"
@@ -1585,26 +1603,26 @@ usage(const string& n)
     consoleErr << "Usage: " << n << " [options] slice-files...\n";
     consoleErr <<
         "Options:\n"
-        "-h, --help           Show this message.\n"
-        "-v, --version        Display the Ice version.\n"
-        "--validate           Validate command line options.\n"
-        "-DNAME               Define NAME as 1.\n"
-        "-DNAME=DEF           Define NAME as DEF.\n"
-        "-UNAME               Remove any definition for NAME.\n"
-        "-IDIR                Put DIR in the include file search path.\n"
-        "-E                   Print preprocessor output on stdout.\n"
-        "--output-dir DIR     Create files in the directory DIR.\n"
-        "--depend             Generate Makefile dependencies.\n"
-        "--depend-xml         Generate dependencies in XML format.\n"
-        "--depend-file FILE   Write dependencies to FILE instead of standard output.\n"
-        "-d, --debug          Print debug messages.\n"
-        "--all                Generate code for Slice definitions in included files.\n"
-        "--checksum           Generate checksums for Slice definitions.\n"
-        "--no-namespace       Do not use PHP namespaces (deprecated).\n"
-        "--ice                Allow reserved Ice prefix in Slice identifiers\n"
-        "                     deprecated: use instead [[\"ice-prefix\"]] metadata.\n"
-        "--underscore         Allow underscores in Slice identifiers\n"
-        "                     deprecated: use instead [[\"underscore\"]] metadata.\n"
+        "-h, --help               Show this message.\n"
+        "-v, --version            Display the Ice version.\n"
+        "-DNAME                   Define NAME as 1.\n"
+        "-DNAME=DEF               Define NAME as DEF.\n"
+        "-UNAME                   Remove any definition for NAME.\n"
+        "-IDIR                    Put DIR in the include file search path.\n"
+        "-E                       Print preprocessor output on stdout.\n"
+        "--output-dir DIR         Create files in the directory DIR.\n"
+        "-d, --debug              Print debug messages.\n"
+        "--depend                 Generate Makefile dependencies.\n"
+        "--depend-xml             Generate dependencies in XML format.\n"
+        "--depend-file FILE       Write dependencies to FILE instead of standard output.\n"
+        "--validate               Validate command line options.\n"
+        "--all                    Generate code for Slice definitions in included files.\n"
+        "--no-namespace           Do not use PHP namespaces (deprecated).\n"
+        "--checksum               Generate checksums for Slice definitions.\n"
+        "--ice                    Allow reserved Ice prefix in Slice identifiers\n"
+        "                         deprecated: use instead [[\"ice-prefix\"]] metadata.\n"
+        "--underscore             Allow underscores in Slice identifiers\n"
+        "                         deprecated: use instead [[\"underscore\"]] metadata.\n"
         ;
 }
 

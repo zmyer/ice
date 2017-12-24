@@ -12,6 +12,10 @@
 #include <TestCommon.h>
 #include <Test.h>
 
+#if defined(ICE_USE_OPENSSL)
+#  include <IceSSL/OpenSSL.h>
+#endif
+
 DEFINE_TEST("client")
 
 using namespace std;
@@ -65,7 +69,13 @@ main(int argc, char* argv[])
     // don't set Ice.Plugin.IceSSL to ensure the plugin is registered without
     // the property setting.
     //
+#if !defined(ICE_USE_OPENSSL)
     Ice::registerIceSSL();
+#endif
+
+#ifdef ICE_STATIC_LIBS
+    Ice::registerIceWS(true);
+#endif
 
     int status;
     Ice::CommunicatorPtr communicator;

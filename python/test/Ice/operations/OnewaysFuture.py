@@ -21,21 +21,21 @@ def onewaysFuture(communicator, proxy):
     f.sent()
 
     try:
-        p.ice_isAAsync(Test._MyClassDisp.ice_staticId())
+        p.ice_isAAsync(Test.MyClass.ice_staticId())
         test(False)
-    except RuntimeError:
+    except Ice.TwowayOnlyException:
         pass
 
     try:
         p.ice_idAsync()
         test(False)
-    except RuntimeError:
+    except Ice.TwowayOnlyException:
         pass
 
     try:
         p.ice_idsAsync()
         test(False)
-    except RuntimeError:
+    except Ice.TwowayOnlyException:
         pass
 
     f = p.opVoidAsync()
@@ -50,5 +50,5 @@ def onewaysFuture(communicator, proxy):
     try:
         p.opByteAsync(0xff, 0x0f)
         test(False)
-    except RuntimeError:
+    except Ice.TwowayOnlyException:
         pass

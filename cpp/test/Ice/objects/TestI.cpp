@@ -104,6 +104,26 @@ InitialI::InitialI(const Ice::ObjectAdapterPtr& adapter) :
     _d->theA = _b1; // Reference to a B.
     _d->theB = _b2; // Reference to a B.
     _d->theC = 0; // Reference to a C.
+
+    _b1->postUnmarshalInvoked = false;
+    _b2->postUnmarshalInvoked = false;
+    _c->postUnmarshalInvoked = false;
+    _d->postUnmarshalInvoked = false;
+}
+
+InitialI::~InitialI()
+{
+#ifdef ICE_CPP11_MAPPING
+    // No GC with the C++11 mapping
+    _b1->theA = ICE_NULLPTR;
+    _b1->theB = ICE_NULLPTR;
+
+    _b2->theA = ICE_NULLPTR;
+    _b2->theB = ICE_NULLPTR;
+    _b2->theC = ICE_NULLPTR;
+
+    _c->theB = ICE_NULLPTR;
+#endif
 }
 
 void
@@ -159,6 +179,17 @@ FPtr
 InitialI::getF(const Ice::Current&)
 {
     return _f;
+}
+
+void
+InitialI::setRecursive(ICE_IN(RecursivePtr), const Ice::Current&)
+{
+}
+
+bool
+InitialI::supportsClassGraphDepthMax(const Ice::Current&)
+{
+    return true;
 }
 
 #ifdef ICE_CPP11_MAPPING
@@ -309,7 +340,7 @@ InitialI::throwEDerived(const Ice::Current&)
 }
 
 bool
-UnexpectedObjectExceptionTestI::ice_invoke(const std::vector<Ice::Byte>&,
+UnexpectedObjectExceptionTestI::ice_invoke(ICE_IN(std::vector<Ice::Byte>),
                                            std::vector<Ice::Byte>& outParams,
                                            const Ice::Current& current)
 {

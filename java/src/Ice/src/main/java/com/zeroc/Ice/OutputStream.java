@@ -272,7 +272,7 @@ public class OutputStream
     public void resize(int sz)
     {
         _buf.resize(sz, false);
-        _buf.b.position(sz);
+        _buf.position(sz);
     }
 
     /**
@@ -281,8 +281,8 @@ public class OutputStream
      **/
     public com.zeroc.IceInternal.Buffer prepareWrite()
     {
-        _buf.b.limit(_buf.size());
-        _buf.b.position(0);
+        _buf.limit(_buf.size());
+        _buf.position(0);
         return _buf;
     }
 
@@ -740,6 +740,7 @@ public class OutputStream
     /**
      * Writes an optional serializable Java object to the stream.
      *
+     * @param <T> The serializable class.
      * @param tag The optional tag.
      * @param v The optional serializable object to write.
      **/
@@ -923,7 +924,7 @@ public class OutputStream
             expand(v.length * 2);
             java.nio.ShortBuffer shortBuf = _buf.b.asShortBuffer();
             shortBuf.put(v);
-            _buf.b.position(_buf.b.position() + v.length * 2);
+            _buf.position(_buf.b.position() + v.length * 2);
         }
     }
 
@@ -975,7 +976,7 @@ public class OutputStream
 
             java.nio.ShortBuffer shortBuf = _buf.b.asShortBuffer();
             shortBuf.put(v);
-            _buf.b.position(_buf.b.position() + sz * 2);
+            _buf.position(_buf.b.position() + sz * 2);
         }
     }
 
@@ -1047,7 +1048,7 @@ public class OutputStream
             expand(v.length * 4);
             java.nio.IntBuffer intBuf = _buf.b.asIntBuffer();
             intBuf.put(v);
-            _buf.b.position(_buf.b.position() + v.length * 4);
+            _buf.position(_buf.b.position() + v.length * 4);
         }
     }
 
@@ -1099,7 +1100,7 @@ public class OutputStream
 
             java.nio.IntBuffer intBuf = _buf.b.asIntBuffer();
             intBuf.put(v);
-            _buf.b.position(_buf.b.position() + sz * 4);
+            _buf.position(_buf.b.position() + sz * 4);
         }
     }
 
@@ -1160,7 +1161,7 @@ public class OutputStream
             expand(v.length * 8);
             java.nio.LongBuffer longBuf = _buf.b.asLongBuffer();
             longBuf.put(v);
-            _buf.b.position(_buf.b.position() + v.length * 8);
+            _buf.position(_buf.b.position() + v.length * 8);
         }
     }
 
@@ -1212,7 +1213,7 @@ public class OutputStream
 
             java.nio.LongBuffer longBuf = _buf.b.asLongBuffer();
             longBuf.put(v);
-            _buf.b.position(_buf.b.position() + sz * 8);
+            _buf.position(_buf.b.position() + sz * 8);
         }
     }
 
@@ -1273,7 +1274,7 @@ public class OutputStream
             expand(v.length * 4);
             java.nio.FloatBuffer floatBuf = _buf.b.asFloatBuffer();
             floatBuf.put(v);
-            _buf.b.position(_buf.b.position() + v.length * 4);
+            _buf.position(_buf.b.position() + v.length * 4);
         }
     }
 
@@ -1325,7 +1326,7 @@ public class OutputStream
 
             java.nio.FloatBuffer floatBuf = _buf.b.asFloatBuffer();
             floatBuf.put(v);
-            _buf.b.position(_buf.b.position() + sz * 4);
+            _buf.position(_buf.b.position() + sz * 4);
         }
     }
 
@@ -1386,7 +1387,7 @@ public class OutputStream
             expand(v.length * 8);
             java.nio.DoubleBuffer doubleBuf = _buf.b.asDoubleBuffer();
             doubleBuf.put(v);
-            _buf.b.position(_buf.b.position() + v.length * 8);
+            _buf.position(_buf.b.position() + v.length * 8);
         }
     }
 
@@ -1438,7 +1439,7 @@ public class OutputStream
 
             java.nio.DoubleBuffer doubleBuf = _buf.b.asDoubleBuffer();
             doubleBuf.put(v);
-            _buf.b.position(_buf.b.position() + sz * 8);
+            _buf.position(_buf.b.position() + sz * 8);
         }
     }
 
@@ -1761,7 +1762,7 @@ public class OutputStream
      **/
     public void pos(int n)
     {
-        _buf.b.position(n);
+        _buf.position(n);
     }
 
     /**

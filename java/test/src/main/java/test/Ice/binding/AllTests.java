@@ -211,20 +211,11 @@ public class AllTests
                 System.getProperty("os.name").startsWith("Windows") ||
                 System.getProperty("java.vendor").toLowerCase().indexOf("android") >= 0;
 
-            int count;
-            if(shortenTest)
-            {
-                count = 20;
-            }
-            else
-            {
-                count = 60;
-            }
-
+            int count = 20;
             int adapterCount = adapters.length;
             while(--count > 0)
             {
-                TestIntfPrx[] proxies;
+                TestIntfPrx[] proxies = new TestIntfPrx[10];
                 if(shortenTest)
                 {
                     if(count == 1)
@@ -232,16 +223,14 @@ public class AllTests
                         rcom.deactivateObjectAdapter(adapters[4]);
                         --adapterCount;
                     }
-                    proxies = new TestIntfPrx[10];
                 }
                 else
                 {
-                    if(count < 60 && count % 10 == 0)
+                    if(count < 20 && count % 4 == 0)
                     {
-                        rcom.deactivateObjectAdapter(adapters[count / 10 - 1]);
+                        rcom.deactivateObjectAdapter(adapters[count / 4 - 1]);
                         --adapterCount;
                     }
-                    proxies = new TestIntfPrx[40];
                 }
 
                 int i;
@@ -766,7 +755,7 @@ public class AllTests
             {
                 testUDP.getAdapterName();
             }
-            catch(java.lang.IllegalArgumentException ex)
+            catch(com.zeroc.Ice.TwowayOnlyException ex)
             {
             }
         }
@@ -1018,14 +1007,28 @@ public class AllTests
                 {
                 }
 
-                try
+                int nRetry = 10;
+                boolean success = false;
+                while(--nRetry > 0)
                 {
-                    test.ice_connectionId(Integer.toString(i)).ice_ping();
+                    try
+                    {
+                        test.ice_connectionId(Integer.toString(i)).ice_ping();
+                        success = true;
+                        break;
+                    }
+                    catch(com.zeroc.Ice.LocalException ex1)
+                    {
+                    }
+                    try
+                    {
+                        Thread.sleep(100);
+                    }
+                    catch(InterruptedException ex1)
+                    {
+                    }
                 }
-                catch(com.zeroc.Ice.LocalException ex1)
-                {
-                    test(false);
-                }
+                test(success);
             }
             catch(com.zeroc.Ice.LocalException ex)
             {

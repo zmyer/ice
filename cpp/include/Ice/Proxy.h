@@ -24,7 +24,7 @@
 #include <Ice/BatchRequestQueueF.h>
 #include <Ice/AsyncResult.h>
 //#include <Ice/RouterF.h> // Can't include RouterF.h here, otherwise we have cyclic includes
-//#include <Ice/LocatorF.h> // Can't include RouterF.h here, otherwise we have cyclic includes
+//#include <Ice/LocatorF.h> // Can't include LocatorF.h here, otherwise we have cyclic includes
 #include <Ice/Current.h>
 #include <Ice/CommunicatorF.h>
 #include <Ice/OutgoingAsync.h>
@@ -37,6 +37,24 @@ namespace Ice
 ICE_API extern const Context noExplicitContext;
 
 }
+
+#if defined(_MSC_VER) && (_MSC_VER <= 1600)
+//
+// COMPILERFIX VC90 and VC100 get confused with namespaces and complains that
+// ::Ice::noExplicitContext isn't defined in IceProxy namespace.
+//
+namespace IceProxy
+{
+
+namespace Ice
+{
+
+ICE_API extern const ::Ice::Context noExplicitContext;
+
+}
+
+}
+#endif
 
 namespace IceInternal
 {
@@ -262,7 +280,7 @@ public:
 
     virtual bool handleSent(bool, bool) override
     {
-        this->_promise.set_value(_sentSynchronously);
+        this->_promise.set_value();
         return false;
     }
 };
@@ -400,7 +418,6 @@ public:
         return ::Ice::Object::ice_staticId();
     }
 
-
     //
     // ice_invoke with default vector mapping for byte-sequence parameters
     //
@@ -447,7 +464,6 @@ public:
         outAsync->invoke(operation, mode, ::IceInternal::makePair(inP), context);
         return [outAsync]() { outAsync->cancel(); };
     }
-
 
     //
     // ice_invoke with cpp:array mapping for byte sequence parameters
@@ -507,7 +523,6 @@ public:
         outAsync->invoke(operation, mode, inP, context);
         return [outAsync]() { outAsync->cancel(); };
     }
-
 
     ::Ice::Identity ice_getIdentity() const;
     ::std::shared_ptr<::Ice::ObjectPrx> ice_identity(const ::Ice::Identity&) const;
@@ -601,7 +616,7 @@ public:
 
     ::std::shared_ptr<::Ice::Connection> ice_getCachedConnection() const;
 
-    bool ice_flushBatchRequests()
+    void ice_flushBatchRequests()
     {
         return ice_flushBatchRequestsAsync().get();
     }
@@ -617,9 +632,9 @@ public:
     }
 
     template<template<typename> class P = std::promise> auto
-    ice_flushBatchRequestsAsync() -> decltype(std::declval<P<bool>>().get_future())
+    ice_flushBatchRequestsAsync() -> decltype(std::declval<P<void>>().get_future())
     {
-        using PromiseOutgoing = ::IceInternal::ProxyFlushBatchPromise<P<bool>>;
+        using PromiseOutgoing = ::IceInternal::ProxyFlushBatchPromise<P<void>>;
         auto outAsync = ::std::make_shared<PromiseOutgoing>(shared_from_this());
         _iceI_flushBatchRequests(outAsync);
         return outAsync->getFuture();
@@ -1069,7 +1084,6 @@ public:
         return _iceI_begin_ice_ping(context, del, cookie);
     }
 
-
     ::Ice::AsyncResultPtr begin_ice_ping(const ::Ice::Callback_Object_ice_pingPtr& del,
                                          const ::Ice::LocalObjectPtr& cookie = 0)
     {
@@ -1164,7 +1178,6 @@ public:
     {
         return ::Ice::Object::ice_staticId();
     }
-
 
     // Returns true if ok, false if user exception.
     bool ice_invoke(const ::std::string&,
@@ -1704,7 +1717,6 @@ inline bool operator>=(const ProxyHandle<T>& lhs, const ProxyHandle<U>& rhs)
 {
     return !(lhs < rhs);
 }
-
 
 //
 // checkedCast and uncheckedCast functions without facet:
@@ -2504,7 +2516,6 @@ public:
         ::IceInternal::CallbackNC<T>(instance, excb, sentcb), _response(cb)
     {
     }
-
 
     virtual void completed(const ::Ice::AsyncResultPtr& result) const
     {

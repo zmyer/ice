@@ -7,8 +7,8 @@
 #
 # **********************************************************************
 
-top_srcdir	:= ..
-lang_srcdir	:= $(top_srcdir)/$(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
+top_srcdir      := ..
+lang_srcdir     := $(top_srcdir)/$(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
 
 include $(top_srcdir)/config/Make.rules
 include $(lang_srcdir)/config/Make.rules
@@ -17,14 +17,14 @@ include $(lang_srcdir)/config/Make.rules
 # Load C++ dependencies
 #
 $(eval $(call load-translator-dependencies,$(top_srcdir)/cpp/src/slice2objc))
-$(eval $(call load-dependencies,$(addprefix $(top_srcdir)/cpp/src/,Ice IceSSL)))
+$(eval $(call load-dependencies,$(addprefix $(top_srcdir)/cpp/src/,Ice IceSSL IceIAP)))
 
 #
 # Load source projects
 #
 projects :=
 include $(shell find $(lang_srcdir)/src -name Makefile.mk)
-$(call make-projects,$(projects),make-objc-src-project)
+$(call make-projects,$(projects),make-objc-src-project,,$(filter all obj%c,$(ICE_BIN_DIST)))
 
 #
 # Now, create and load test projects.

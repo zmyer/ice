@@ -7,7 +7,7 @@
 //
 // **********************************************************************
 
-// No pragma once as this file can be included several times in a translation 
+// No pragma once as this file can be included several times in a translation
 // unit
 
 #if defined(_MSC_VER)
@@ -17,7 +17,7 @@
 #   pragma warning(disable:4512) //  ... assignment operator could not be generated
 
 #   if _MSC_VER >= 1900
-#       pragma warning(disable:4275) // non dll-interface class ... used as base for dll-interface class ...
+#      pragma warning(disable:4275) // non dll-interface class ... used as base for dll-interface class ...
 #   endif
 
 #elif defined(__clang__)

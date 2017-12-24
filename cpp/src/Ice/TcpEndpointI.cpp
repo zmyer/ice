@@ -137,8 +137,15 @@ IceInternal::TcpEndpointI::acceptor(const string&) const
 TcpEndpointIPtr
 IceInternal::TcpEndpointI::endpoint(const TcpAcceptorPtr& acceptor) const
 {
-    return ICE_MAKE_SHARED(TcpEndpointI, _instance, _host, acceptor->effectivePort(), _sourceAddr, _timeout, _connectionId,
-                            _compress);
+    int port = acceptor->effectivePort();
+    if(_port == port)
+    {
+        return ICE_DYNAMIC_CAST(TcpEndpointI, ICE_SHARED_FROM_CONST_THIS(TcpEndpointI));
+    }
+    else
+    {
+        return ICE_MAKE_SHARED(TcpEndpointI, _instance, _host, port, _sourceAddr, _timeout, _connectionId, _compress);
+    }
 }
 
 string
@@ -281,9 +288,8 @@ IceInternal::TcpEndpointI::checkOption(const string& option, const string& argum
     {
         if(argument.empty())
         {
-            EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "no argument provided for -t option in endpoint " + endpoint;
-            throw ex;
+            throw EndpointParseException(__FILE__, __LINE__, "no argument provided for -t option in endpoint " +
+                                         endpoint);
         }
 
         if(argument == "infinite")
@@ -295,9 +301,8 @@ IceInternal::TcpEndpointI::checkOption(const string& option, const string& argum
             istringstream t(argument);
             if(!(t >> const_cast<Int&>(_timeout)) || !t.eof() || _timeout < 1)
             {
-                EndpointParseException ex(__FILE__, __LINE__);
-                ex.str = "invalid timeout value `" + argument + "' in endpoint " + endpoint;
-                throw ex;
+                throw EndpointParseException(__FILE__, __LINE__, "invalid timeout value `" + argument +
+                                             "' in endpoint " + endpoint);
             }
         }
         return true;
@@ -307,9 +312,8 @@ IceInternal::TcpEndpointI::checkOption(const string& option, const string& argum
     {
         if(!argument.empty())
         {
-            EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "unexpected argument `" + argument + "' provided for -z option in " + endpoint;
-            throw ex;
+            throw EndpointParseException(__FILE__, __LINE__, "unexpected argument `" + argument +
+                                         "' provided for -z option in " + endpoint);
         }
         const_cast<bool&>(_compress) = true;
         return true;
@@ -375,7 +379,7 @@ IceInternal::TcpEndpointFactory::destroy()
 }
 
 EndpointFactoryPtr
-IceInternal::TcpEndpointFactory::clone(const ProtocolInstancePtr& instance, const EndpointFactoryPtr&) const
+IceInternal::TcpEndpointFactory::clone(const ProtocolInstancePtr& instance) const
 {
     return new TcpEndpointFactory(instance);
 }

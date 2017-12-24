@@ -16,29 +16,29 @@ module Test
 
 interface Empty
 {
-};
+}
 
 interface Thrower;
 
 exception A
 {
     int aMem;
-};
+}
 
 exception B extends A
 {
     int bMem;
-};
+}
 
 exception C extends B
 {
     int cMem;
-};
+}
 
 exception D
 {
     int dMem;
-};
+}
 
 interface Thrower
 {
@@ -66,18 +66,19 @@ interface Thrower
 
     void throwAfterResponse();
     void throwAfterException() throws A;
-};
+}
 
 interface WrongOperation
 {
     void noSuchOperation();
-};
+}
 
 interface Echo
 {
+    void setConnection();
     void startBatch();
     void flushBatch();
     void shutdown();
-};
+}
 
-};
+}

@@ -22,6 +22,18 @@ Ice._ModuleRegistry.require(module,
     ]);
 const IceSSL = Ice._ModuleRegistry.module("IceSSL");
 
+//
+// With Chrome we don't want to close the socket while connection is in progress,
+// see comments on close implementation below.
+//
+// We need to check for Edge browser as it might include Chrome in its user agent.
+//
+const IsChrome = navigator.userAgent.indexOf("Edge/") === -1 &&
+                 navigator.userAgent.indexOf("Chrome/") !== -1;
+const IsSafari = /^((?!chrome).)*safari/i.test(navigator.userAgent);
+
+const IsWorker = typeof(WorkerGlobalScope) !== 'undefined' && this instanceof WorkerGlobalScope;
+
 const Debug = Ice.Debug;
 const ExUtil = Ice.ExUtil;
 const Network = Ice.Network;
@@ -112,8 +124,8 @@ class WSTransceiver
         this._registered = true;
         if(this._hasBytesAvailable || this._exception)
         {
-            this._bytesAvailableCallback();
             this._hasBytesAvailable = false;
+            Timer.setTimeout(() => this._bytesAvailableCallback(), 0);
         }
     }
 
@@ -130,6 +142,23 @@ class WSTransceiver
         if(this._fd === null)
         {
             Debug.assert(this._exception); // Websocket creation failed.
+            return;
+        }
+
+        //
+        // With Chrome (in particular on macOS) calling close() while the websocket isn't
+        // connected yet doesn't abort the connection attempt, and might result in the
+        // connection being reused by a different web socket.
+        //
+        // To workaround this problem, we always wait for the socket to be connected or
+        // closed before closing the socket.
+        //
+        // NOTE: when this workaround is no longer necessary, don't forget removing the
+        // StateClosePending state.
+        //
+        if((IsChrome || IsSafari) && this._fd.readyState === WebSocket.CONNECTING)
+        {
+            this._state = StateClosePending;
             return;
         }
 
@@ -180,7 +209,6 @@ class WSTransceiver
             }
         };
 
-        var i = byteBuffer.position;
         while(true)
         {
             var packetSize = (this._maxSendPacketSize > 0 && byteBuffer.remaining > this._maxSendPacketSize) ?
@@ -199,6 +227,17 @@ class WSTransceiver
             var slice = byteBuffer.b.slice(byteBuffer.position, byteBuffer.position + packetSize);
             this._fd.send(slice);
             byteBuffer.position = byteBuffer.position + packetSize;
+
+            //
+            // TODO: WORKAROUND for Safari issue. The websocket accepts all the
+            // data (bufferedAmount is always 0). We relinquish the control here
+            // to ensure timeouts work properly.
+            //
+            if(IsSafari && byteBuffer.remaining > 0)
+            {
+                Timer.setTimeout(cb, this.writeReadyTimeout());
+                return false;
+            }
         }
         return true;
     }

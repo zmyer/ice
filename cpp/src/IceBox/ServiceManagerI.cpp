@@ -22,8 +22,14 @@ using namespace IceUtilInternal;
 using namespace IceBox;
 using namespace std;
 
-typedef IceBox::Service* (*SERVICE_FACTORY)(CommunicatorPtr);
-
+#ifdef ICE_CPP11_MAPPING
+typedef IceBox::Service* (*ServiceFactory)(const shared_ptr<Communicator>&);
+#else
+//
+// We copy the CommunicatorPtr to maintain compatibility with earlier releases
+//
+typedef IceBox::Service* (*ServiceFactory)(CommunicatorPtr);
+#endif
 
 namespace
 {
@@ -44,9 +50,8 @@ struct StartServiceInfo
         }
         catch(const IceUtilInternal::BadOptException& ex)
         {
-            FailureException e(__FILE__, __LINE__);
-            e.reason = "ServiceManager: invalid arguments for service `" + name + "':\n" + ex.reason;
-            throw e;
+            throw FailureException(__FILE__, __LINE__, "ServiceManager: invalid arguments for service `" + name +
+                                   "':\n" + ex.reason);
         }
 
         assert(!args.empty());
@@ -359,9 +364,8 @@ IceBox::ServiceManagerI::start()
             p = services.find(prefix + *q);
             if(p == services.end())
             {
-                FailureException ex(__FILE__, __LINE__);
-                ex.reason = "ServiceManager: no service definition for `" + *q + "'";
-                throw ex;
+                throw FailureException(__FILE__, __LINE__, "ServiceManager: no service definition for `" +
+                                       *q + "'");
             }
             servicesInfo.push_back(StartServiceInfo(*q, p->second, _argv));
             services.erase(p);
@@ -552,14 +556,14 @@ IceBox::ServiceManagerI::start(const string& service, const string& entryPoint, 
     IceInternal::DynamicLibrary::symbol_type sym = library->loadEntryPoint(entryPoint, false);
     if(sym == 0)
     {
-        string msg = library->getErrorMessage();
-        FailureException ex(__FILE__, __LINE__);
-        ex.reason = "ServiceManager: unable to load entry point `" + entryPoint + "'";
+        ostringstream os;
+        os << "ServiceManager: unable to load entry point `" << entryPoint << "'";
+        const string msg = library->getErrorMessage();
         if(!msg.empty())
         {
-            ex.reason += ": " + msg;
+            os << ": " + msg;
         }
-        throw ex;
+        throw FailureException(__FILE__, __LINE__, os.str());
     }
 
     ServiceInfo info;
@@ -661,9 +665,7 @@ IceBox::ServiceManagerI::start(const string& service, const string& entryPoint, 
             s << "ServiceManager: exception while starting service " << service << ":\n";
             s << ex;
 
-            FailureException e(__FILE__, __LINE__);
-            e.reason = s.str();
-            throw e;
+            throw FailureException(__FILE__, __LINE__, s.str());
         }
     }
 
@@ -677,7 +679,7 @@ IceBox::ServiceManagerI::start(const string& service, const string& entryPoint, 
 #   pragma report(disable, "1540-0216")
 #endif
 
-        SERVICE_FACTORY factory = reinterpret_cast<SERVICE_FACTORY>(sym);
+        ServiceFactory factory = reinterpret_cast<ServiceFactory>(sym);
         try
         {
             info.service = ServicePtr(factory(_communicator));
@@ -692,18 +694,14 @@ IceBox::ServiceManagerI::start(const string& service, const string& entryPoint, 
             s << "ServiceManager: exception in entry point `" + entryPoint + "' for service " << info.name << ":\n";
             s << ex;
 
-            FailureException e(__FILE__, __LINE__);
-            e.reason = s.str();
-            throw e;
+            throw FailureException(__FILE__, __LINE__, s.str());
         }
         catch(...)
         {
             ostringstream s;
             s << "ServiceManager: unknown exception in entry point `" + entryPoint + "' for service " << info.name;
 
-            FailureException e(__FILE__, __LINE__);
-            e.reason = s.str();
-            throw e;
+            throw FailureException(__FILE__, __LINE__, s.str());
         }
 
         //
@@ -730,18 +728,14 @@ IceBox::ServiceManagerI::start(const string& service, const string& entryPoint, 
             s << "ServiceManager: exception while starting service " << info.name << ":\n";
             s << ex;
 
-            FailureException e(__FILE__, __LINE__);
-            e.reason = s.str();
-            throw e;
+            throw FailureException(__FILE__, __LINE__, s.str());
         }
         catch(...)
         {
             ostringstream s;
             s << "ServiceManager: unknown exception while starting service " << info.name;
 
-            FailureException e(__FILE__, __LINE__);
-            e.reason = s.str();
-            throw e;
+            throw FailureException(__FILE__, __LINE__, s.str());
         }
 
         info.library = library;
@@ -1173,4 +1167,3 @@ IceBox::ServiceManagerI::removeAdminFacets(const string& prefix)
         // Ignored
     }
 }
-

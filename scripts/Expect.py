@@ -24,13 +24,7 @@ __all__ = ["Expect", "EOF", "TIMEOUT" ]
 
 win32 = (sys.platform == "win32")
 if win32:
-    # We use this to remove the reliance on win32api. Unfortunately,
-    # python 2.5 under 64 bit versions of windows doesn't have ctypes,
-    # hence we have to be prepared for that module not to be present.
-    try:
-        import ctypes
-    except ImportError:
-        pass
+    import ctypes
 
 class EOF:
     """Raised when EOF is read from a child.
@@ -86,6 +80,40 @@ def escape(s, escapeNewlines = True):
             else:
                 o.write('\\%03o' % ord(c))
     return o.getvalue()
+
+def taskkill(args):
+    p = subprocess.Popen("taskkill {0}".format(args), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out = p.stdout.read().decode('UTF-8').strip()
+    #print(out)
+    p.wait()
+    p.stdout.close()
+
+def killProcess(p):
+    if win32:
+        taskkill("/F /T /PID {0}".format(p.pid))
+    else:
+        os.kill(p.pid, signal.SIGKILL)
+
+def terminateProcess(p, hasInterruptSupport=True):
+    if win32:
+        #
+        # Signals under windows are all turned into CTRL_BREAK_EVENT, except with Java since
+        # CTRL_BREAK_EVENT generates a stack trace. We don't use taskkill here because it
+        # doesn't work with CLI processes (it sends a WM_CLOSE event).
+        #
+        if hasInterruptSupport:
+            try:
+                ctypes.windll.kernel32.GenerateConsoleCtrlEvent(1, p.pid) # 1 is CTRL_BREAK_EVENT
+            except NameError:
+                taskkill("/F /T /PID {0}".format(p.pid))
+                pass
+            except:
+                traceback.print_exc(file=sys.stdout)
+                taskkill("/F /T /PID {0}".format(p.pid))
+        else:
+            taskkill("/F /T /PID {0}".format(p.pid))
+    else:
+        os.kill(p.pid, signal.SIGINT)
 
 class reader(threading.Thread):
     def __init__(self, desc, p, logfile):
@@ -339,21 +367,12 @@ def splitCommand(command_line):
 processes = {}
 
 def cleanup():
-    for k in processes:
+    for key in processes.copy():
         try:
-            processes[k].terminate()
+            killProcess(processes[key])
         except:
             pass
     processes.clear()
-#atexit.register(cleanup)
-
-def signal_handler(signal, frame):
-    cleanup()
-    sys.exit(0)
-
-#if win32:
-#    signal.signal(signal.SIGINT, signal_handler)
-#signal.signal(signal.SIGTERM, signal_handler)
 
 class Expect (object):
     def __init__(self, command, startReader=True, timeout=30, logfile=None, mapping=None, desc=None, cwd=None, env=None,
@@ -407,6 +426,9 @@ class Expect (object):
 
         if startReader:
             self.startReader()
+
+    def __str__(self):
+        return "{0} pid={1}".format(self.desc, "<none>" if self.p is None else self.p.pid)
 
     def startReader(self, watchDog = None):
         if watchDog is not None:
@@ -519,129 +541,75 @@ class Expect (object):
         self.buf = self.r.getbuf()
         self.before = self.buf
         self.after = ""
+        #
+        # Without this we get warnings when runing with python_d on Windows
+        #
+        # ResourceWarning: unclosed file <_io.TextIOWrapper name=3 encoding='cp1252'>
+        #
+        self.r.p.stdout.close()
+        self.r.p.stdin.close()
         self.r = None
 
         return self.exitstatus
 
     def terminate(self):
         """Terminate the process."""
-        # First try to break the app. Don't bother if this is win32
-        # and we're using java. It won't break (BREAK causes a stack
-        # trace).
 
         if self.p is None:
             return
 
-        if self.hasInterruptSupport():
-            try:
-                if win32:
-                    # We BREAK since CTRL_C doesn't work (the only way to make
-                    # that work is with remote code injection).
-                    #
-                    # Using the ctypes module removes the reliance on the
-                    # python win32api
-                    try:
-                        #win32console.GenerateConsoleCtrlEvent(win32console.CTRL_BREAK_EVENT, self.p.pid)
-                        ctypes.windll.kernel32.GenerateConsoleCtrlEvent(1, self.p.pid) # 1 is CTRL_BREAK_EVENT
-                    except NameError:
-                        pass
-                else:
-                   os.kill(self.p.pid, signal.SIGINT)
-            except:
-                traceback.print_exc(file=sys.stdout)
-
-            # If the break does not terminate the process within 5
-            # seconds, then terminate the process.
-            try:
-                self.wait(timeout = 5)
-                return
-            except TIMEOUT as e:
-                pass
+        def kill():
+            ex = None
+            while True:
+                try:
+                    if not self.p:
+                        return
+                    killProcess(self.p)
+                    self.wait()
+                except KeyboardInterrupt as e:
+                    ex = e
+                    raise
+                except e:
+                    ex = e
+            if ex:
+                print(ex)
+                raise ex
 
         try:
-            if win32:
-                # Next kill the app.
-                if self.hasInterruptSupport():
-                    print("%s: did not respond to break. terminating: %d" % (self.desc, self.p.pid))
-                self.p.terminate()
-            else:
-               os.kill(self.p.pid, signal.SIGKILL)
-            self.wait()
+            self.wait(timeout = 0.5)
+            return
+        except KeyboardInterrupt:
+            kill()
+            raise
+        except TIMEOUT:
+            pass
+
+        try:
+            terminateProcess(self.p, self.hasInterruptSupport())
+        except KeyboardInterrupt:
+            kill()
+            raise
         except:
             traceback.print_exc(file=sys.stdout)
+
+        # If the break does not terminate the process within 5
+        # seconds, then kill the process.
+        try:
+            self.wait(timeout = 5)
+            return
+        except KeyboardInterrupt:
+            kill()
+            raise
+        except TIMEOUT:
+            kill()
 
     def kill(self, sig):
         """Send the signal to the process."""
         self.killed = sig # Save the sent signal.
         if win32:
-            # Signals under windows are all turned into CTRL_BREAK_EVENT,
-            # except with Java since CTRL_BREAK_EVENT generates a stack
-            # trace.
-            #
-            # We BREAK since CTRL_C doesn't work (the only way to make
-            # that work is with remote code injection).
-            if self.hasInterruptSupport():
-                try:
-                    #
-                    # Using the ctypes module removes the reliance on the
-                    # python win32api
-                    try:
-                        #win32console.GenerateConsoleCtrlEvent(win32console.CTRL_BREAK_EVENT, self.p.pid)
-                        ctypes.windll.kernel32.GenerateConsoleCtrlEvent(1, self.p.pid) # 1 is CTRL_BREAK_EVENT
-                    except NameError:
-                        pass
-                except:
-                    traceback.print_exc(file=sys.stdout)
-            else:
-                self.p.terminate()
+            terminateProcess(self.p, self.hasInterruptSupport())
         else:
             os.kill(self.p.pid, sig)
-
-    # status == 0 is normal exit status for C++
-    #
-    # status == 130 is normal exit status for a Java app that was
-    # SIGINT interrupted.
-    #
-    def waitTestSuccess(self, exitstatus = 0, timeout = None):
-        """Wait for the process to terminate for up to timeout seconds, and
-           validate the exit status is as expected."""
-
-        def test(result, expected):
-            if expected != result:
-                print("unexpected exit status: expected: %d, got %d" % (expected, result))
-                sys.exit(1)
-
-        try:
-            self.wait(timeout)
-            if self.mapping in ["java", "java-compat"]:
-                if self.killed is not None:
-                    if win32:
-                        test(self.exitstatus, -self.killed)
-                    else:
-                        if self.killed == signal.SIGINT:
-                            test(130, self.exitstatus)
-                        else:
-                            sys.exit(1)
-                else:
-                    test(self.exitstatus, exitstatus)
-            else:
-                test(self.exitstatus, exitstatus)
-
-        except:
-            cleanup()
-            raise
-
-    def waitTestFail(self, timeout = None):
-        """Wait for the process to terminate for up to timeout seconds, and
-           validate the exit status is as expected."""
-        try:
-            self.wait(timeout)
-            if self.exitstatus == 0:
-                print("unexpected non-zero exit status")
-                sys.exit(1)
-        except:
-            cleanup()
-            raise
 
     def trace(self, suppress = None):
         self.r.enabletrace(suppress)
@@ -651,11 +619,13 @@ class Expect (object):
            validate the exit status is as expected."""
 
         def test(result, expected):
+            if not win32 and result == -2: # Interrupted by Ctrl-C, simulate KeyboardInterrupt
+                raise KeyboardInterrupt()
             if expected != result:
                 raise RuntimeError("unexpected exit status: expected: %d, got %d\n" % (expected, result))
 
         self.wait(timeout)
-        if self.mapping == "java":
+        if self.mapping in ["java", "java-compat"]:
             if self.killed is not None:
                 if win32:
                     test(self.exitstatus, -self.killed)
@@ -670,10 +640,10 @@ class Expect (object):
             test(self.exitstatus, exitstatus)
 
     def getOutput(self):
-        return self.buf
+        return self.buf if self.p is None else self.r.getbuf()
 
     def hasInterruptSupport(self):
         """Return True if the application gracefully terminated, False otherwise."""
-        if win32 and self.mapping == "java":
+        if win32 and (self.mapping == "java" or self.mapping == "java-compat"):
             return False
         return True

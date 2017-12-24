@@ -52,6 +52,7 @@ public class AllTests : TestCommon.AllTests
             try
             {
                 communicator.stringToProxy("object @ oa1").ice_ping();
+                test(false);
             }
             catch(Ice.NoEndpointException)
             {
@@ -62,6 +63,7 @@ public class AllTests : TestCommon.AllTests
             try
             {
                 communicator.stringToProxy("object @ oa1").ice_ping();
+                test(false);
             }
             catch(Ice.ObjectNotExistException)
             {
@@ -72,6 +74,7 @@ public class AllTests : TestCommon.AllTests
             try
             {
                 communicator.stringToProxy("object @ oa1").ice_ping();
+                test(false);
             }
             catch(Ice.NoEndpointException)
             {
@@ -192,6 +195,55 @@ public class AllTests : TestCommon.AllTests
             test(TestIntfPrxHelper.uncheckedCast(
                      communicator.stringToProxy("object @ rg")).getAdapterId().Equals("oa1"));
             proxies[0].deactivateObjectAdapter("oa");
+        }
+        WriteLine("ok");
+
+        Write("testing invalid lookup endpoints... ");
+        Flush();
+        {
+            String multicast;
+            if(communicator.getProperties().getProperty("Ice.IPv6").Equals("1"))
+            {
+                multicast = "\"ff15::1\"";
+            }
+            else
+            {
+                multicast = "239.255.0.1";
+            }
+
+            {
+                Ice.InitializationData initData = new Ice.InitializationData();
+                initData.properties = communicator.getProperties().ice_clone_();
+                initData.properties.setProperty("IceDiscovery.Lookup", "udp -h " + multicast + " --interface unknown");
+                Ice.Communicator comm = Ice.Util.initialize(initData);
+                test(comm.getDefaultLocator() != null);
+                try
+                {
+                    comm.stringToProxy("controller0@control0").ice_ping();
+                    test(false);
+                }
+                catch(Ice.LocalException)
+                {
+                }
+                comm.destroy();
+            }
+            {
+                Ice.InitializationData initData = new Ice.InitializationData();
+                initData.properties = communicator.getProperties().ice_clone_();
+                string intf = initData.properties.getProperty("IceDiscovery.Interface");
+                if(!intf.Equals(""))
+                {
+                    intf = " --interface \"" + intf + "\"";
+                }
+                string port = initData.properties.getProperty("IceDiscovery.Port");
+                initData.properties.setProperty("IceDiscovery.Lookup",
+                                                 "udp -h " + multicast + " --interface unknown:" +
+                                                 "udp -h " + multicast + " -p " + port + intf);
+                Ice.Communicator comm = Ice.Util.initialize(initData);
+                test(comm.getDefaultLocator() != null);
+                comm.stringToProxy("controller0@control0").ice_ping();
+                comm.destroy();
+            }
         }
         WriteLine("ok");
 

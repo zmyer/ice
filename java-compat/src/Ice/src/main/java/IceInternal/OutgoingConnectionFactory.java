@@ -9,6 +9,8 @@
 
 package IceInternal;
 
+import java.util.concurrent.Callable;
+
 public final class OutgoingConnectionFactory
 {
     //
@@ -161,8 +163,13 @@ public final class OutgoingConnectionFactory
                 assert(_connections.isEmpty());
                 assert(_connectionsByEndpoint.isEmpty());
             }
-            _monitor.destroy();
         }
+
+        //
+        // Must be destroyed outside the synchronization since this might block waiting for
+        // a timer task to complete.
+        //
+        _monitor.destroy();
     }
 
     public void
@@ -194,8 +201,28 @@ public final class OutgoingConnectionFactory
             return;
         }
 
-        ConnectCallback cb = new ConnectCallback(this, endpoints, hasMore, callback, selType);
-        cb.getConnectors();
+        final ConnectCallback cb = new ConnectCallback(this, endpoints, hasMore, callback, selType);
+        //
+        // Calling cb.getConnectors() can eventually result in a call to connect() on a socket, which is not
+        // allowed while in Android's main thread (with a dispatcher installed).
+        //
+        if(_instance.queueRequests())
+        {
+            _instance.getQueueExecutor().executeNoThrow(new Callable<Void>()
+            {
+                @Override
+                public Void call()
+                    throws Exception
+                {
+                    cb.getConnectors();
+                    return null;
+                }
+            });
+        }
+        else
+        {
+            cb.getConnectors();
+        }
     }
 
     public synchronized void
@@ -316,6 +343,7 @@ public final class OutgoingConnectionFactory
         _destroyed = false;
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void
     finalize()
@@ -759,7 +787,7 @@ public final class OutgoingConnectionFactory
     handleConnectionException(Ice.LocalException ex, boolean hasMore)
     {
         TraceLevels traceLevels = _instance.traceLevels();
-        if(traceLevels.retry >= 2)
+        if(traceLevels.network >= 2)
         {
             StringBuilder s = new StringBuilder(128);
             s.append("connection to endpoint failed");
@@ -779,7 +807,7 @@ public final class OutgoingConnectionFactory
                 }
             }
             s.append(ex.toString());
-            _instance.initializationData().logger.trace(traceLevels.retryCat, s.toString());
+            _instance.initializationData().logger.trace(traceLevels.networkCat, s.toString());
         }
     }
 
@@ -787,7 +815,7 @@ public final class OutgoingConnectionFactory
     handleException(Ice.LocalException ex, boolean hasMore)
     {
         TraceLevels traceLevels = _instance.traceLevels();
-        if(traceLevels.retry >= 2)
+        if(traceLevels.network >= 2)
         {
             StringBuilder s = new StringBuilder(128);
             s.append("couldn't resolve endpoint host");
@@ -807,7 +835,7 @@ public final class OutgoingConnectionFactory
                 }
             }
             s.append(ex.toString());
-            _instance.initializationData().logger.trace(traceLevels.retryCat, s.toString());
+            _instance.initializationData().logger.trace(traceLevels.networkCat, s.toString());
         }
     }
 

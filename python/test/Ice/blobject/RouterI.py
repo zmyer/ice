@@ -131,7 +131,7 @@ class ServantLocatorI(Ice.ServantLocator):
     def deactivate(self, s):
         pass
 
-class RouterI(Ice._RouterDisp):
+class RouterI(Ice.Router):
     def __init__(self, communicator, sync):
         self._adapter = communicator.createObjectAdapterWithEndpoints("forward", "default -h 127.0.0.1")
         if sync:
@@ -148,7 +148,7 @@ class RouterI(Ice._RouterDisp):
         self._locator.useSync(sync)
 
     def getClientProxy(self, current):
-        return self._blobjectProxy
+        return (self._blobjectProxy, True)
 
     def getServerProxy(self, current):
         assert false

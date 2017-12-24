@@ -13,6 +13,8 @@ import java.io.PrintWriter;
 
 import test.Ice.timeout.Test.TimeoutPrx;
 import test.Ice.timeout.Test.TimeoutPrxHelper;
+import test.Ice.timeout.Test.ControllerPrx;
+import test.Ice.timeout.Test.ControllerPrxHelper;
 
 public class AllTests
 {
@@ -132,7 +134,26 @@ public class AllTests
         private Callback callback = new Callback();
     }
 
-    public static TimeoutPrx
+    public static Ice.Connection
+    connect(Ice.ObjectPrx prx)
+    {
+        int nRetry = 10;
+        while(--nRetry > 0)
+        {
+            try
+            {
+                prx.ice_getConnection();
+                break;
+            }
+            catch(Ice.ConnectTimeoutException ex)
+            {
+                // Can sporadically occur with slow machines
+            }
+        }
+        return prx.ice_getConnection(); // Establish connection
+    }
+
+    public static void
     allTests(test.Util.Application app)
     {
         Ice.Communicator communicator = app.communicator();
@@ -151,6 +172,10 @@ public class AllTests
         TimeoutPrx timeout = TimeoutPrxHelper.checkedCast(obj);
         test(timeout != null);
 
+        ControllerPrx controller = ControllerPrxHelper.checkedCast(
+           communicator.stringToProxy("controller:" + app.getTestEndpoint(1)));
+        test(controller != null);
+
         out.print("testing connect timeout... ");
         out.flush();
         {
@@ -158,7 +183,7 @@ public class AllTests
             // Expect ConnectTimeoutException.
             //
             TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_timeout(100 * mult));
-            timeout.holdAdapter(500 * mult);
+            controller.holdAdapter(200 * mult);
             try
             {
                 to.op();
@@ -175,7 +200,7 @@ public class AllTests
             //
             timeout.op(); // Ensure adapter is active.
             TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_timeout(1000 * mult));
-            timeout.holdAdapter(500 * mult);
+            controller.holdAdapter(200 * mult);
             try
             {
                 to.op();
@@ -197,8 +222,9 @@ public class AllTests
             //
             // Expect TimeoutException.
             //
-            TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_timeout(100));
-            timeout.holdAdapter(500 * mult);
+            TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_timeout(250));
+            connect(to);
+            controller.holdAdapter(-1);
             try
             {
                 to.sendData(seq);
@@ -208,14 +234,15 @@ public class AllTests
             {
                 // Expected.
             }
+            controller.resumeAdapter();
+            timeout.op(); // Ensure adapter is active.
         }
         {
             //
             // Expect success.
             //
-            timeout.op(); // Ensure adapter is active.
             TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_timeout(1000 * mult));
-            timeout.holdAdapter(500 * mult);
+            controller.holdAdapter(200 * mult);
             try
             {
                 to.sendData(new byte[1000000]);
@@ -235,7 +262,7 @@ public class AllTests
             test(connection == to.ice_getConnection());
             try
             {
-                to.sleep(750 * mult);
+                to.sleep(500 * mult);
                 test(false);
             }
             catch(Ice.InvocationTimeoutException ex)
@@ -246,7 +273,7 @@ public class AllTests
             test(connection == to.ice_getConnection());
             try
             {
-                to.sleep(250 * mult);
+                to.sleep(100 * mult);
             }
             catch(Ice.InvocationTimeoutException ex)
             {
@@ -260,7 +287,7 @@ public class AllTests
             //
             TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_invocationTimeout(100));
             CallbackFail cb = new CallbackFail();
-            to.begin_sleep(750 * mult, cb);
+            to.begin_sleep(500 * mult, cb);
             cb.check();
             obj.ice_ping();
         }
@@ -270,18 +297,17 @@ public class AllTests
             //
             TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_invocationTimeout(500 * mult));
             CallbackSuccess cb = new CallbackSuccess();
-            to.begin_sleep(250 * mult, cb);
+            to.begin_sleep(100 * mult, cb);
             cb.check();
         }
         {
             //
             // Backward compatible connection timeouts
             //
-            TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_invocationTimeout(-2).ice_timeout(100));
-            Ice.Connection con = null;
+            TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_invocationTimeout(-2).ice_timeout(250));
+            Ice.Connection con = connect(to);
             try
             {
-                con = to.ice_getConnection();
                 to.sleep(750);
                 test(false);
             }
@@ -302,7 +328,7 @@ public class AllTests
 
             try
             {
-                con = to.ice_getConnection();
+                con = connect(to);
                 to.end_sleep(to.begin_sleep(750));
                 test(false);
             }
@@ -326,9 +352,9 @@ public class AllTests
         out.print("testing close timeout... ");
         out.flush();
         {
-            TimeoutPrx to = TimeoutPrxHelper.checkedCast(obj.ice_timeout(100 * mult));
-            Ice.Connection connection = to.ice_getConnection();
-            timeout.holdAdapter(500);
+            TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(obj.ice_timeout(250 * mult));
+            Ice.Connection connection = connect(to);
+            controller.holdAdapter(-1);
             connection.close(Ice.ConnectionClose.GracefullyWithWait);
             try
             {
@@ -338,23 +364,27 @@ public class AllTests
             {
                 test(false);
             }
-            try
+            while(true)
             {
-                Thread.sleep(500 * mult);
+                try
+                {
+                    connection.getInfo();
+                    try
+                    {
+                        Thread.sleep(10);
+                    }
+                    catch(java.lang.InterruptedException ex)
+                    {
+                    }
+                }
+                catch(Ice.ConnectionManuallyClosedException ex)
+                {
+                    // Expected.
+                    test(ex.graceful);
+                    break;
+                }
             }
-            catch(java.lang.InterruptedException ex)
-            {
-            }
-            try
-            {
-                connection.getInfo();
-                test(false);
-            }
-            catch(Ice.ConnectionManuallyClosedException ex)
-            {
-                // Expected.
-                test(ex.graceful);
-            }
+            controller.resumeAdapter();
             timeout.op(); // Ensure adapter is active.
         }
         out.println("ok");
@@ -368,10 +398,12 @@ public class AllTests
             //
             Ice.InitializationData initData = app.createInitializationData();
             initData.properties = communicator.getProperties()._clone();
-            initData.properties.setProperty("Ice.Override.Timeout", "250");
+            initData.properties.setProperty("Ice.Override.ConnectTimeout", "250");
+            initData.properties.setProperty("Ice.Override.Timeout", "100");
             Ice.Communicator comm = app.initialize(initData);
-            TimeoutPrx to = TimeoutPrxHelper.checkedCast(comm.stringToProxy(sref));
-            timeout.holdAdapter(700 * mult);
+            TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(comm.stringToProxy(sref));
+            connect(to);
+            controller.holdAdapter(-1);
             try
             {
                 to.sendData(seq);
@@ -381,12 +413,15 @@ public class AllTests
             {
                 // Expected.
             }
+            controller.resumeAdapter();
+            timeout.op(); // Ensure adapter is active.
+
             //
             // Calling ice_timeout() should have no effect.
             //
-            timeout.op(); // Ensure adapter is active.
-            to = TimeoutPrxHelper.checkedCast(to.ice_timeout(1000 * mult));
-            timeout.holdAdapter(500 * mult);
+            to = TimeoutPrxHelper.uncheckedCast(to.ice_timeout(1000 * mult));
+            connect(to);
+            controller.holdAdapter(-1);
             try
             {
                 to.sendData(seq);
@@ -396,6 +431,8 @@ public class AllTests
             {
                 // Expected.
             }
+            controller.resumeAdapter();
+            timeout.op(); // Ensure adapter is active.
             comm.destroy();
         }
         {
@@ -415,7 +452,7 @@ public class AllTests
 
             Ice.Communicator comm = app.initialize(initData);
             TimeoutPrx to = TimeoutPrxHelper.uncheckedCast(comm.stringToProxy(sref));
-            timeout.holdAdapter(750 * mult);
+            controller.holdAdapter(-1);
             try
             {
                 to.op();
@@ -425,11 +462,13 @@ public class AllTests
             {
                 // Expected.
             }
+            controller.resumeAdapter();
+            timeout.op(); // Ensure adapter is active.
+
             //
             // Calling ice_timeout() should have no effect on the connect timeout.
             //
-            timeout.op(); // Ensure adapter is active.
-            timeout.holdAdapter(750 * mult);
+            controller.holdAdapter(-1);
             to = TimeoutPrxHelper.uncheckedCast(to.ice_timeout(1000 * mult));
             try
             {
@@ -440,13 +479,15 @@ public class AllTests
             {
                 // Expected.
             }
+            controller.resumeAdapter();
+            timeout.op(); // Ensure adapter is active.
+
             //
             // Verify that timeout set via ice_timeout() is still used for requests.
             //
-            timeout.op(); // Ensure adapter is active.
             to = TimeoutPrxHelper.uncheckedCast(to.ice_timeout(250));
-            to.ice_getConnection(); // Establish connection
-            timeout.holdAdapter(750 * mult);
+            connect(to);
+            controller.holdAdapter(-1);
             try
             {
                 to.sendData(seq);
@@ -456,6 +497,8 @@ public class AllTests
             {
                 // Expected.
             }
+            controller.resumeAdapter();
+            timeout.op(); // Ensure adapter is active.
             comm.destroy();
         }
         {
@@ -467,10 +510,11 @@ public class AllTests
             initData.properties.setProperty("Ice.Override.CloseTimeout", "100");
             Ice.Communicator comm = app.initialize(initData);
             comm.stringToProxy(sref).ice_getConnection();
-            timeout.holdAdapter(800);
+            controller.holdAdapter(-1);
             long now = System.nanoTime();
             comm.destroy();
             test(System.nanoTime() - now < 700 * 1000000);
+            controller.resumeAdapter();
         }
         out.println("ok");
 
@@ -547,6 +591,6 @@ public class AllTests
         }
         out.println("ok");
 
-        return timeout;
+        controller.shutdown();
     }
 }

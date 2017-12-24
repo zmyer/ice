@@ -327,6 +327,7 @@ generated from the section label.
         <property name="BatchAutoFlush" deprecated="true"/>
         <property name="BatchAutoFlushSize" />
         <property name="ChangeUser" />
+        <property name="ClassGraphDepthMax" />
         <property name="ClientAccessPolicyProtocol" />
         <property name="Compression.Level" />
         <property name="CollectObjects"/>
@@ -458,6 +459,12 @@ generated from the section label.
         <property name="ServiceManager.Proxy" class="proxy"/>
     </section>
 
+    <section name="IceBridge">
+        <property name="Source" class="objectadapter" />
+        <property name="Target.Endpoints" />
+        <property name="InstanceName" />
+    </section>
+
     <section name="IceGridAdmin">
         <property name="AuthenticateUsingSSL" />
         <property name="MetricsConfig" />
@@ -471,6 +478,7 @@ generated from the section label.
         <property name="Discovery.Interface" />
         <property name="Discovery.Lookup" />
         <property name="Discovery.Reply" class="objectadapter" />
+        <property name="Discovery.Locator" class="objectadapter" />
         <property name="Trace.Observers" />
         <property name="Trace.SaveToRegistry" />
     </section>
@@ -589,6 +597,7 @@ generated from the section label.
         <property name="ProtocolVersionMax" />
         <property name="ProtocolVersionMin" />
         <property name="Random" />
+        <property name="SchannelStrongCrypto" />
         <property name="Trace.Security" />
         <property name="TrustOnly" />
         <property name="TrustOnly.Client" />

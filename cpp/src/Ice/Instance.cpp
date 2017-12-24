@@ -188,7 +188,6 @@ private:
     const InstancePtr _instance;
 };
 
-
 //
 // Timer specialization which supports the thread observer
 //
@@ -948,6 +947,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
     _initData(initData),
     _messageSizeMax(0),
     _batchAutoFlushSize(0),
+    _classGraphDepthMax(0),
     _collectObjects(false),
     _toStringMode(ICE_ENUM(ToStringMode, Unicode)),
     _implicitContext(0),
@@ -980,10 +980,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
                     FILE* file = IceUtilInternal::freopen(stdOutFilename, "a", stdout);
                     if(file == 0)
                     {
-                        FileException ex(__FILE__, __LINE__);
-                        ex.path = stdOutFilename;
-                        ex.error = getSystemErrno();
-                        throw ex;
+                        throw FileException(__FILE__, __LINE__, getSystemErrno(), stdOutFilename);
                     }
                 }
 
@@ -992,10 +989,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
                     FILE* file = IceUtilInternal::freopen(stdErrFilename, "a", stderr);
                     if(file == 0)
                     {
-                        FileException ex(__FILE__, __LINE__);
-                        ex.path = stdErrFilename;
-                        ex.error = getSystemErrno();
-                        throw ex;
+                        throw FileException(__FILE__, __LINE__, getSystemErrno(), stdErrFilename);
                     }
                 }
 
@@ -1020,42 +1014,37 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
                 string newUser = _initData.properties->getProperty("Ice.ChangeUser");
                 if(!newUser.empty())
                 {
-                    errno = 0;
-                    struct passwd* pw = getpwnam(newUser.c_str());
-                    if(!pw)
+                    struct passwd pwbuf;
+                    vector<char> buffer(4096); // 4KB initial buffer
+                    struct passwd *pw;
+                    int err;
+                    while((err =  getpwnam_r(newUser.c_str(), &pwbuf, &buffer[0], buffer.size(), &pw)) == ERANGE &&
+                          buffer.size() < 1024 * 1024) // Limit buffer to 1M
                     {
-                        if(errno)
-                        {
-                            SyscallException ex(__FILE__, __LINE__);
-                            ex.error = getSystemErrno();
-                            throw ex;
-                        }
-                        else
-                        {
-                            InitializationException ex(__FILE__, __LINE__, "Unknown user account `" + newUser + "'");
-                            throw ex;
-                        }
+                        buffer.resize(buffer.size() * 2);
+                    }
+                    if(err != 0)
+                    {
+                        throw Ice::SyscallException(__FILE__, __LINE__, err);
+                    }
+                    else if(pw == 0)
+                    {
+                        throw InitializationException(__FILE__, __LINE__, "unknown user account `" + newUser + "'");
                     }
 
                     if(setgid(pw->pw_gid) == -1)
                     {
-                        SyscallException ex(__FILE__, __LINE__);
-                        ex.error = getSystemErrno();
-                        throw ex;
+                        throw SyscallException(__FILE__, __LINE__, getSystemErrno());
                     }
 
                     if(initgroups(pw->pw_name, pw->pw_gid) == -1)
                     {
-                        SyscallException ex(__FILE__, __LINE__);
-                        ex.error = getSystemErrno();
-                        throw ex;
+                        throw SyscallException(__FILE__, __LINE__, getSystemErrno());
                     }
 
                     if(setuid(pw->pw_uid) == -1)
                     {
-                        SyscallException ex(__FILE__, __LINE__);
-                        ex.error = getSystemErrno();
-                        throw ex;
+                        throw SyscallException(__FILE__, __LINE__, getSystemErrno());
                     }
                 }
 #endif
@@ -1069,9 +1058,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
                 WSADATA data;
                 if(WSAStartup(version, &data) != 0)
                 {
-                    SocketException ex(__FILE__, __LINE__);
-                    ex.error = getSocketErrno();
-                    throw ex;
+                    throw SocketException(__FILE__, __LINE__, getSocketErrno());
                 }
 #endif
 
@@ -1098,7 +1085,6 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
             }
         }
 
-
         if(!_initData.logger)
         {
             string logfile = _initData.properties->getProperty("Ice.LogFile");
@@ -1124,7 +1110,7 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
             else
             {
                 _initData.logger = getProcessLogger();
-                if(ICE_DYNAMIC_CAST(Logger, _initData.logger))
+                if(ICE_DYNAMIC_CAST(LoggerI, _initData.logger))
                 {
                     _initData.logger = ICE_MAKE_SHARED(LoggerI, _initData.properties->getProperty("Ice.ProgramName"), "", logStdErrConvert);
                 }
@@ -1189,6 +1175,19 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
             }
         }
 
+        {
+            static const int defaultValue = 100;
+            Int num = _initData.properties->getPropertyAsIntWithDefault("Ice.ClassGraphDepthMax", defaultValue);
+            if(num < 1 || static_cast<size_t>(num) > static_cast<size_t>(0x7fffffff))
+            {
+                const_cast<size_t&>(_classGraphDepthMax) = static_cast<size_t>(0x7fffffff);
+            }
+            else
+            {
+                const_cast<size_t&>(_classGraphDepthMax) = static_cast<size_t>(num);
+            }
+        }
+
         const_cast<bool&>(_collectObjects) = _initData.properties->getPropertyAsInt("Ice.CollectObjects") > 0;
 
         string toStringModeStr = _initData.properties->getPropertyWithDefault("Ice.ToStringMode", "Unicode");
@@ -1204,7 +1203,6 @@ IceInternal::Instance::Instance(const CommunicatorPtr& communicator, const Initi
         {
             throw InitializationException(__FILE__, __LINE__, "The value for Ice.ToStringMode must be Unicode, ASCII or Compat");
         }
-
 
         //
         // Client ACM enabled by default. Server ACM disabled by default.
@@ -1322,7 +1320,7 @@ IceInternal::Instance::~Instance()
 }
 
 void
-IceInternal::Instance::finishSetup(int& argc, char* argv[], const Ice::CommunicatorPtr& communicator)
+IceInternal::Instance::finishSetup(int& argc, const char* argv[], const Ice::CommunicatorPtr& communicator)
 {
     //
     // Load plug-ins.
@@ -1333,20 +1331,10 @@ IceInternal::Instance::finishSetup(int& argc, char* argv[], const Ice::Communica
     pluginManagerImpl->loadPlugins(argc, argv);
 
     //
-    // Add WS and WSS endpoint factories if TCP/SSL factories are installed.
+    // Initialize the endpoint factories once all the plugins are loaded. This gives
+    // the opportunity for the endpoint factories to find underyling factories.
     //
-    EndpointFactoryPtr tcpFactory = _endpointFactoryManager->get(TCPEndpointType);
-    if(tcpFactory)
-    {
-        ProtocolInstancePtr instance = new ProtocolInstance(communicator, WSEndpointType, "ws", false);
-        _endpointFactoryManager->add(new WSEndpointFactory(instance, tcpFactory->clone(instance, 0)));
-    }
-    EndpointFactoryPtr sslFactory = _endpointFactoryManager->get(SSLEndpointType);
-    if(sslFactory)
-    {
-        ProtocolInstancePtr instance = new ProtocolInstance(communicator, WSSEndpointType, "wss", true);
-        _endpointFactoryManager->add(new WSEndpointFactory(instance, sslFactory->clone(instance, 0)));
-    }
+    _endpointFactoryManager->initialize();
 
     //
     // Reset _stringConverter and _wstringConverter, in case a plugin changed them
@@ -1781,7 +1769,6 @@ IceInternal::Instance::updateThreadObservers()
     {
     }
 }
-
 
 BufSizeWarnInfo
 IceInternal::Instance::getBufSizeWarn(Short type)

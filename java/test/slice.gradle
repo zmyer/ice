@@ -52,6 +52,7 @@ task testSliceTask {
                                                      'Ice/optional/*.ice',
                                                      'Ice/stream/*.ice',
                                                      'Ice/enums/*.ice',
+                                                     'Glacier2/application/*.ice',
                                                      'Glacier2/router/*.ice',
                                                      'Glacier2/sessionHelper/*.ice',
                                                      'IceDiscovery/simple/*.ice',
@@ -76,6 +77,11 @@ task testSliceTask {
             set4 {
                 include = ["${testDir}/Ice/packagemd"]
                 files = fileTree(dir: testDir, includes:['Ice/packagemd/*.ice'])
+            }
+            set5 {
+                args = "--impl"
+                files = fileTree(dir: testDir, includes:['Ice/impl/Test.ice',
+                                                         'Ice/impl/TestAMD.ice'])
             }
         }
     }

@@ -345,7 +345,7 @@ namespace Ice
                    (acm.heartbeat != ACMHeartbeat.HeartbeatOff && _writeStream.isEmpty() &&
                     now >= (_acmLastActivity + acm.timeout / 4)))
                 {
-                    if(acm.heartbeat != ACMHeartbeat.HeartbeatOnInvocation || _dispatchCount > 0)
+                    if(acm.heartbeat != ACMHeartbeat.HeartbeatOnDispatch || _dispatchCount > 0)
                     {
                         sendHeartbeatNow();
                     }
@@ -475,7 +475,17 @@ namespace Ice
 
         public void flushBatchRequests(CompressBatch compressBatch)
         {
-            flushBatchRequestsAsync(compressBatch).Wait();
+            try
+            {
+                var completed = new FlushBatchTaskCompletionCallback();
+                var outgoing = new ConnectionFlushBatchAsync(this, _instance, completed);
+                outgoing.invoke(_flushBatchRequests_name, compressBatch, true);
+                completed.Task.Wait();
+            }
+            catch(AggregateException ex)
+            {
+                throw ex.InnerException;
+            }
         }
 
         private class ConnectionFlushBatchCompletionCallback : AsyncResultCompletionCallback
@@ -523,7 +533,7 @@ namespace Ice
         {
             var completed = new FlushBatchTaskCompletionCallback(progress, cancel);
             var outgoing = new ConnectionFlushBatchAsync(this, _instance, completed);
-            outgoing.invoke(_flushBatchRequests_name, compressBatch);
+            outgoing.invoke(_flushBatchRequests_name, compressBatch, false);
             return completed.Task;
         }
 
@@ -534,7 +544,7 @@ namespace Ice
             var result = new ConnectionFlushBatchCompletionCallback(this, _communicator, _instance,
                                                                     _flushBatchRequests_name, cookie, cb);
             var outgoing = new ConnectionFlushBatchAsync(this, _instance, result);
-            outgoing.invoke(_flushBatchRequests_name, compressBatch);
+            outgoing.invoke(_flushBatchRequests_name, compressBatch, false);
             return result;
         }
 
@@ -584,6 +594,10 @@ namespace Ice
         {
             lock(this)
             {
+                if(_state >= StateClosed)
+                {
+                    return;
+                }
                 _heartbeatCallback = callback;
             }
         }
@@ -639,10 +653,9 @@ namespace Ice
             {
             }
 
-            public override bool handleResponse(bool ok, OutgoingAsyncBase og)
+            public override void handleInvokeResponse(bool ok, OutgoingAsyncBase og)
             {
                 SetResult(null);
-                return false;
             }
         }
 
@@ -782,7 +795,6 @@ namespace Ice
                 {
                     return; // The request has already been or will be shortly notified of the failure.
                 }
-
 
                 OutgoingMessage o = _sendStreams.FirstOrDefault(m => m.outAsync == outAsync);
                 if(o != null)
@@ -971,11 +983,10 @@ namespace Ice
 
                 if(_adapter != null)
                 {
+                    //
+                    // The OA's servant manager is immutable.
+                    //
                     _servantManager = ((ObjectAdapterI) _adapter).getServantManager();
-                    if(_servantManager == null)
-                    {
-                        _adapter = null;
-                    }
                 }
                 else
                 {
@@ -1745,6 +1756,11 @@ namespace Ice
             {
                 setState(StateClosed, ex);
             }
+        }
+
+        public IceInternal.ThreadPool getThreadPool()
+        {
+            return _threadPool;
         }
 
         static ConnectionI()

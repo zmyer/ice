@@ -47,10 +47,12 @@ ICE_API @interface ICEInitializationData : NSObject
 @property(retain, nonatomic) NSDictionary* prefixTable_;
 
 -(id) init:(id<ICEProperties>)properties logger:(id<ICELogger>)logger
-     dispatcher:(void(^)(id<ICEDispatcherCall>, id<ICEConnection>))d;
+                                     dispatcher:(void(^)(id<ICEDispatcherCall>, id<ICEConnection>))d
+                        batchRequestInterceptor:(void(^)(id<ICEBatchRequest>, int, int))i;
 +(id) initializationData;
 +(id) initializationData:(id<ICEProperties>)properties logger:(id<ICELogger>)logger
-     dispatcher:(void(^)(id<ICEDispatcherCall>, id<ICEConnection>))d;
+                                                   dispatcher:(void(^)(id<ICEDispatcherCall>, id<ICEConnection>))d
+                                      batchRequestInterceptor:(void(^)(id<ICEBatchRequest>, int, int))i;
 // This class also overrides copyWithZone:, hash, isEqual:, and dealloc.
 @end
 
@@ -66,9 +68,10 @@ ICE_API @interface ICEUtil : NSObject
 +(id<ICEProperties>) createProperties;
 +(id<ICEProperties>) createProperties:(int*)argc argv:(char*[])argv;
 +(id<ICECommunicator>) createCommunicator;
-+(id<ICECommunicator>) createCommunicator:(ICEInitializationData *)initData;
++(id<ICECommunicator>) createCommunicator:(ICEInitializationData*)initData;
 +(id<ICECommunicator>) createCommunicator:(int*)argc argv:(char*[])argv;
-+(id<ICECommunicator>) createCommunicator:(int*)argc argv:(char*[])argv initData:(ICEInitializationData *)initData;
++(id<ICECommunicator>) createCommunicator:(int*)argc argv:(char*[])argv initData:(ICEInitializationData*)initData;
++(id<ICECommunicator>) createCommunicator:(int*)argc argv:(char*[])argv configFile:(NSString*)configFile;
 +(id<ICEInputStream>) createInputStream:(id<ICECommunicator>)communicator data:(NSData*)data;
 +(id<ICEInputStream>) createInputStream:(id<ICECommunicator>)c data:(NSData*)data encoding:(ICEEncodingVersion*)e;
 +(id<ICEOutputStream>) createOutputStream:(id<ICECommunicator>)communicator;
@@ -90,6 +93,8 @@ ICE_API @interface ICEUtil : NSObject
 @end
 
 extern void ICEregisterIceSSL(BOOL);
+extern void ICEregisterIceUDP(BOOL);
+extern void ICEregisterIceWS(BOOL);
 extern void ICEregisterIceDiscovery(BOOL);
 extern void ICEregisterIceLocatorDiscovery(BOOL);
 #if defined(__APPLE__) && TARGET_OS_IPHONE > 0

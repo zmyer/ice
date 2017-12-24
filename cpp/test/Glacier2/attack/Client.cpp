@@ -8,7 +8,7 @@
 // **********************************************************************
 
 #include <IceUtil/Random.h>
-#include <Ice/Application.h>
+#include <Ice/Ice.h>
 #include <Glacier2/Router.h>
 #include <Backend.h>
 #include <TestCommon.h>
@@ -28,10 +28,6 @@ public:
 int
 main(int argc, char* argv[])
 {
-#ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
-#endif
-
     Ice::InitializationData initData = getTestInitData(argc, argv);
 
     //
@@ -48,7 +44,7 @@ int
 AttackClient::run(int, char**)
 {
     cout << "getting router... " << flush;
-    ObjectPrx routerBase = communicator()->stringToProxy("Glacier2/router:" + getTestEndpoint(communicator(), 10));
+    ObjectPrx routerBase = communicator()->stringToProxy("Glacier2/router:" + getTestEndpoint(communicator(), 50));
     Glacier2::RouterPrx router = Glacier2::RouterPrx::checkedCast(routerBase);
     test(router);
     communicator()->setDefaultRouter(router);
@@ -118,7 +114,7 @@ AttackClient::run(int, char**)
     backend->shutdown();
     communicator()->setDefaultRouter(0);
     ObjectPrx adminBase = communicator()->stringToProxy("Glacier2/admin -f Process:" +
-                                                        getTestEndpoint(communicator(), 11));
+                                                        getTestEndpoint(communicator(), 51));
     Ice::ProcessPrx process = Ice::ProcessPrx::checkedCast(adminBase);
     test(process);
     process->shutdown();

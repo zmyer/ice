@@ -62,7 +62,7 @@ struct IFileInfoPathLess: public binary_function<const LargeFileInfo&, const Lar
             {
                 return true;
             }
-            else if(::tolower(static_cast<unsigned char>(lhs.path[i])) > 
+            else if(::tolower(static_cast<unsigned char>(lhs.path[i])) >
                     ::tolower(static_cast<unsigned char>(rhs.path[i])))
             {
                 return false;
@@ -102,7 +102,7 @@ void
 usage(const string& appName)
 {
     consoleErr << "Usage: " << appName << " [options] DIR [FILES...]\n";
-    consoleErr <<     
+    consoleErr <<
         "Options:\n"
         "-h, --help              Show this message.\n"
         "-v, --version           Display the Ice version.\n"
@@ -141,7 +141,7 @@ main(int argc, char* argv[])
     opts.addOpt("Z", "no-compress");
     opts.addOpt("V", "verbose");
     opts.addOpt("i", "case-insensitive");
-    
+
     vector<string> args;
     try
     {
@@ -199,18 +199,18 @@ main(int argc, char* argv[])
     try
     {
         string absDataDir = dataDir;
-    
+
         string cwd;
         if(IceUtilInternal::getcwd(cwd) != 0)
         {
-            throw "cannot get the current directory:\n" + IceUtilInternal::lastErrorToString();
+            throw runtime_error("cannot get the current directory:\n" + IceUtilInternal::lastErrorToString());
         }
 
         if(!IceUtilInternal::isAbsolutePath(absDataDir))
         {
             absDataDir = simplify(cwd + '/' + absDataDir);
         }
-        
+
         for(StringSeq::iterator p = fileSeq.begin(); p != fileSeq.end(); ++p)
         {
             if(!IceUtilInternal::isAbsolutePath(*p))
@@ -230,14 +230,14 @@ main(int argc, char* argv[])
         {
             if(p->compare(0, absDataDirWithSlash.size(), absDataDirWithSlash) != 0)
             {
-                throw "`" + *p + "' is not a path in `" + dataDir + "'";
+                throw runtime_error("`" + *p + "' is not a path in `" + dataDir + "'");
             }
-            
+
             p->erase(0, absDataDirWithSlash.size());
         }
-    
+
         LargeFileInfoSeq infoSeq;
-            
+
         if(fileSeq.empty())
         {
             CalcCB calcCB;
@@ -290,31 +290,29 @@ main(int argc, char* argv[])
         {
             LargeFileInfoSeq newInfoSeq = infoSeq;
             sort(newInfoSeq.begin(), newInfoSeq.end(), IFileInfoPathLess());
-
-            string ex;
+            string reason;
             LargeFileInfoSeq::iterator p = newInfoSeq.begin();
             while((p = adjacent_find(p, newInfoSeq.end(), IFileInfoPathEqual())) != newInfoSeq.end())
             {
                 do
                 {
-                    ex += '\n' + dataDir + '/' + p->path;
+                    reason += '\n' + dataDir + '/' + p->path;
                     ++p;
                 }
                 while(p < newInfoSeq.end() && IFileInfoPathEqual()(*(p - 1), *p));
             }
 
-            if(!ex.empty())
+            if(!reason.empty())
             {
-                ex = "duplicate files:" + ex;
-                throw ex;
+                throw runtime_error("duplicate files:" + reason);
             }
         }
 
         saveFileInfoSeq(absDataDir, infoSeq);
     }
-    catch(const string& ex)
+    catch(const exception& ex)
     {
-        consoleErr << appName << ": " << ex << endl;
+        consoleErr << appName << ": " << ex.what() << endl;
         return EXIT_FAILURE;
     }
     catch(const char* ex)

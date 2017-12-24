@@ -232,7 +232,6 @@ public:
     {
     }
 
-
     void
     checkPermissionsResponse(bool ok, const string& reason)
     {
@@ -477,7 +476,7 @@ CreateSession::CreateSession(const SessionRouterIPtr& sessionRouter, const strin
                 _context["_con.cipher"] = info->cipher;
                 if(info->certs.size() > 0)
                 {
-                    _context["_con.peerCert"] = info->certs[0];
+                    _context["_con.peerCert"] = info->certs[0]->encode();
                 }
             }
         }
@@ -775,9 +774,9 @@ SessionRouterI::destroy()
 }
 
 ObjectPrx
-SessionRouterI::getClientProxy(const Current& current) const
+SessionRouterI::getClientProxy(IceUtil::Optional<bool>& hasRoutingTable, const Current& current) const
 {
-    return getRouter(current.con, current.id)->getClientProxy(current); // Forward to the per-client router.
+    return getRouter(current.con, current.id)->getClientProxy(hasRoutingTable, current); // Forward to the per-client router.
 }
 
 ObjectPrx
@@ -853,10 +852,13 @@ SessionRouterI::createSessionFromSecureConnection_async(
         sslinfo.localPort = ipInfo->localPort;
         sslinfo.localHost = ipInfo->localAddress;
         sslinfo.cipher = info->cipher;
-        sslinfo.certs = info->certs;
+        for(std::vector<IceSSL::CertificatePtr>::const_iterator i = info->certs.begin(); i != info->certs.end(); ++i)
+        {
+            sslinfo.certs.push_back((*i)->encode());
+        }
         if(info->certs.size() > 0)
         {
-            userDN = IceSSL::Certificate::decode(info->certs[0])->getSubjectDN();
+            userDN = info->certs[0]->getSubjectDN();
         }
     }
     catch(const IceSSL::CertificateEncodingException&)
@@ -1175,9 +1177,7 @@ SessionRouterI::startCreateSession(const CreateSessionPtr& cb, const ConnectionP
 
     if(_destroy)
     {
-        CannotCreateSessionException exc;
-        exc.reason = "router is shutting down";
-        throw exc;
+        throw CannotCreateSessionException("router is shutting down");
     }
 
     //
@@ -1197,9 +1197,7 @@ SessionRouterI::startCreateSession(const CreateSessionPtr& cb, const ConnectionP
 
         if(p != _routersByConnection.end())
         {
-            CannotCreateSessionException exc;
-            exc.reason = "session exists";
-            throw exc;
+            throw CannotCreateSessionException("session exists");
         }
     }
 
@@ -1246,9 +1244,7 @@ SessionRouterI::finishCreateSession(const ConnectionPtr& connection, const Route
     {
         router->destroy(_sessionDestroyCallback);
 
-        CannotCreateSessionException exc;
-        exc.reason = "router is shutting down";
-        throw exc;
+        throw CannotCreateSessionException("router is shutting down");
     }
 
     _routersByConnectionHint = _routersByConnection.insert(
@@ -1256,7 +1252,7 @@ SessionRouterI::finishCreateSession(const ConnectionPtr& connection, const Route
 
     if(_instance->serverObjectAdapter())
     {
-        string category = router->getServerProxy()->ice_getIdentity().category;
+        string category = router->getServerProxy(Ice::emptyCurrent)->ice_getIdentity().category;
         assert(!category.empty());
         pair<map<string, RouterIPtr>::iterator, bool> rc =
             _routersByCategory.insert(pair<const string, RouterIPtr>(category, router));

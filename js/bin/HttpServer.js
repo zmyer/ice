@@ -26,19 +26,34 @@ function Init()
         json: "application/json",
     };
 
-    var TestData =
-    {
-        languages: [{value: "cpp", name: "C++"}, {value: "java", name: "Java"}]
+    var TestData = {
+        cssDeps: [
+            "https://cdnjs.cloudflare.com/ajax/libs/foundation/5.5.3/css/foundation.min.css"
+        ],
+        jsDeps: [
+            "https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/modernizr/2.8.3/modernizr.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/foundation/5.5.3/js/foundation.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.min.js",
+            "https://cdnjs.cloudflare.com/ajax/libs/URI.js/1.18.12/URI.min.js",
+            "/assets/jquery.spin.js"
+        ]
     };
+
+    var languages = [{value: "cpp", name: "C++"}, {value: "java", name: "Java"}]
     if(process.platform == "win32")
     {
-        TestData.languages.push({value: "csharp", name: "C#"});
+        languages.push({value: "csharp", name: "C#"});
     }
 
     var libraries = ["/lib/Ice.js", "/lib/Ice.min.js",
-                    "/lib/Glacier2.js", "/lib/Glacier2.min.js",
-                    "/lib/IceStorm.js", "/lib/IceStorm.min.js",
-                    "/lib/IceGrid.js", "/lib/IceGrid.min.js",];
+                     "/lib/Glacier2.js", "/lib/Glacier2.min.js",
+                     "/lib/IceStorm.js", "/lib/IceStorm.min.js",
+                     "/lib/IceGrid.js", "/lib/IceGrid.min.js",
+                     "/lib/es5/Ice.js", "/lib/es5/Ice.min.js",
+                     "/lib/es5/Glacier2.js", "/lib/es5/Glacier2.min.js",
+                     "/lib/es5/IceStorm.js", "/lib/es5/IceStorm.min.js",
+                     "/lib/es5/IceGrid.js", "/lib/es5/IceGrid.min.js"];
 
     TestData.TestSuites = fs.readFileSync(path.join(__dirname, "..", "test", "Common", "TestSuites.json"), "utf8");
     var TestSuites = JSON.parse(TestData.TestSuites);
@@ -98,9 +113,9 @@ function Init()
                     }
                     else
                     {
-                        var languages = TestData.languages.map(function(o) { return o.value; });
-                        var j = languages.indexOf(language);
-                        language = languages[j == languages.length - 1 ? 0 : j + 1];
+                        var lgs = languages.map(function(o) { return o.value; });
+                        var j = lgs.indexOf(language);
+                        language = lgs[j == lgs.length - 1 ? 0 : j + 1];
                         worker = false;
                         protocol = "http";
                     }
@@ -134,12 +149,16 @@ function Init()
                             TestData.scripts =
                             [
                                 "/node_modules/babel-polyfill/dist/polyfill.js",
-                                "/node_modules/regenerator-runtime/runtime.js",
                                 "/lib/es5/Ice.js",
-                                "/test/Common/TestRunner.js",
-                                "/test/Common/TestSuite.js",
+                                "/test/es5/Common/TestRunner.js",
+                                "/test/es5/Common/TestSuite.js",
                                 "/test/es5/Common/Controller.js"
                             ].concat(testSuite.files);
+
+                            TestData.scripts = TestData.scripts.map(function(f)
+                                {
+                                    return f.replace("/lib/Glacier2.js", "/lib/es5/Glacier2.js");
+                                });
                         }
                         else
                         {
@@ -154,10 +173,12 @@ function Init()
                     }
                     else
                     {
-                        TestData.scripts =
-                            [
-                                "/test/Common/TestSuite.js"
-                            ];
+                        TestData.scripts = es5 ? ["/test/es5/Common/TestSuite.js"] : ["/test/Common/TestSuite.js"];
+                    }
+                    TestData.languages = languages.slice();
+                    if(testSuite.files.indexOf("Server.js") >= 0)
+                    {
+                        TestData.languages.push({value: "js", name: "JavaScript"});
                     }
                     res.writeHead(200, {"Content-Type": "text/html"});
                     res.end(template.render(TestData));
@@ -170,9 +191,9 @@ function Init()
             var es5 = matchController[1].indexOf("es5/") !== -1;
             var m = es5 ? matchController[1].replace("es5/", "") : matchController[1];
             var testpath = path.resolve(path.join(this._basePath, "test", matchController[1]))
+            var worker = req.url.query.worker == "True";
             var scripts = es5 ? [
                 "/node_modules/babel-polyfill/dist/polyfill.js",
-                "/node_modules/regenerator-runtime/runtime.js",
                 "/lib/es5/Ice.js",
                 "/test/es5/Common/Controller.js",
                 "/test/es5/Common/ControllerI.js",
@@ -181,10 +202,11 @@ function Init()
                 "/test/Common/Controller.js",
                 "/test/Common/ControllerI.js",
             ];
+
             var testSuite = TestSuites[m];
             if(testSuite)
             {
-                scripts = scripts.concat(TestSuites[m].files.map(function(f) {
+                TestData.scripts = scripts.concat(TestSuites[m].files.map(function(f) {
                     if(f.indexOf("/") === -1)
                     {
                         return "/test/" + matchController[1] + "/" + f;
@@ -201,11 +223,26 @@ function Init()
             }
             else
             {
-                scripts = scripts.concat(fs.readdirSync(testpath).filter(function(f) { return path.extname(f) === ".js"; }))
+                TestData.scripts = scripts.concat(fs.readdirSync(testpath).filter(function(f) { return path.extname(f) === ".js"; }))
             }
+
+            if(worker)
+            {
+                // Do not include babel polyfill when using workers, it is bundle with the controllerwoker
+                TestData.workerScripts = TestData.scripts.filter(script => script.indexOf("/babel-polyfill/") === -1);
+            }
+
             res.writeHead(200, {"Content-Type": "text/html"});
-            res.end(controller.render({ "scripts" : scripts }))
+            res.end(controller.render(TestData))
             console.log("HTTP/200 (Ok) " + req.method + " " + req.url.pathname);
+        }
+        else if(req.url.pathname === '/start')
+        {
+            res.writeHead(302,
+            {
+                "Location": "/test/Ice/acm/controller.html&port=15002"
+            });
+            res.end();
         }
         else
         {
@@ -227,6 +264,7 @@ function Init()
             }
 
             var filePath = req.url.pathname;
+            var sourceMap;
             if(filePath.indexOf("es5/") !== -1 && path.extname(filePath) != ".js")
             {
                 // We only host JS files in the es5 subdirectory, other files
@@ -234,7 +272,10 @@ function Init()
                 filePath = filePath.replace("es5/", "")
             }
             filePath = path.resolve(path.join(basePath, filePath))
-
+            if(iceLib)
+            {
+                sourceMap = req.url.pathname.replace(".js", ".js.map");
+            }
             //
             // If OPTIMIZE is set resolve Ice libraries to the corresponding minified
             // versions.
@@ -267,12 +308,12 @@ function Init()
                                 fs.stat(filePath,
                                         function(err, stats)
                                         {
-                                            doRequest(err, stats, filePath);
+                                            doRequest(err, stats, filePath, sourceMap);
                                         });
                             }
                             else
                             {
-                                doRequest(err, stats, filePath + ".gz");
+                                doRequest(err, stats, filePath + ".gz", sourceMap);
                             }
                         });
             }
@@ -281,11 +322,11 @@ function Init()
                 fs.stat(filePath,
                             function(err, stats)
                             {
-                                doRequest(err, stats, filePath);
+                                doRequest(err, stats, filePath, sourceMap);
                             });
             }
 
-            var doRequest = function(err, stats, filePath)
+            var doRequest = function(err, stats, filePath, sourceMap)
             {
                 if(err)
                 {
@@ -338,6 +379,11 @@ function Init()
                             "Content-Length": stats.size,
                             "Etag": hash.digest("hex")
                         };
+
+                        if(sourceMap)
+                        {
+                            headers["X-SourceMap"] = sourceMap;
+                        }
 
                         if(path.extname(filePath).slice(1) == "gz")
                         {

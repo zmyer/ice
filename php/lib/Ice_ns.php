@@ -75,6 +75,18 @@ namespace Ice
         {
             return "::Ice::Object";
         }
+
+        public function ice_getSlicedData()
+        {
+            if(property_exists($this, '_ice_slicedData'))
+            {
+                return $this->_ice_slicedData;
+            }
+            else
+            {
+                return null;
+            }
+        }
     }
 
     class InterfaceByValue extends Value
@@ -83,7 +95,7 @@ namespace Ice
         {
             $this->id =$id;
         }
-        
+
         public function ice_id()
         {
             return $this->id;
@@ -120,7 +132,10 @@ namespace Ice
         {
         }
 
-        public $unknownTypeId;
+        public function ice_id()
+        {
+            return $this->unknownTypeId;
+        }
     }
 
     $Ice__t_UnknownSlicedValue = IcePHP_defineClass('::Ice::UnknownSlicedValue', "\\Ice\\UnknownSlicedValue", -1, true, false, $Ice__t_Value, null);
@@ -167,7 +182,25 @@ namespace Ice
         const SlicedFormat = 2;
     }
 
-    $Ice_sliceChecksums = array();
+    class SliceChecksumInit
+    {
+        public function __construct($checksums)
+        {
+            SliceChecksumInit::$_checksums = array_merge(SliceChecksumInit::$_checksums, $checksums);
+        }
+
+        public static function checksums()
+        {
+            return SliceChecksumInit::$_checksums;;
+        }
+
+        private static $_checksums = array();
+    };
+
+    function sliceChecksums()
+    {
+        return SliceChecksumInit::checksums();
+    }
 }
 
 namespace

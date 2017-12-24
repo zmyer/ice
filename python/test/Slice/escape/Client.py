@@ -12,7 +12,7 @@ import os, sys, traceback
 
 for toplevel in [".", "..", "../..", "../../..", "../../../.."]:
     toplevel = os.path.normpath(toplevel)
-    if os.path.exists(os.path.join(toplevel, "python", "Ice.py")):
+    if os.path.exists(os.path.join(toplevel, "python", "Ice", "__init__.py")):
         break
 else:
     raise RuntimeError("can't find toplevel directory!")
@@ -24,15 +24,15 @@ Ice.loadSlice('Clash.ice')
 
 import _and
 
-class delI(_and._delDisp):
+class delI(_and._del):
     def _elifAsync(self, _else, current=None):
         pass
 
-class execI(_and._execDisp):
+class execI(_and._exec):
     def _finally(self, current=None):
         assert current.operation == "finally"
 
-class ifI(_and._ifDisp):
+class ifI(_and._if):
     def _elifAsync(self, _else, current=None):
         pass
     def _finally(self, current=None):
@@ -75,7 +75,7 @@ def testtypes():
     print("ok")
 
 def run(args, communicator):
-    communicator.getProperties().setProperty("TestAdapter.Endpoints", "default -p 12010:udp")
+    communicator.getProperties().setProperty("TestAdapter.Endpoints", "default -p 12010")
     adapter = communicator.createObjectAdapter("TestAdapter")
     adapter.add(execI(), Ice.stringToIdentity("test"))
     adapter.activate()

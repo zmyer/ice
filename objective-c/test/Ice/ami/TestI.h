@@ -6,7 +6,7 @@
 // ICE_LICENSE file included in this distribution.
 //
 // **********************************************************************
-  
+
 #import <AMITest.h>
 #import <Foundation/Foundation.h>
 
@@ -16,7 +16,16 @@
 @interface TestAMITestIntfI : TestAMITestIntf<TestAMITestIntf>
 {
     int _batchCount;
+    BOOL _dispatching;
     NSCondition* _cond;
+}
+@end
+
+//
+// Servant implementation
+//
+@interface TestAMITestOuterInnerTestIntfI : TestAMITestOuterInnerTestIntf<TestAMITestOuterInnerTestIntf>
+{
 }
 @end
 
@@ -26,4 +35,3 @@
 }
 -(id) initWithAdapter:(id<ICEObjectAdapter>)adapter;
 @end
-

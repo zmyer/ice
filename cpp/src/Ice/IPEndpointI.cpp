@@ -86,7 +86,6 @@ IceInternal::IPEndpointI::getInfo() const
     return info;
 }
 
-
 Ice::Short
 IceInternal::IPEndpointI::type() const
 {
@@ -138,7 +137,7 @@ IceInternal::IPEndpointI::connectors_async(Ice::EndpointSelectionType selType, c
 }
 
 vector<EndpointIPtr>
-IceInternal::IPEndpointI::expand() const
+IceInternal::IPEndpointI::expandIfWildcard() const
 {
     vector<EndpointIPtr> endps;
     vector<string> hosts = getHostsForEndpointExpand(_host, _instance->protocolSupport(), false);
@@ -154,6 +153,55 @@ IceInternal::IPEndpointI::expand() const
         }
     }
     return endps;
+}
+
+vector<EndpointIPtr>
+IceInternal::IPEndpointI::expandHost(EndpointIPtr& publish) const
+{
+    //
+    // If this endpoint has an empty host (wildcard address), don't expand, just return
+    // this endpoint.
+    //
+    if(_host.empty())
+    {
+        vector<EndpointIPtr> endpoints;
+        endpoints.push_back(ICE_SHARED_FROM_CONST_THIS(IPEndpointI));
+        return endpoints;
+    }
+
+    //
+    // If using a fixed port, this endpoint can be used as the published endpoint to
+    // access the returned endpoints. Otherwise, we'll publish each individual expanded
+    // endpoint.
+    //
+    if(_port > 0)
+    {
+        publish = ICE_SHARED_FROM_CONST_THIS(IPEndpointI);
+    }
+
+    vector<Address> addrs = getAddresses(_host,
+                                         _port,
+                                         _instance->protocolSupport(),
+                                         Ice::ICE_ENUM(EndpointSelectionType, Ordered),
+                                         _instance->preferIPv6(),
+                                         true);
+
+    vector<EndpointIPtr> endpoints;
+    if(addrs.size() == 1)
+    {
+        endpoints.push_back(ICE_SHARED_FROM_CONST_THIS(IPEndpointI));
+    }
+    else
+    {
+        for(vector<Address>::const_iterator p = addrs.begin(); p != addrs.end(); ++p)
+        {
+            string host;
+            int port;
+            addrToAddressAndPort(*p, host, port);
+            endpoints.push_back(createEndpoint(host, port, _connectionId));
+        }
+    }
+    return endpoints;
 }
 
 bool
@@ -378,9 +426,8 @@ IceInternal::IPEndpointI::initWithOptions(vector<string>& args, bool oaEndpoint)
         }
         else
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "`-h *' not valid for proxy endpoint `" + toString() + "'";
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__, "`-h *' not valid for proxy endpoint `" + toString() +
+                                              "'");
         }
     }
 
@@ -388,9 +435,9 @@ IceInternal::IPEndpointI::initWithOptions(vector<string>& args, bool oaEndpoint)
     {
         if(oaEndpoint)
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "`--sourceAddress' not valid for object adapter endpoint `" + toString() + "'";
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__,
+                                              "`--sourceAddress' not valid for object adapter endpoint `" + toString() +
+                                              "'");
         }
     }
     else if(!oaEndpoint)
@@ -406,9 +453,8 @@ IceInternal::IPEndpointI::checkOption(const string& option, const string& argume
     {
         if(argument.empty())
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "no argument provided for -h option in endpoint " + endpoint;
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__, "no argument provided for -h option in endpoint " +
+                                              endpoint);
         }
         const_cast<string&>(_host) = argument;
     }
@@ -416,39 +462,36 @@ IceInternal::IPEndpointI::checkOption(const string& option, const string& argume
     {
         if(argument.empty())
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "no argument provided for -p option in endpoint " + endpoint;
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__, "no argument provided for -p option in endpoint " +
+                                              endpoint);
         }
         istringstream p(argument);
         if(!(p >> const_cast<Ice::Int&>(_port)) || !p.eof())
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "invalid port value `" + argument + "' in endpoint " + endpoint;
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__, "invalid port value `" + argument + "' in endpoint " +
+                                              endpoint);
         }
         else if(_port < 0 || _port > 65535)
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "port value `" + argument + "' out of range in endpoint " + endpoint;
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__, "port value `" + argument +
+                                              "' out of range in endpoint " + endpoint);
         }
     }
     else if(option == "--sourceAddress")
     {
         if(argument.empty())
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "no argument provided for --sourceAddress option in endpoint " + endpoint;
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__,
+                                              "no argument provided for --sourceAddress option in endpoint " +
+                                              endpoint);
         }
 #ifndef ICE_OS_UWP
         const_cast<Address&>(_sourceAddr) = getNumericAddress(argument);
         if(!isAddressValid(_sourceAddr))
         {
-            Ice::EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "invalid IP address provided for --sourceAddress option in endpoint " + endpoint;
-            throw ex;
+            throw Ice::EndpointParseException(__FILE__, __LINE__,
+                                              "invalid IP address provided for --sourceAddress option in endpoint " +
+                                              endpoint);
         }
 #endif
     }
@@ -634,7 +677,8 @@ IceInternal::EndpointHostResolver::run()
 
             if(threadObserver)
             {
-                threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateInUseForOther), ICE_ENUM(ThreadState, ThreadStateIdle));
+                threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateInUseForOther),
+                                             ICE_ENUM(ThreadState, ThreadStateIdle));
             }
 
         }
@@ -642,7 +686,8 @@ IceInternal::EndpointHostResolver::run()
         {
             if(threadObserver)
             {
-                threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateInUseForOther), ICE_ENUM(ThreadState, ThreadStateIdle));
+                threadObserver->stateChanged(ICE_ENUM(ThreadState, ThreadStateInUseForOther),
+                                             ICE_ENUM(ThreadState, ThreadStateIdle));
             }
             if(r.observer)
             {
@@ -678,7 +723,10 @@ IceInternal::EndpointHostResolver::updateObserver()
     const CommunicatorObserverPtr& obsv = _instance->initializationData().observer;
     if(obsv)
     {
-        _observer.attach(obsv->getThreadObserver("Communicator", name(), ICE_ENUM(ThreadState, ThreadStateIdle), _observer.get()));
+        _observer.attach(obsv->getThreadObserver("Communicator",
+                                                 name(),
+                                                 ICE_ENUM(ThreadState, ThreadStateIdle),
+                                                 _observer.get()));
     }
 }
 
@@ -688,7 +736,6 @@ IceInternal::EndpointHostResolver::EndpointHostResolver(const InstancePtr& insta
     _instance(instance)
 {
 }
-
 
 void
 IceInternal::EndpointHostResolver::resolve(const string& host,

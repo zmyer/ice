@@ -20,6 +20,7 @@ sourceSets {
 
 dependencies {
     compile localDependency('ice')
+    compile localDependency('icessl')
     compile localDependency('icediscovery')
     compile localDependency('icelocatordiscovery')
     compile localDependency('icebox')
@@ -31,7 +32,7 @@ dependencies {
 
 if(!gradle.startParameter.isOffline()) {
     dependencies {
-        runtime "org.apache.tools:bzip2:1.0"
+        runtime "org.apache.commons:commons-compress:1.14"
     }
 }
 

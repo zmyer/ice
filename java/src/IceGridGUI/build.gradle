@@ -7,8 +7,8 @@
 //
 // **********************************************************************
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+sourceCompatibility = iceSourceCompatibility
+targetCompatibility = iceTargetCompatibility
 
 project.ext.displayName = "IceGridGUI Compat"
 project.ext.description = ""
@@ -22,7 +22,7 @@ project.ext.javafxJar = searchFile([{System.env['JFXRT_HOME']}, { System.env['JA
 
 project.ext.hasJavaFx = javafxJar != null
 
-if (project.ext.hasJavaFx) {
+if(project.ext.hasJavaFx) {
     apply plugin: 'application'
     apply from: 'javafx.gradle'
 } else {
@@ -35,12 +35,18 @@ if (project.ext.hasJavaFx) {
     }
 }
 
+// Disable deprecation warnings caused by JGoodies
+tasks.withType(JavaCompile) {
+    options.deprecation = false
+}
+
 configurations {
     bundleapp
 }
 
 dependencies {
       compile project(':ice')
+      compile project(':icessl')
       compile project(':icelocatordiscovery')
       compile project(':icebox')
       compile project(':icestorm')
@@ -48,7 +54,7 @@ dependencies {
       compile project(':icegrid')
       compile "com.jgoodies:jgoodies-looks:${jgoodiesLooksVersion}"
       compile "com.jgoodies:jgoodies-forms:${jgoodiesFormsVersion}"
-      bundleapp 'com.oracle:appbundler:1.0'
+      bundleapp 'com.panayotis:appbundler:1.0.2'
 }
 
 project.ext.tmpJarName = "IceGridGUITEMP.jar"
@@ -59,7 +65,7 @@ project.ext.keystore_password = env['JARSIGNER_KEYSTORE_PASSWORD']
 
 jar {
     archiveName = tmpJarName
-    if (!hasJavaFx) {
+    if(!hasJavaFx) {
         manifest {
             attributes 'Main-Class': "com.zeroc.IceGridGUI.Main"
         }
@@ -70,27 +76,34 @@ project.ext.libJars = []
 ['rt.jar', 'jsse.jar', 'i386/default/jclSC170/vm.jar', 'amd64/default/jclSC170/vm.jar', 'ibmcertpathfw.jar', 'math.jar'].each {
     def jfile = searchFile([{System.env['JAVA_HOME']}, {System.properties['java.home']}],
                            ["${it}", "lib/${it}", "jre/lib/${it}"])
-    if (jfile) {
+    if(jfile) {
       project.ext.libJars << jfile
     }
 }
 
-if (hasJavaFx) {
+if(hasJavaFx) {
     project.ext.libJars << javafxJar
 }
 
-if(icegridguiProguard.toBoolean()){
-    apply from: "proguard-jar.gradle"
-}else{
-    apply from: "plain-jar.gradle"
+project.ext.jarBuilder = "plain-jar.gradle"
+if(icegridguiProguard.toBoolean()) {
+    // Proguard does not yet support Java 9
+    if(JavaVersion.current() == JavaVersion.VERSION_1_9) {
+        logger.warn('Proguard does not yet support Java 9. Plain IceGridGUI JAR will be built.')
+    } else {
+        project.ext.jarBuilder = "proguard-jar.gradle"
+    }
 }
+apply from: jarBuilder
 
-task signjar(dependsOn: updateManifest) << {
-    if(keystore != null && keystore.length() > 0) {
-        ant.signjar(jar: "${libDir}/${jarName}",
-                    alias: 'zeroc.com',
-                    keystore:"${keystore}",
-                    storepass:"${keystore_password}")
+task signjar(dependsOn: updateManifest) {
+    doLast {
+        if(keystore != null && keystore.length() > 0) {
+            ant.signjar(jar: "${libDir}/${jarName}",
+                        alias: 'zeroc.com',
+                        keystore:"${keystore}",
+                        storepass:"${keystore_password}")
+        }
     }
 }
 assemble.dependsOn(signjar)
@@ -98,31 +111,33 @@ assemble.dependsOn(signjar)
 if(macosx)
 {
     def appName = "IceGrid GUI"
-    task bundleapp(dependsOn: updateManifest) << {
-        ant.taskdef(name: 'bundleapp',
-                    classname: 'com.oracle.appbundler.AppBundlerTask',
-                    classpath: configurations.bundleapp.asPath)
+    task bundleapp(dependsOn: updateManifest) {
+        doLast {
+            ant.taskdef(name: 'bundleapp',
+                        classname: 'com.oracle.appbundler.AppBundlerTask',
+                        classpath: configurations.bundleapp.asPath)
 
-        ant.bundleapp(outputdirectory: "${libDir}",
-                      name: appName,
-                      displayname: appName,
-                      identifier: "com.zeroc.IceGridGUI",
-                      icon: "${projectDir}/src/main/resources/icons/icegrid.icns",
-                      shortversion: "${project.version}",
-                      applicationCategory: "public.app-category.utilities",
-                      mainclassname: "com.zeroc.IceGridGUI/MainProxy",
-                      copyright: "Copyright © 2005-2016 ZeroC, Inc. All rights reserved.") {
-            classpath(file: "${libDir}/${jarName}") {
-            }
-            option(value: "-Dapple.laf.useScreenMenuBar=true") {
-            }
-            option(value: "-Dcom.apple.macos.use-file-dialog-packages=true") {
-            }
-            option(value: "-Dcom.apple.macos.useScreenMenuBar=true") {
-            }
-            option(value: "-Xdock:name=IceGrid GUI") {
-            }
-            option(value: "-Dcom.apple.mrj.application.apple.menu.about.name=${appName}") {
+            ant.bundleapp(outputdirectory: "${libDir}",
+                        name: appName,
+                        displayname: appName,
+                        identifier: "com.zeroc.IceGridGUI",
+                        icon: "${projectDir}/src/main/resources/icons/icegrid.icns",
+                        shortversion: "${project.version}",
+                        applicationCategory: "public.app-category.utilities",
+                        mainclassname: "com.zeroc.IceGridGUI/MainProxy",
+                        copyright: "Copyright © 2005-2017 ZeroC, Inc. All rights reserved.") {
+                classpath(file: "${libDir}/${jarName}") {
+                }
+                option(value: "-Dapple.laf.useScreenMenuBar=true") {
+                }
+                option(value: "-Dcom.apple.macos.use-file-dialog-packages=true") {
+                }
+                option(value: "-Dcom.apple.macos.useScreenMenuBar=true") {
+                }
+                option(value: "-Xdock:name=IceGrid GUI") {
+                }
+                option(value: "-Dcom.apple.mrj.application.apple.menu.about.name=${appName}") {
+                }
             }
         }
     }

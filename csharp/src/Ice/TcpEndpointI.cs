@@ -127,8 +127,15 @@ namespace IceInternal
 
         public TcpEndpointI endpoint(TcpAcceptor acceptor)
         {
-            return new TcpEndpointI(instance_, host_, acceptor.effectivePort(), sourceAddr_, _timeout, connectionId_,
-                                    _compress);
+            int port = acceptor.effectivePort();
+            if(port == port_)
+            {
+                return this;
+            }
+            else
+            {
+                return new TcpEndpointI(instance_, host_, port, sourceAddr_, _timeout, connectionId_, _compress);
+            }
         }
 
         public override string options()
@@ -292,6 +299,10 @@ namespace IceInternal
             _instance = instance;
         }
 
+        public void initialize()
+        {
+        }
+
         public short type()
         {
             return _instance.type();
@@ -319,7 +330,7 @@ namespace IceInternal
             _instance = null;
         }
 
-        public EndpointFactory clone(ProtocolInstance instance, EndpointFactory del)
+        public EndpointFactory clone(ProtocolInstance instance)
         {
             return new TcpEndpointFactory(instance);
         }

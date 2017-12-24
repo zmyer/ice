@@ -233,8 +233,15 @@ IceObjC::StreamEndpointI::acceptor(const string&) const
 IceObjC::StreamEndpointIPtr
 IceObjC::StreamEndpointI::endpoint(const StreamAcceptorPtr& a) const
 {
-    return ICE_MAKE_SHARED(StreamEndpointI, _instance, _host, a->effectivePort(), _sourceAddr, _timeout, _connectionId,
-                           _compress);
+    int port = a->effectivePort();
+    if(port == _port)
+    {
+        return ICE_DYNAMIC_CAST(StreamEndpointI, ICE_SHARED_FROM_CONST_THIS(StreamEndpointI));
+    }
+    else
+    {
+        return ICE_MAKE_SHARED(StreamEndpointI, _instance, _host, port, _sourceAddr, _timeout, _connectionId, _compress);
+    }
 }
 
 string
@@ -378,9 +385,8 @@ IceObjC::StreamEndpointI::checkOption(const string& option, const string& argume
     {
         if(argument.empty())
         {
-            EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "no argument provided for -t option in endpoint " + endpoint;
-            throw ex;
+            throw EndpointParseException(__FILE__, __LINE__, "no argument provided for -t option in endpoint " +
+                                         endpoint);
         }
 
         if(argument == "infinite")
@@ -392,9 +398,8 @@ IceObjC::StreamEndpointI::checkOption(const string& option, const string& argume
             istringstream t(argument);
             if(!(t >> const_cast<Int&>(_timeout)) || !t.eof() || _timeout < 1)
             {
-                EndpointParseException ex(__FILE__, __LINE__);
-                ex.str = "invalid timeout value `" + argument + "' in endpoint " + endpoint;
-                throw ex;
+                throw EndpointParseException(__FILE__, __LINE__, "invalid timeout value `" + argument +
+                                             "' in endpoint " + endpoint);
             }
         }
         return true;
@@ -404,9 +409,8 @@ IceObjC::StreamEndpointI::checkOption(const string& option, const string& argume
     {
         if(!argument.empty())
         {
-            EndpointParseException ex(__FILE__, __LINE__);
-            ex.str = "unexpected argument `" + argument + "' provided for -z option in " + endpoint;
-            throw ex;
+            throw EndpointParseException(__FILE__, __LINE__, "unexpected argument `" + argument +
+                                         "' provided for -z option in " + endpoint);
         }
         const_cast<bool&>(_compress) = true;
         return true;
@@ -473,7 +477,7 @@ IceObjC::StreamEndpointFactory::destroy()
 }
 
 EndpointFactoryPtr
-IceObjC::StreamEndpointFactory::clone(const ProtocolInstancePtr& instance, const EndpointFactoryPtr&) const
+IceObjC::StreamEndpointFactory::clone(const ProtocolInstancePtr& instance) const
 {
     return new StreamEndpointFactory(_instance->clone(instance));
 }

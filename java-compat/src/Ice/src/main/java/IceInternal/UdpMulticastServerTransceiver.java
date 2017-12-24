@@ -121,7 +121,7 @@ final class UdpMulticastServerTransceiver implements Transceiver
         {
             Buffer rb = _buffers.removeFirst();
             buf.swap(rb);
-            buf.b.position(buf.b.limit());
+            buf.position(buf.b.limit());
             buf.resize(buf.b.limit(), true);
 
             if(rb.b.hasArray())
@@ -169,7 +169,8 @@ final class UdpMulticastServerTransceiver implements Transceiver
     public String toDetailedString()
     {
         StringBuilder s = new StringBuilder(toString());
-        java.util.List<String> intfs = Network.getInterfacesForMulticast(_mcastInterface, _addr);
+        java.util.List<String> intfs = Network.getInterfacesForMulticast(_mcastInterface,
+                                                                         Network.getProtocolSupport(_addr));
         if(!intfs.isEmpty())
         {
             s.append("\nlocal interfaces = ");
@@ -356,6 +357,7 @@ final class UdpMulticastServerTransceiver implements Transceiver
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void finalize()
         throws Throwable

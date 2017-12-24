@@ -46,7 +46,6 @@ public final class ObjectAdapterFactory
         }
     }
 
-
     public void
     waitForShutdown()
     {
@@ -241,6 +240,7 @@ public final class ObjectAdapterFactory
         _communicator = communicator;
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void
     finalize()

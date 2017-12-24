@@ -21,7 +21,6 @@
 
 #include <set>
 
-
 namespace Glacier2
 {
 
@@ -100,7 +99,7 @@ public:
     virtual ~SessionRouterI();
     void destroy();
 
-    virtual Ice::ObjectPrx getClientProxy(const Ice::Current&) const;
+    virtual Ice::ObjectPrx getClientProxy(IceUtil::Optional<bool>&, const Ice::Current&) const;
     virtual Ice::ObjectPrx getServerProxy(const Ice::Current&) const;
     virtual Ice::ObjectProxySeq addProxies(const Ice::ObjectProxySeq&, const Ice::Current&);
     virtual std::string getCategoryForClient(const Ice::Current&) const;

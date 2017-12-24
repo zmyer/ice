@@ -268,7 +268,6 @@ Ice.StringUtil = class
 };
 module.exports.Ice = Ice;
 
-
 function encodeChar(c, sb, special, toStringMode)
 {
     switch(c)
@@ -419,7 +418,7 @@ function checkChar(s, pos)
         msg += " has invalid ordinal value" + c;
         throw new Error(msg);
     }
-    return s.charAt(pos)
+    return s.charAt(pos);
 }
 //
 // Decode the character or escape sequence starting at start and appends it to result;
@@ -483,13 +482,13 @@ function decodeChar(s, start, end, special, result)
             case 'r':
             {
                 ++start;
-                result.push("\r")
+                result.push("\r");
                 break;
             }
             case 't':
             {
                 ++start;
-                result.push("\t")
+                result.push("\t");
                 break;
             }
             case 'v':

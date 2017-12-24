@@ -853,7 +853,11 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         out.write(arr);
         out.writePendingValues();
         out.finished(data);
+
         Ice::InputStream in(communicator, data);
+#ifndef ICE_CPP11_MAPPING
+        in.setCollectObjects(true);
+#endif
         MyClassS arr2;
         in.read(arr2);
         in.readPendingValues();
@@ -886,12 +890,39 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         out2.finished(data);
 
         Ice::InputStream in2(communicator, data);
+#ifndef ICE_CPP11_MAPPING
+        in2.setCollectObjects(true);
+#endif
         MyClassSS arr2S;
         in2.read(arr2S);
         test(arr2S.size() == arrS.size());
         test(arr2S[0].size() == arrS[0].size());
         test(arr2S[1].size() == arrS[1].size());
         test(arr2S[2].size() == arrS[2].size());
+
+#ifdef ICE_CPP11_MAPPING
+        auto clearS = [](MyClassS& arr) {
+            for(MyClassS::iterator p = arr.begin(); p != arr.end(); ++p)
+            {
+                if(*p)
+                {
+                    (*p)->c = nullptr;
+                    (*p)->o = nullptr;
+                    (*p)->d["hi"] = nullptr;
+                }
+            }
+        };
+        auto clearSS = [clearS](MyClassSS& arr) {
+            for(MyClassSS::iterator p = arr.begin(); p != arr.end(); ++p)
+            {
+                clearS(*p);
+            }
+        };
+        clearS(arr);
+        clearS(arr2);
+        clearSS(arrS);
+        clearSS(arr2S);
+#endif
     }
 
 #ifndef ICE_CPP11_MAPPING
@@ -1032,6 +1063,9 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
         out.finished(data);
 
         Ice::InputStream in(communicator, data);
+#ifndef ICE_CPP11_MAPPING
+        in.setCollectObjects(true);
+#endif
         try
         {
             in.throwException();
@@ -1049,7 +1083,16 @@ run(int, char**, const Ice::CommunicatorPtr& communicator)
             test(ex1.c->seq7 == c->seq7);
             test(ex1.c->seq8 == c->seq8);
             test(ex1.c->seq9 == c->seq9);
+
+#ifdef ICE_CPP11_MAPPING
+            ex1.c->c = nullptr;
+            ex1.c->o = nullptr;
+#endif
         }
+#ifdef ICE_CPP11_MAPPING
+        c->c = nullptr;
+        c->o = nullptr;
+#endif
     }
 
     {
@@ -1298,7 +1341,8 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
 #endif
 
     int status;

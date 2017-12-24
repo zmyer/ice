@@ -1006,8 +1006,8 @@ proxyIceGetEndpointSelection(ProxyObject* self)
     PyObject* cls = lookupType("Ice.EndpointSelectionType");
     assert(cls);
 
-    PyObjectHandle rnd = PyObject_GetAttrString(cls, STRCAST("Random"));
-    PyObjectHandle ord = PyObject_GetAttrString(cls, STRCAST("Ordered"));
+    PyObjectHandle rnd = getAttr(cls, "Random", false);
+    PyObjectHandle ord = getAttr(cls, "Ordered", false);
     assert(rnd.get());
     assert(ord.get());
 
@@ -1051,8 +1051,8 @@ proxyIceEndpointSelection(ProxyObject* self, PyObject* args)
     }
 
     Ice::EndpointSelectionType val;
-    PyObjectHandle rnd = PyObject_GetAttrString(cls, STRCAST("Random"));
-    PyObjectHandle ord = PyObject_GetAttrString(cls, STRCAST("Ordered"));
+    PyObjectHandle rnd = getAttr(cls, "Random", false);
+    PyObjectHandle ord = getAttr(cls, "Ordered", false);
     assert(rnd.get());
     assert(ord.get());
     if(rnd.get() == type)
@@ -1142,7 +1142,6 @@ proxyIceSecure(ProxyObject* self, PyObject* args)
     return createProxy(newProxy, *self->communicator, reinterpret_cast<PyObject*>(Py_TYPE(self)));
 }
 
-
 #ifdef WIN32
 extern "C"
 #endif
@@ -1172,8 +1171,15 @@ extern "C"
 static PyObject*
 proxyIceEncodingVersion(ProxyObject* self, PyObject* args)
 {
+    PyObject* versionType = IcePy::lookupType("Ice.EncodingVersion");
+    PyObject* p;
+    if(!PyArg_ParseTuple(args, STRCAST("O!"), versionType, &p))
+    {
+        return 0;
+    }
+
     Ice::EncodingVersion val;
-    if(!getEncodingVersion(args, val))
+    if(!getEncodingVersion(p, val))
     {
         PyErr_Format(PyExc_ValueError, STRCAST("ice_encodingVersion requires an encoding version"));
         return 0;
@@ -1815,8 +1821,6 @@ proxyIceGetConnectionAsync(ProxyObject* self, PyObject* /*args*/, PyObject* /*kw
 
     try
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-
         result = (*self->proxy)->begin_ice_getConnection(cb);
     }
     catch(const Ice::Exception& ex)
@@ -1891,8 +1895,6 @@ proxyBeginIceGetConnection(ProxyObject* self, PyObject* args, PyObject* kwds)
     Ice::AsyncResultPtr result;
     try
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-
         if(cb)
         {
             result = (*self->proxy)->begin_ice_getConnection(cb);
@@ -2020,8 +2022,6 @@ proxyIceFlushBatchRequestsAsync(ProxyObject* self, PyObject* /*args*/, PyObject*
 
     try
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-
         result = (*self->proxy)->begin_ice_flushBatchRequests(cb);
     }
     catch(const Ice::Exception& ex)
@@ -2094,8 +2094,6 @@ proxyBeginIceFlushBatchRequests(ProxyObject* self, PyObject* args, PyObject* kwd
     Ice::AsyncResultPtr result;
     try
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-
         if(cb)
         {
             result = (*self->proxy)->begin_ice_flushBatchRequests(cb);
@@ -2191,7 +2189,7 @@ AMI_Object_ice_flushBatchRequestsI::exception(const Ice::Exception& ex)
     }
     else
     {
-        PyObjectHandle method = PyObject_GetAttrString(_callback, STRCAST(methodName.c_str()));
+        PyObjectHandle method = getAttr(_callback, methodName, false);
         assert(method.get());
         PyObjectHandle exh = convertException(ex);
         assert(exh.get());
@@ -2213,7 +2211,7 @@ AMI_Object_ice_flushBatchRequestsI::sent(bool)
     const string methodName = "ice_sent";
     if(PyObject_HasAttrString(_callback, STRCAST(methodName.c_str())))
     {
-        PyObjectHandle method = PyObject_GetAttrString(_callback, STRCAST(methodName.c_str()));
+        PyObjectHandle method = getAttr(_callback, methodName, false);
         assert(method.get());
         PyObjectHandle args = PyTuple_New(0);
         PyObjectHandle tmp = PyObject_Call(method.get(), args.get(), 0);
@@ -2278,20 +2276,17 @@ checkedCastImpl(ProxyObject* p, const string& id, PyObject* facet, PyObject* ctx
     bool b = false;
     try
     {
-        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
-        if(!ctx || ctx == Py_None)
+        Ice::Context c = ::Ice::noExplicitContext;
+        if(ctx && ctx != Py_None)
         {
-            b = target->ice_isA(id);
-        }
-        else
-        {
-            Ice::Context c;
             if(!dictionaryToContext(ctx, c))
             {
                 return 0;
             }
-            b = target->ice_isA(id, c);
         }
+
+        AllowThreads allowThreads; // Release Python's global interpreter lock during remote invocations.
+        b = target->ice_isA(id, c);
     }
     catch(const Ice::FacetNotExistException&)
     {

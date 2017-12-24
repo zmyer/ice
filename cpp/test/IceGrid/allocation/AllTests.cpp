@@ -77,7 +77,6 @@ private:
 };
 typedef IceUtil::Handle<Callback> CallbackPtr;
 
-
 class StressClient : public IceUtil::Thread, public IceUtil::Monitor<IceUtil::Mutex>
 {
 public:
@@ -602,6 +601,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
                 // The notification of the server being disabled is asynchronous and might
                 // not be visible to the allocation system immediately.
                 session1->allocateObjectByType("::Test");
+                session1->releaseObject(obj->ice_getIdentity());
                 IceUtil::ThreadControl::sleep(IceUtil::Time::milliSeconds(100));
             }
             test(false);
@@ -614,8 +614,8 @@ allTests(const Ice::CommunicatorPtr& communicator)
         cout << "ok" << endl;
 
         cout << "testing object allocation timeout... " << flush;
-
         session1->allocateObjectById(allocatable);
+
         IceUtil::Time time = IceUtil::Time::now();
         session2->setAllocationTimeout(500);
         try
@@ -841,6 +841,7 @@ allTests(const Ice::CommunicatorPtr& communicator)
                 // The notification of the server being disabled is asynchronous and might
                 // not be visible to the allocation system immediately.
                 session1->allocateObjectByType("::TestServer1");
+                session1->releaseObject(allocatable3);
                 IceUtil::ThreadControl::sleep(IceUtil::Time::milliSeconds(100));
             }
             test(false);

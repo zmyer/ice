@@ -14,9 +14,8 @@
 static int
 run(id<ICECommunicator> communicator)
 {
-    id<TestTimeoutTimeoutPrx> timeoutAllTests(id<ICECommunicator>);
-    id<TestTimeoutTimeoutPrx> timeout = timeoutAllTests(communicator);
-    [timeout shutdown];
+    void timeoutAllTests(id<ICECommunicator>);
+    timeoutAllTests(communicator);
     return EXIT_SUCCESS;
 }
 
@@ -29,6 +28,7 @@ main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
     ICEregisterIceSSL(YES);
+    ICEregisterIceWS(YES);
 #if TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR
     ICEregisterIceIAP(YES);
 #endif

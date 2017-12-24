@@ -83,7 +83,7 @@ class TestCase(threading.Thread):
         initData = Ice.InitializationData()
         initData.properties = self._com.ice_getCommunicator().getProperties().clone()
         initData.logger = self._logger
-        initData.properties.setProperty("Ice.ACM.Timeout", "1")
+        initData.properties.setProperty("Ice.ACM.Timeout", "2")
         if self._clientACMTimeout >= 0:
             initData.properties.setProperty("Ice.ACM.Client.Timeout", str(self._clientACMTimeout))
         if self._clientACMClose >= 0:
@@ -150,12 +150,13 @@ def allTests(communicator):
     class InvocationHeartbeatTest(TestCase):
         def __init__(self, com):
             TestCase.__init__(self, "invocation heartbeat", com)
+            self.setServerACM(1, -1, -1) # Faster ACM to make sure we receive enough ACM heartbeats
 
         def runTestCase(self, adapter, proxy):
-            proxy.sleep(2)
+            proxy.sleep(4)
 
             with self.m:
-                test(self._heartbeat >= 2)
+                test(self._heartbeat >= 6)
 
     class InvocationHeartbeatOnHoldTest(TestCase):
         def __init__(self, com):
@@ -179,7 +180,7 @@ def allTests(communicator):
     class InvocationNoHeartbeatTest(TestCase):
         def __init__(self, com):
             TestCase.__init__(self, "invocation with no heartbeat", com)
-            self.setServerACM(1, 2, 0) # Disable heartbeat on invocations
+            self.setServerACM(2, 2, 0) # Disable heartbeat on invocations
 
         def runTestCase(self, adapter, proxy):
             try:
@@ -203,7 +204,7 @@ def allTests(communicator):
 
         def runTestCase(self, adapter, proxy):
             # No close on invocation, the call should succeed this time.
-            proxy.sleep(2)
+            proxy.sleep(3)
 
             with self.m:
                 test(self._heartbeat == 0)
@@ -215,7 +216,7 @@ def allTests(communicator):
             self.setClientACM(1, 1, 0) # Only close on idle.
 
         def runTestCase(self, adapter, proxy):
-            time.sleep(1.6) # Idle for 1.6 seconds
+            time.sleep(3) # Idle for 3 seconds
 
             with self.m:
                 test(self._heartbeat == 0)
@@ -227,7 +228,7 @@ def allTests(communicator):
             self.setClientACM(1, 2, 0) # Only close on invocation.
 
         def runTestCase(self, adapter, proxy):
-            time.sleep(1.5) # Idle for 1.5 seconds
+            time.sleep(3) # Idle for 3 seconds
 
             with self.m:
                 test(self._heartbeat == 0)
@@ -245,14 +246,14 @@ def allTests(communicator):
             # the close is graceful or forceful.
             #
             adapter.hold()
-            time.sleep(1.6) # Idle for 1.6 seconds
+            time.sleep(3) # Idle for 3 seconds
 
             with self.m:
                 test(self._heartbeat == 0)
                 test(not self._closed) # Not closed yet because of graceful close.
 
             adapter.activate()
-            time.sleep(0.5)
+            time.sleep(1)
 
             with self.m:
                 test(self._closed) # Connection should be closed this time.
@@ -264,7 +265,7 @@ def allTests(communicator):
 
         def runTestCase(self, adapter, proxy):
             adapter.hold()
-            time.sleep(1.6) # Idle for 1.6 seconds
+            time.sleep(3) # Idle for 3 seconds
 
             with self.m:
                 test(self._heartbeat == 0)
@@ -276,7 +277,7 @@ def allTests(communicator):
             self.setServerACM(1, -1, 2) # Enable server heartbeats.
 
         def runTestCase(self, adapter, proxy):
-            time.sleep(2)
+            time.sleep(3)
 
             with self.m:
                 test(self._heartbeat >= 3)
@@ -287,9 +288,9 @@ def allTests(communicator):
             self.setServerACM(1, -1, 3) # Enable server heartbeats.
 
         def runTestCase(self, adapter, proxy):
-            for i in range(0, 20):
+            for i in range(0, 10):
                 proxy.ice_ping()
-                time.sleep(0.1)
+                time.sleep(0.3)
 
             with self.m:
                 test(self._heartbeat >= 3)

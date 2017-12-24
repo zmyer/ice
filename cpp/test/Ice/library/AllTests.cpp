@@ -22,8 +22,7 @@ class TestI : public Test::MyInterface
 {
 public:
 
-    void op(bool, const Ice::Current& = Ice::noExplicitCurrent);
-
+    void op(bool, const Ice::Current&);
 };
 
 void
@@ -42,4 +41,3 @@ void allTests(const Ice::ObjectAdapterPtr& oa)
     Test::MyInterfacePrxPtr proxy = ICE_UNCHECKED_CAST(Test::MyInterfacePrx, oa->addWithUUID(servant));
     consume(servant, proxy);
 }
-

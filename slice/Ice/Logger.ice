@@ -9,7 +9,7 @@
 
 #pragma once
 
-[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API"]]
+[["ice-prefix", "cpp:header-ext:h", "cpp:dll-export:ICE_API", "objc:header-dir:objc", "objc:dll-export:ICE_API", "python:pkgdir:Ice"]]
 
 #ifndef __SLICE2JAVA_COMPAT__
 [["java:package:com.zeroc"]]
@@ -68,7 +68,7 @@ local interface Logger
      *
      **/
     void error(string message);
-    
+
     /**
      *
      * Returns this logger's prefix.
@@ -87,6 +87,6 @@ local interface Logger
      *
      */
     Logger cloneWithPrefix(string prefix);
-};
+}
 
-};
+}

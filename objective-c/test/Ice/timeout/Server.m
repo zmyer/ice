@@ -14,11 +14,17 @@
 static int
 run(id<ICECommunicator> communicator)
 {
-    [[communicator getProperties] setProperty:@"TestAdapter.Endpoints" value:@"default -p 12010:udp"];
+    [[communicator getProperties] setProperty:@"TestAdapter.Endpoints" value:@"default -p 12010"];
+    [[communicator getProperties] setProperty:@"ControllerAdapter.Endpoints" value:@"default -p 12011"];
+    [[communicator getProperties] setProperty:@"ControllerAdapter.ThreadPool.Size" value:@"1"];
+
     id<ICEObjectAdapter> adapter = [communicator createObjectAdapter:@"TestAdapter"];
-    ICEObject* object = [TimeoutI timeout];
-    [adapter add:object identity:[ICEUtil stringToIdentity:@"timeout"]];
+    [adapter add:[TimeoutI timeout] identity:[ICEUtil stringToIdentity:@"timeout"]];
     [adapter activate];
+
+    id<ICEObjectAdapter> controllerAdapter = [communicator createObjectAdapter:@"ControllerAdapter"];
+    [controllerAdapter add:[TimeoutControllerI controller:adapter] identity:[ICEUtil stringToIdentity:@"controller"]];
+    [controllerAdapter activate];
 
     serverReady(communicator);
 
@@ -35,6 +41,8 @@ main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
     ICEregisterIceSSL(YES);
+    ICEregisterIceWS(YES);
+    ICEregisterIceUDP(YES);
 #if TARGET_OS_IPHONE && !TARGET_IPHONE_SIMULATOR
     ICEregisterIceIAP(YES);
 #endif
@@ -59,6 +67,12 @@ main(int argc, char* argv[])
             // This test kills connections, so we don't want warnings.
             //
             [initData.properties setProperty:@"Ice.Warn.Connections" value:@"0"];
+
+            //
+            // The client sends large messages to cause the transport
+            // buffers to fill up.
+            //
+            [initData.properties setProperty:@"Ice.MessageSizeMax" value:@"20000"];
 
             //
             // Limit the send buffer size, this test relies on the socket

@@ -14,7 +14,7 @@ def test(b):
     if not b:
         raise RuntimeError('test assertion failed')
 
-class TestI(Test._TestIntfDisp):
+class TestI(Test.TestIntf):
 
     def requestFailedException(self, current=None):
         return None
@@ -102,7 +102,7 @@ class ServantLocatorI(Ice.ServantLocator):
         test(not self._deactivated)
 
         test(current.id.category == self._category or self._category == "")
-        
+
         if current.id.name == "unknown":
             return None
 
@@ -129,7 +129,7 @@ class ServantLocatorI(Ice.ServantLocator):
 
         test(current.id.category == self._category  or self._category == "")
         test(current.id.name == "locate" or current.id.name == "finished")
-        
+
         if current.id.name == "finished":
             self.exception(current)
 

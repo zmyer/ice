@@ -20,19 +20,13 @@ public class Client : TestCommon.Application
 {
     public override int run(string[] args)
     {
-        Test.TimeoutPrx timeout = AllTests.allTests(this);
-        timeout.shutdown();
+        AllTests.allTests(this);
         return 0;
     }
 
     protected override Ice.InitializationData getInitData(ref string[] args)
     {
         Ice.InitializationData initData = base.getInitData(ref args);
-        //
-        // We need to send messages large enough to cause the transport
-        // buffers to fill up.
-        //
-        initData.properties.setProperty("Ice.MessageSizeMax", "20000");
 
         //
         // For this test, we want to disable retries.

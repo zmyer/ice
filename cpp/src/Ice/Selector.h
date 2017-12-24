@@ -58,7 +58,6 @@ class SelectorTimeoutException
 {
 };
 
-
 #if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 
 class Selector
@@ -141,6 +140,7 @@ private:
     void wakeup();
     void checkReady(EventHandler*);
     void updateSelector();
+    void updateSelectorForEventHandler(EventHandler*, SocketOperation, SocketOperation);
 
     const InstancePtr _instance;
 

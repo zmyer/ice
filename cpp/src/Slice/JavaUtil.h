@@ -97,7 +97,6 @@ protected:
                                   const std::string& = std::string(),
                                   const std::string& = std::string()) const;
 
-
     //
     // Returns the package prefix for a give Slice file.
     //
@@ -108,6 +107,7 @@ protected:
     //
     std::string getPackage(const ContainedPtr&) const;
 
+    std::string getAbsolute(const std::string&, const std::string&) const;
     //
     // Returns the Java name for a Contained entity. If the optional
     // package argument matches the entity's package name, then the
@@ -145,7 +145,7 @@ protected:
         TypeModeReturn
     };
     std::string typeToString(const TypePtr&, TypeMode, const std::string& = std::string(),
-                             const StringList& = StringList(), bool = true, bool = false) const;
+                             const StringList& = StringList(), bool = true, bool = false, bool = false) const;
 
     //
     // Get the Java object name for a type. For primitive types, this returns the
@@ -264,7 +264,6 @@ protected:
                                   const std::string& = std::string(),
                                   const std::string& = std::string()) const;
 
-
     //
     // Returns the package prefix for a give Slice file.
     //
@@ -274,6 +273,12 @@ protected:
     // Returns the Java package of a Contained entity.
     //
     std::string getPackage(const ContainedPtr&) const;
+
+    //
+    // Returns the Java type without a package if the package
+    // matches the current package
+    //
+    std::string getAbsolute(const std::string&, const std::string&) const;
 
     //
     // Returns the Java name for a Contained entity. If the optional

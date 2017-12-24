@@ -197,8 +197,7 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     test(d.theA == b1);
     test(d.theB == b2);
     //test(d.theC == 0);
-//    if(!collocated)
-//    {
+
     test(d.preMarshalInvoked);
     test(d.postUnmarshalInvoked);
     test(d.theA.preMarshalInvoked);
@@ -207,7 +206,6 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     test(d.theB.postUnmarshalInvoked);
     test(d.theB.theC.preMarshalInvoked);
     test(d.theB.theC.postUnmarshalInvoked);
-//    }
 
     breakRetainCycleB(b1);
     breakRetainCycleB(b2);
@@ -242,6 +240,38 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     [initial setI:h];
     tprintf("ok\n");
 
+    tprintf("testing recursive type... ");
+    TestObjectsRecursive* top = [TestObjectsRecursive recursive];
+    TestObjectsRecursive* p = top;
+    int depth = 0;
+    @try
+    {
+        for(; depth <= 20000; ++depth)
+        {
+            p.v = [TestObjectsRecursive recursive];
+            p = p.v;
+            if((depth < 10 && (depth % 10) == 0) ||
+               (depth < 1000 && (depth % 100) == 0) ||
+               (depth < 10000 && (depth % 1000) == 0) ||
+               (depth % 10000) == 0)
+            {
+                [initial setRecursive:top];
+            }
+        }
+        test(![initial supportsClassGraphDepthMax]);
+    }
+    @catch(ICEUnknownLocalException*)
+    {
+        // Expected marshal exception from the server (max class graph depth reached)
+        test(depth == 100); // The default is 100.
+    }
+    @catch(ICEUnknownException*)
+    {
+        // Expected stack overflow from the server (Java only)
+    }
+    [initial setRecursive:[TestObjectsRecursive recursive]];
+    tprintf("ok\n");
+
     tprintf("testing sequences... ");
     TestObjectsMutableBaseSeq* inS = [TestObjectsMutableBaseSeq array];
     TestObjectsMutableBaseSeq* outS;
@@ -265,10 +295,10 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     tprintf("testing marshaled results...");
     b1 = [initial getMB];
     test(b1 != nil && b1.theB == b1);
-    b1.theB = nil;
+    breakRetainCycleB(b1);
     b1 = [initial end_getAMDMB:[initial begin_getAMDMB]];
     test(b1 != nil && b1.theB == b1);
-    b1.theB = nil;
+    breakRetainCycleB(b1);
     tprintf("ok\n");
 
     tprintf("testing UnexpectedObjectException... ");
@@ -292,12 +322,11 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
         test(NO);
     }
     tprintf("ok\n");
-//     }
 
     //
     // TestObjectss specific to Objective-C.
     //
-   {
+    {
         tprintf("setting Object sequence... ");
         TestObjectsMutableObjectSeq* seq = [TestObjectsMutableObjectSeq array];
 
@@ -585,7 +614,6 @@ objectsAllTests(id<ICECommunicator> communicator, BOOL collocated)
     {
         // cross-test server does not implement this object
     }
-
 
     return initial;
 }

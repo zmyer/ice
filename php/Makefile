@@ -7,8 +7,8 @@
 #
 # **********************************************************************
 
-top_srcdir	:= ..
-lang_srcdir	:= $(top_srcdir)/$(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
+top_srcdir      := ..
+lang_srcdir     := $(top_srcdir)/$(notdir $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST))))))
 
 include $(top_srcdir)/config/Make.rules
 
@@ -22,6 +22,8 @@ $(eval $(call load-dependencies,$(addprefix $(top_srcdir)/cpp/src/,Ice IceSSL Ic
 # Load php rules after loading C++ dependencies
 #
 include $(lang_srcdir)/config/Make.rules
+
+ifeq ($(filter all php,$(ICE_BIN_DIST)),)
 
 #
 # Load Makefile.mk fragments
@@ -61,6 +63,8 @@ $(eval $(call make-php-package,$(slicedir),lib,IceBox))
 $(eval $(call make-php-package,$(slicedir),lib,IceGrid))
 $(eval $(call make-php-package,$(slicedir),lib,IcePatch2))
 $(eval $(call make-php-package,$(slicedir),lib,IceStorm))
+
+endif
 
 #
 # Translate the Slice files from test directories

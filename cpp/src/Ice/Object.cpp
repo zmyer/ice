@@ -20,7 +20,7 @@ using namespace IceInternal;
 
 namespace Ice
 {
-const Current noExplicitCurrent = Current();
+const Current emptyCurrent = Current();
 }
 
 #ifndef ICE_CPP11_MAPPING
@@ -120,6 +120,12 @@ Ice::Object::ice_clone() const
     throw CloneNotImplementedException(__FILE__, __LINE__);
     return 0; // avoid warning with some compilers
 }
+
+Ice::SlicedDataPtr
+Ice::Object::ice_getSlicedData() const
+{
+    return 0;
+}
 #endif
 
 bool
@@ -137,7 +143,7 @@ Ice::Object::_iceD_ice_isA(Incoming& inS, const Current& current)
     OutputStream* ostr = inS.startWriteParams();
     ostr->write(ret);
     inS.endWriteParams();
-    return false;
+    return true;
 }
 
 bool
@@ -146,7 +152,7 @@ Ice::Object::_iceD_ice_ping(Incoming& inS, const Current& current)
     inS.readEmptyParams();
     ice_ping(current);
     inS.writeEmptyParams();
-    return false;
+    return true;
 }
 
 bool
@@ -157,7 +163,7 @@ Ice::Object::_iceD_ice_ids(Incoming& inS, const Current& current)
     OutputStream* ostr = inS.startWriteParams();
     ostr->write(&ret[0], &ret[0] + ret.size(), false);
     inS.endWriteParams();
-    return false;
+    return true;
 }
 
 bool
@@ -168,9 +174,8 @@ Ice::Object::_iceD_ice_id(Incoming& inS, const Current& current)
     OutputStream* ostr = inS.startWriteParams();
     ostr->write(ret, false);
     inS.endWriteParams();
-    return false;
+    return true;
 }
-
 
 bool
 #ifdef ICE_CPP11_MAPPING
@@ -192,8 +197,9 @@ Ice::Object::ice_dispatch(Request& request, const DispatchInterceptorAsyncCallba
 #endif
         try
         {
-            return _iceDispatch(in, in.getCurrent());
+            bool sync = _iceDispatch(in, in.getCurrent());
             in.pop();
+            return sync;
         }
         catch(...)
         {
@@ -328,14 +334,12 @@ Ice::Object::_iceCheckMode(OperationMode expected, OperationMode received)
         }
         else
         {
-            Ice::MarshalException ex(__FILE__, __LINE__);
             std::ostringstream reason;
             reason << "unexpected operation mode. expected = "
                    << operationModeToString(expected)
                    << " received = "
                    << operationModeToString(received);
-            ex.reason = reason.str();
-            throw ex;
+            throw Ice::MarshalException(__FILE__, __LINE__, reason.str());
         }
     }
 }
@@ -356,7 +360,7 @@ Ice::Blobject::_iceDispatch(Incoming& in, const Current& current)
     {
         in.writeParamEncaps(&outEncaps[0], static_cast<Ice::Int>(outEncaps.size()), ok);
     }
-    return false;
+    return true;
 }
 
 bool
@@ -376,7 +380,7 @@ Ice::BlobjectArray::_iceDispatch(Incoming& in, const Current& current)
     {
         in.writeParamEncaps(&outEncaps[0], static_cast<Ice::Int>(outEncaps.size()), ok);
     }
-    return false;
+    return true;
 }
 
 bool
@@ -404,7 +408,7 @@ Ice::BlobjectAsync::_iceDispatch(Incoming& in, const Current& current)
 #else
     ice_invoke_async(new ::IceAsync::Ice::AMD_Object_ice_invoke(in), vector<Byte>(inEncaps, inEncaps + sz), current);
 #endif
-    return true;
+    return false;
 }
 
 bool
@@ -426,5 +430,5 @@ Ice::BlobjectArrayAsync::_iceDispatch(Incoming& in, const Current& current)
 #else
     ice_invoke_async(new ::IceAsync::Ice::AMD_Object_ice_invoke(in), inEncaps, current);
 #endif
-    return true;
+    return false;
 }

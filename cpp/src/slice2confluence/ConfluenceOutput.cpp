@@ -392,7 +392,6 @@ Confluence::ConfluenceOutput::convertCommentHTML(string comment)
             comment.replace(tagStart, tagEnd + 1 - tagStart, replacement); // Don't skip whitespace
         }
 
-
         // Special case: terminate <p> (and any italics) on double newline or end of comment
         size_t dnl = comment.find("\n\n", tagStart + replacement.size());
         tagStart = comment.find("<");
@@ -457,7 +456,6 @@ Confluence::ConfluenceOutput::startElement(const string& element)
 
     string::size_type tagpos = element.find_first_of(" ");
     const string tagname = element.substr(0, tagpos).c_str();
-
 
     if(tagname == "p")
     {
@@ -805,7 +803,7 @@ Confluence::ConfluenceOutput::getMarkerLimits(const string& str)
         }
         else
         {
-            consoleErr << "getEscaperLimits FOUND START OF ESCAPE MARKER WITH NO MATCHING END IN STRING:"
+            consoleErr << "getMarkerLimits FOUND START OF ESCAPE MARKER WITH NO MATCHING END IN STRING:"
                        << endl << str.substr(start) << endl;
             break;
         }

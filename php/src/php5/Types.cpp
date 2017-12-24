@@ -2765,7 +2765,7 @@ IcePHP::ProxyInfo::define(zval* b, zval* i TSRMLS_DC)
 {
     if(b)
     {
-        TypeInfoPtr p = Wrapper<TypeInfoPtr>::value(b);
+        TypeInfoPtr p = Wrapper<TypeInfoPtr>::value(b TSRMLS_CC);
         const_cast<ProxyInfoPtr&>(base) = ProxyInfoPtr::dynamicCast(p);
         assert(base);
     }
@@ -3079,7 +3079,7 @@ IcePHP::ObjectWriter::_iceWrite(Ice::OutputStream* os) const
         }
 
         AutoDestroy destroy(ret);
-    
+
         if(Z_TYPE_P(ret) != IS_STRING)
         {
             throw AbortMarshaling();
@@ -3768,7 +3768,6 @@ ZEND_FUNCTION(IcePHP_defineProxy)
     zval* base;
     zval* interfaces;
 
-
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, const_cast<char*>("so!a!"), &id, &idLen, &base, &interfaces) ==
        FAILURE)
     {
@@ -3892,7 +3891,6 @@ handleExceptionInfoFreeStorage(void* p TSRMLS_DC)
     zend_object_std_dtor(static_cast<zend_object*>(p) TSRMLS_CC);
     efree(p);
 }
-
 
 static bool
 createExceptionInfo(zval* zv, const ExceptionInfoPtr& p TSRMLS_DC)
@@ -4089,9 +4087,10 @@ IcePHP::typesInit(INIT_FUNC_ARGS)
     exceptionInfoClassEntry = zend_register_internal_class(&ce TSRMLS_CC);
     memcpy(&_exceptionInfoHandlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 
-    REGISTER_STRING_CONSTANT("Ice_Unset", const_cast<char*>(_unsetGUID.c_str()), CONST_CS|CONST_PERSISTENT);
 #ifdef ICEPHP_USE_NAMESPACES
-    REGISTER_NS_STRING_CONSTANT("Ice", "Unset", const_cast<char*>(_unsetGUID.c_str()), CONST_CS|CONST_PERSISTENT);
+    REGISTER_NS_STRING_CONSTANT("Ice", "None", const_cast<char*>(_unsetGUID.c_str()), CONST_CS|CONST_PERSISTENT);
+#else
+    REGISTER_STRING_CONSTANT("Ice_Unset", const_cast<char*>(_unsetGUID.c_str()), CONST_CS|CONST_PERSISTENT);
 #endif
 
     return true;

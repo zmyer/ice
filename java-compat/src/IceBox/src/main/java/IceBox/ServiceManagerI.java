@@ -714,7 +714,7 @@ public class ServiceManagerI extends _ServiceManagerDisp
                     //
                     try
                     {
-                        obj = c.newInstance();
+                        obj = c.getDeclaredConstructor().newInstance();
                     }
                     catch(IllegalAccessException ex)
                     {
@@ -1161,7 +1161,6 @@ public class ServiceManagerI extends _ServiceManagerDisp
             // Ignored
         }
     }
-
 
     private Ice.Communicator _communicator;
     private boolean _adminEnabled = false;

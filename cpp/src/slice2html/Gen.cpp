@@ -1685,8 +1685,7 @@ Slice::GeneratorBase::readFile(const string& file, string& part1, string& part2)
 
     if(!foundTitle)
     {
-        string err = "no TITLE marker in `" + file + "'";
-        throw err;
+        throw logic_error("no TITLE marker in `" + file + "'");
     }
 
     ostringstream p2;
@@ -1940,7 +1939,6 @@ TOCGenerator::symbols() const
 {
     return _symbols;
 }
-
 
 void
 TOCGenerator::writeEntry(const ContainedPtr& c)
@@ -2977,7 +2975,7 @@ Slice::EnumGenerator::generate(const EnumPtr& e)
 }
 
 Slice::PageVisitor::PageVisitor(const Files& files) :
-	_files(files)
+    _files(files)
 {
 }
 

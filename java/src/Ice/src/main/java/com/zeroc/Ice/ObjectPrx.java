@@ -630,6 +630,16 @@ public interface ObjectPrx
     Connection ice_getConnection();
 
     /**
+     * Returns an executor object that uses the Ice thread pool.
+     *
+     * @return The Executor object.
+     **/
+    default java.util.concurrent.Executor ice_executor()
+    {
+        return _getReference().getThreadPool();
+    }
+
+    /**
      * Asynchronously gets the connection for this proxy. The call does not block.
      *
      * @return A future for the completion of the request.
@@ -855,7 +865,15 @@ public interface ObjectPrx
                         ObjectPrx h = null;
                         try
                         {
-                            h = _ObjectPrxI.class.cast(impl.newInstance());
+                            h = _ObjectPrxI.class.cast(impl.getDeclaredConstructor().newInstance());
+                        }
+                        catch(NoSuchMethodException ex)
+                        {
+                            throw new SyscallException(ex);
+                        }
+                        catch(java.lang.reflect.InvocationTargetException ex)
+                        {
+                            throw new SyscallException(ex);
                         }
                         catch(InstantiationException ex)
                         {
@@ -896,7 +914,7 @@ public interface ObjectPrx
             {
                 if(explicitFacet)
                 {
-                    ObjectPrx h = _ObjectPrxI.class.cast(impl.newInstance());
+                    ObjectPrx h = _ObjectPrxI.class.cast(impl.getDeclaredConstructor().newInstance());
                     h._copyFrom(obj.ice_facet(facet));
                     r = proxy.cast(h);
                 }
@@ -908,11 +926,19 @@ public interface ObjectPrx
                     }
                     else
                     {
-                        ObjectPrx h = _ObjectPrxI.class.cast(impl.newInstance());
+                        ObjectPrx h = _ObjectPrxI.class.cast(impl.getDeclaredConstructor().newInstance());
                         h._copyFrom(obj);
                         r = proxy.cast(h);
                     }
                 }
+            }
+            catch(NoSuchMethodException ex)
+            {
+                throw new SyscallException(ex);
+            }
+            catch(java.lang.reflect.InvocationTargetException ex)
+            {
+                throw new SyscallException(ex);
             }
             catch(InstantiationException ex)
             {
@@ -924,55 +950,6 @@ public interface ObjectPrx
             }
         }
         return r;
-    }
-
-    static <T> T waitForResponseForCompletion(java.util.concurrent.CompletableFuture<T> f)
-    {
-        try
-        {
-            return waitForResponseForCompletionUserEx(f);
-        }
-        catch(UserException ex)
-        {
-            throw new UnknownUserException(ex.ice_id(), ex);
-        }
-    }
-
-    static <T> T waitForResponseForCompletionUserEx(java.util.concurrent.CompletableFuture<T> f)
-        throws UserException
-    {
-        if(Thread.interrupted())
-        {
-            throw new OperationInterruptedException();
-        }
-
-        try
-        {
-            return f.get();
-        }
-        catch(InterruptedException ex)
-        {
-            throw new OperationInterruptedException();
-        }
-        catch(java.util.concurrent.ExecutionException ee)
-        {
-            try
-            {
-                throw ee.getCause();
-            }
-            catch(RuntimeException ex) // Includes LocalException
-            {
-                throw ex;
-            }
-            catch(UserException ex)
-            {
-                throw ex;
-            }
-            catch(Throwable ex)
-            {
-                throw new UnknownException(ex);
-            }
-        }
     }
 
     void _write(OutputStream os);

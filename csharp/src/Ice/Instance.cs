@@ -336,6 +336,12 @@ namespace IceInternal
             return _batchAutoFlushSize;
         }
 
+        public int classGraphDepthMax()
+        {
+            // No mutex lock, immutable.
+            return _classGraphDepthMax;
+        }
+
         public Ice.ToStringMode
         toStringMode()
         {
@@ -655,12 +661,13 @@ namespace IceInternal
         }
 
         public void
-        setThreadHook(Ice.ThreadNotification threadHook)
+        setThreadHook(System.Action threadStart, System.Action threadStop)
         {
             //
             // No locking, as it can only be called during plug-in loading
             //
-            _initData.threadHook = threadHook;
+            _initData.threadStart = threadStart;
+            _initData.threadStop = threadStop;
         }
 
         public Type resolveClass(string id)
@@ -790,11 +797,6 @@ namespace IceInternal
                         _initData.logger =
                             new Ice.TraceLoggerI(_initData.properties.getProperty("Ice.ProgramName"), console);
                     }
-
-                    if(Ice.Util.getProcessLogger() is Ice.LoggerI)
-                    {
-                        _initData.logger = new Ice.ConsoleLoggerI(_initData.properties.getProperty("Ice.ProgramName"));
-                    }
                     else
                     {
                         _initData.logger = Ice.Util.getProcessLogger();
@@ -853,6 +855,19 @@ namespace IceInternal
                     else
                     {
                         _batchAutoFlushSize = num * 1024; // Property is in kilobytes, _batchAutoFlushSize in bytes
+                    }
+                }
+
+                {
+                    const int defaultValue = 100;
+                    var num = _initData.properties.getPropertyAsIntWithDefault("Ice.ClassGraphDepthMax", defaultValue);
+                    if(num < 1 || num > 0x7fffffff)
+                    {
+                        _classGraphDepthMax = 0x7fffffff;
+                    }
+                    else
+                    {
+                        _classGraphDepthMax = num;
                     }
                 }
 
@@ -917,6 +932,13 @@ namespace IceInternal
 
                 ProtocolInstance udpInstance = new ProtocolInstance(this, Ice.UDPEndpointType.value, "udp", false);
                 _endpointFactoryManager.add(new UdpEndpointFactory(udpInstance));
+
+                ProtocolInstance wsInstance = new ProtocolInstance(this, Ice.WSEndpointType.value, "ws", false);
+                _endpointFactoryManager.add(new WSEndpointFactory(wsInstance, Ice.TCPEndpointType.value));
+
+                ProtocolInstance wssInstance = new ProtocolInstance(this, Ice.WSSEndpointType.value, "wss", true);
+                _endpointFactoryManager.add(new WSEndpointFactory(wssInstance, Ice.SSLEndpointType.value));
+
                 _pluginManager = new Ice.PluginManagerI(communicator);
 
                 if(_initData.valueFactoryManager == null)
@@ -933,7 +955,18 @@ namespace IceInternal
                 if(_initData.properties.getPropertyAsIntWithDefault("Ice.PreloadAssemblies", 0) > 0)
                 {
                     AssemblyUtil.preloadAssemblies();
-                } 
+                }
+
+#pragma warning disable 618
+                if(_initData.threadStart == null && _initData.threadHook != null)
+                {
+                    _initData.threadStart = _initData.threadHook.start;
+                }
+                if(_initData.threadStop == null && _initData.threadHook != null)
+                {
+                    _initData.threadStop = _initData.threadHook.stop;
+                }
+#pragma warning restore 618
             }
             catch(Ice.LocalException)
             {
@@ -952,20 +985,10 @@ namespace IceInternal
             pluginManagerImpl.loadPlugins(ref args);
 
             //
-            // Add WS and WSS endpoint factories if TCP/SSL factories are installed.
+            // Initialize the endpoint factories once all the plugins are loaded. This gives
+            // the opportunity for the endpoint factories to find underyling factories.
             //
-            EndpointFactory tcpFactory = _endpointFactoryManager.get(Ice.TCPEndpointType.value);
-            if(tcpFactory != null)
-            {
-                ProtocolInstance instance = new ProtocolInstance(this, Ice.WSEndpointType.value, "ws", false);
-                _endpointFactoryManager.add(new WSEndpointFactory(instance, tcpFactory.clone(instance, null)));
-            }
-            EndpointFactory sslFactory = _endpointFactoryManager.get(Ice.SSLEndpointType.value);
-            if(sslFactory != null)
-            {
-                ProtocolInstance instance = new ProtocolInstance(this, Ice.WSSEndpointType.value, "wss", true);
-                _endpointFactoryManager.add(new WSEndpointFactory(instance, sslFactory.clone(instance, null)));
-            }
+            _endpointFactoryManager.initialize();
 
             //
             // Create Admin facets, if enabled.
@@ -1202,10 +1225,12 @@ namespace IceInternal
                 _initData.observer.setObserverUpdater(null);
             }
 
-            LoggerAdminLogger logger = _initData.logger as LoggerAdminLogger;
-            if(logger != null)
             {
-                logger.destroy();
+                LoggerAdminLogger logger = _initData.logger as LoggerAdminLogger;
+                if(logger != null)
+                {
+                    logger.destroy();
+                }
             }
 
             //
@@ -1326,6 +1351,14 @@ namespace IceInternal
 
                 _state = StateDestroyed;
                 Monitor.PulseAll(this);
+            }
+
+            {
+                Ice.FileLoggerI logger = _initData.logger as Ice.FileLoggerI;
+                if(logger != null)
+                {
+                    logger.destroy();
+                }
             }
         }
 
@@ -1548,6 +1581,7 @@ namespace IceInternal
         private DefaultsAndOverrides _defaultsAndOverrides; // Immutable, not reset by destroy().
         private int _messageSizeMax; // Immutable, not reset by destroy().
         private int _batchAutoFlushSize; // Immutable, not reset by destroy().
+        private int _classGraphDepthMax; // Immutable, not reset by destroy().
         private Ice.ToStringMode _toStringMode; // Immutable, not reset by destroy().
         private int _cacheMessageBuffers; // Immutable, not reset by destroy().
         private ACMConfig _clientACM; // Immutable, not reset by destroy().

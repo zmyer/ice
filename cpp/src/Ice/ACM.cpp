@@ -25,7 +25,7 @@ IceUtil::Shared* IceInternal::upCast(FactoryACMMonitor* p) { return p; }
 
 IceInternal::ACMConfig::ACMConfig(bool server) :
     timeout(IceUtil::Time::seconds(60)),
-    heartbeat(ICE_ENUM(ACMHeartbeat, HeartbeatOnInvocation)),
+    heartbeat(ICE_ENUM(ACMHeartbeat, HeartbeatOnDispatch)),
     close(server ? ICE_ENUM(ACMClose, CloseOnInvocation) : ICE_ENUM(ACMClose, CloseOnInvocationAndIdle))
 {
 }
@@ -48,7 +48,8 @@ IceInternal::ACMConfig::ACMConfig(const Ice::PropertiesPtr& p,
     this->timeout = IceUtil::Time::seconds(p->getPropertyAsIntWithDefault(timeoutProperty,
                                                                           static_cast<int>(dflt.timeout.toSeconds())));
     int hb = p->getPropertyAsIntWithDefault(prefix + ".Heartbeat", static_cast<int>(dflt.heartbeat));
-    if(hb >= static_cast<int>(ICE_ENUM(ACMHeartbeat, HeartbeatOff)) && hb <= static_cast<int>(ICE_ENUM(ACMHeartbeat, HeartbeatAlways)))
+    if(hb >= static_cast<int>(ICE_ENUM(ACMHeartbeat, HeartbeatOff)) &&
+       hb <= static_cast<int>(ICE_ENUM(ACMHeartbeat, HeartbeatAlways)))
     {
         this->heartbeat = static_cast<Ice::ACMHeartbeat>(hb);
     }
@@ -59,7 +60,8 @@ IceInternal::ACMConfig::ACMConfig(const Ice::PropertiesPtr& p,
     }
 
     int cl = p->getPropertyAsIntWithDefault(prefix + ".Close", static_cast<int>(dflt.close));
-    if(cl >= static_cast<int>(ICE_ENUM(ACMClose, CloseOff)) && cl <= static_cast<int>(ICE_ENUM(ACMClose, CloseOnIdleForceful)))
+    if(cl >= static_cast<int>(ICE_ENUM(ACMClose, CloseOff)) &&
+       cl <= static_cast<int>(ICE_ENUM(ACMClose, CloseOnIdleForceful)))
     {
         this->close = static_cast<Ice::ACMClose>(cl);
     }
@@ -89,12 +91,37 @@ IceInternal::FactoryACMMonitor::destroy()
     Lock sync(*this);
     if(!_instance)
     {
+        //
+        // Ensure all the connections have been cleared, it's important to wait here
+        // to prevent the timer destruction in IceInternal::Instance::destroy.
+        //
+        while(!_connections.empty())
+        {
+            wait();
+        }
         return;
     }
 
+    //
+    // Cancel the scheduled timer task and schedule it again now to clear the
+    // connection set from the timer thread.
+    //
+    if(!_connections.empty())
+    {
+        _instance->timer()->cancel(ICE_SHARED_FROM_THIS);
+        _instance->timer()->schedule(ICE_SHARED_FROM_THIS, IceUtil::Time());
+    }
+
     _instance = 0;
-    _connections.clear();
     _changes.clear();
+
+    //
+    // Wait for the connection set to be cleared by the timer thread.
+    //
+    while(!_connections.empty())
+    {
+        wait();
+    }
 }
 
 void
@@ -185,6 +212,8 @@ IceInternal::FactoryACMMonitor::runTimerTask()
         Lock sync(*this);
         if(!_instance)
         {
+            _connections.clear();
+            notifyAll();
             return;
         }
 
@@ -207,7 +236,6 @@ IceInternal::FactoryACMMonitor::runTimerTask()
             return;
         }
     }
-
 
     //
     // Monitor connections outside the thread synchronization, so

@@ -15,9 +15,15 @@ public class Server extends test.Util.Application
     public int run(String[] args)
     {
         Ice.Communicator communicator = communicator();
+
         Ice.ObjectAdapter adapter = communicator.createObjectAdapter("TestAdapter");
         adapter.add(new TimeoutI(), Ice.Util.stringToIdentity("timeout"));
         adapter.activate();
+
+        Ice.ObjectAdapter controllerAdapter = communicator.createObjectAdapter("ControllerAdapter");
+        controllerAdapter.add(new ControllerI(adapter), Ice.Util.stringToIdentity("controller"));
+        controllerAdapter.activate();
+
         return WAIT;
     }
 
@@ -27,11 +33,20 @@ public class Server extends test.Util.Application
         Ice.InitializationData initData = super.getInitData(argsH);
         initData.properties.setProperty("Ice.Package.Test", "test.Ice.timeout");
         initData.properties.setProperty("TestAdapter.Endpoints", getTestEndpoint(initData.properties, 0));
+        initData.properties.setProperty("ControllerAdapter.Endpoints", getTestEndpoint(initData.properties, 1));
+        initData.properties.setProperty("ControllerAdapter.ThreadPool.Size", "1");
+
         //
         // Limit the recv buffer size, this test relies on the socket
         // send() blocking after sending a given amount of data.
         //
         initData.properties.setProperty("Ice.TCP.RcvSize", "50000");
+
+        //
+        // The client sends large messages to cause the transport
+        // buffers to fill up.
+        //
+        initData.properties.setProperty("Ice.MessageSizeMax", "20000");
 
         //
         // This test kills connections, so we don't want warnings.

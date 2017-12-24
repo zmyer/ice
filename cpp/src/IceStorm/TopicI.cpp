@@ -652,9 +652,7 @@ TopicImpl::link(const TopicPrx& topic, Ice::Int cost)
     if(p != _subscribers.end())
     {
         string name = IceStormInternal::identityToTopicName(id);
-        LinkExists ex;
-        ex.name = name;
-        throw ex;
+        throw LinkExists(name);
     }
 
     LogUpdate llu;
@@ -708,9 +706,7 @@ TopicImpl::unlink(const TopicPrx& topic)
             out << _name << ": unlink " << name << " failed - not linked";
         }
 
-        NoSuchLink ex;
-        ex.name = name;
-        throw ex;
+        throw NoSuchLink(name);
     }
 
     TraceLevelsPtr traceLevels = _instance->traceLevels();
@@ -1017,7 +1013,6 @@ TopicImpl::publish(bool forwarded, const EventDataSeq& events)
         generation = unlock.generation();
     }
 
-
     // Tell the master to reap this set of subscribers. This is an
     // AMI invocation so it shouldn't block the caller (in the
     // typical case) we do it outside of the mutex lock for
@@ -1117,7 +1112,6 @@ TopicImpl::observerRemoveSubscriber(const LogUpdate& llu, const Ice::IdentitySeq
     }
 
     IceUtil::Mutex::Lock sync(_subscribersMutex);
-
 
     // First remove from the database.
     try

@@ -113,6 +113,22 @@ isMutableAfterReturnType(const TypePtr& type)
     return false;
 }
 
+void
+checkDeprecatedType(const UnitPtr& unit, const TypePtr& type)
+{
+    ClassDeclPtr decl = ClassDeclPtr::dynamicCast(type);
+    if(decl && !decl->isLocal() && decl->isInterface())
+    {
+        unit->warning(Deprecated, "interface by value is deprecated");
+    }
+
+    ProxyPtr proxy = ProxyPtr::dynamicCast(type);
+    if(proxy && !proxy->_class()->isInterface())
+    {
+        unit->warning(Deprecated, "proxy for a class is deprecated");
+    }
+}
+
 }
 
 namespace Slice
@@ -661,7 +677,6 @@ Slice::Container::destroy()
 ModulePtr
 Slice::Container::createModule(const string& name)
 {
-    checkIdentifier(name);
     ContainedList matches = _unit->findContents(thisScope() + name);
     matches.sort(); // Modules can occur many times...
     matches.unique(); // ... but we only want one instance of each.
@@ -714,8 +729,6 @@ Slice::Container::createModule(const string& name)
 ClassDefPtr
 Slice::Container::createClassDef(const string& name, int id, bool intf, const ClassList& bases, bool local)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     for(ContainedList::const_iterator p = matches.begin(); p != matches.end(); ++p)
     {
@@ -796,20 +809,15 @@ Slice::Container::createClassDef(const string& name, int id, bool intf, const Cl
     // definition. This way the code generator can rely on always
     // having a class declaration available for lookup.
     //
-    ClassDeclPtr decl = createClassDecl(name, intf, local, false);
+    ClassDeclPtr decl = createClassDecl(name, intf, local);
     def->_declaration = decl;
 
     return def;
 }
 
 ClassDeclPtr
-Slice::Container::createClassDecl(const string& name, bool intf, bool local, bool checkName)
+Slice::Container::createClassDecl(const string& name, bool intf, bool local)
 {
-    if (checkName)
-    {
-        checkIdentifier(name);
-    }
-
     ClassDefPtr def;
 
     ContainedList matches = _unit->findContents(thisScope() + name);
@@ -899,8 +907,6 @@ Slice::Container::createClassDecl(const string& name, bool intf, bool local, boo
 ExceptionPtr
 Slice::Container::createException(const string& name, const ExceptionPtr& base, bool local, NodeType nt)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -951,8 +957,6 @@ Slice::Container::createException(const string& name, const ExceptionPtr& base, 
 StructPtr
 Slice::Container::createStruct(const string& name, bool local, NodeType nt)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -996,8 +1000,6 @@ SequencePtr
 Slice::Container::createSequence(const string& name, const TypePtr& type, const StringList& metaData, bool local,
                                  NodeType nt)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -1041,6 +1043,8 @@ Slice::Container::createSequence(const string& name, const TypePtr& type, const 
         _unit->error(msg);
     }
 
+    checkDeprecatedType(_unit, type);
+
     SequencePtr p = new Sequence(this, name, type, metaData, local);
     _contents.push_back(p);
     return p;
@@ -1051,8 +1055,6 @@ Slice::Container::createDictionary(const string& name, const TypePtr& keyType, c
                                    const TypePtr& valueType, const StringList& valueMetaData, bool local,
                                    NodeType nt)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -1115,6 +1117,8 @@ Slice::Container::createDictionary(const string& name, const TypePtr& keyType, c
         }
     }
 
+    checkDeprecatedType(_unit, valueType);
+
     DictionaryPtr p = new Dictionary(this, name, keyType, keyMetaData, valueType, valueMetaData, local);
     _contents.push_back(p);
     return p;
@@ -1123,8 +1127,6 @@ Slice::Container::createDictionary(const string& name, const TypePtr& keyType, c
 EnumPtr
 Slice::Container::createEnum(const string& name, bool local, NodeType nt)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -1167,18 +1169,24 @@ Slice::Container::createEnum(const string& name, bool local, NodeType nt)
 EnumeratorPtr
 Slice::Container::createEnumerator(const string& name)
 {
-    validateEnumerator(name);
-    EnumeratorPtr p = new Enumerator(this, name);
-    _contents.push_back(p);
+    EnumeratorPtr p = validateEnumerator(name);
+    if(!p)
+    {
+        p = new Enumerator(this, name);
+        _contents.push_back(p);
+    }
     return p;
 }
 
 EnumeratorPtr
 Slice::Container::createEnumerator(const string& name, int value)
 {
-    validateEnumerator(name);
-    EnumeratorPtr p = new Enumerator(this, name, value);
-    _contents.push_back(p);
+    EnumeratorPtr p = validateEnumerator(name);
+    if(!p)
+    {
+        p = new Enumerator(this, name, value);
+        _contents.push_back(p);
+    }
     return p;
 }
 
@@ -1187,8 +1195,6 @@ Slice::Container::createConst(const string name, const TypePtr& constType, const
                               const SyntaxTreeBasePtr& valueType, const string& value, const string& literal,
                               NodeType nt)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -1511,7 +1517,6 @@ Slice::Container::unit() const
 {
     return SyntaxTreeBase::unit();
 }
-
 
 ModuleList
 Slice::Container::modules() const
@@ -2534,74 +2539,6 @@ Slice::Container::Container(const UnitPtr& unit) :
 {
 }
 
-void
-Slice::Container::checkIdentifier(const string& name) const
-{
-    //
-    // Weed out identifiers with reserved suffixes.
-    //
-    static const string suffixBlacklist[] = { "Helper", "Holder", "Prx", "Ptr" };
-    for(size_t i = 0; i < sizeof(suffixBlacklist) / sizeof(*suffixBlacklist); ++i)
-    {
-        if(name.find(suffixBlacklist[i], name.size() - suffixBlacklist[i].size()) != string::npos)
-        {
-            _unit->error("illegal identifier `" + name + "': `" + suffixBlacklist[i] + "' suffix is reserved");
-        }
-    }
-
-    //
-    // Check for illegal underscores.
-    //
-    if(name.find('_') == 0)
-    {
-        _unit->error("illegal leading underscore in identifier `" + name + "'");
-    }
-    else if(name.rfind('_') == name.size() - 1)
-    {
-        _unit->error("illegal trailing underscore in identifier `" + name + "'");
-    }
-    else if(name.find("__") != string::npos)
-    {
-        _unit->error("illegal double underscore in identifier `" + name + "'");
-    }
-    else if(_unit->currentIncludeLevel() == 0 && !_unit->allowUnderscore() && name.find('_') != string::npos)
-    {
-        //
-        // For rules controlled by a translator option, we don't complain about included files.
-        //
-
-        DefinitionContextPtr dc = _unit->currentDefinitionContext();
-        assert(dc);
-        if(dc->findMetaData("underscore") != "underscore") // no "underscore" global metadata
-        {
-            _unit->error("illegal underscore in identifier `" + name + "'");
-        }
-    }
-
-    //
-    // For rules controlled by a translator option, we don't complain about included files.
-    //
-    if(_unit->currentIncludeLevel() == 0 && !_unit->allowIcePrefix())
-    {
-        DefinitionContextPtr dc = _unit->currentDefinitionContext();
-        assert(dc);
-        if(dc->findMetaData("ice-prefix") != "ice-prefix") // no "ice-prefix" global metadata
-        {
-            if(name.size() >= 3)
-            {
-                string prefix3;
-                prefix3 += ::tolower(static_cast<unsigned char>(name[0]));
-                prefix3 += ::tolower(static_cast<unsigned char>(name[1]));
-                prefix3 += ::tolower(static_cast<unsigned char>(name[2]));
-                if(prefix3 == "ice")
-                {
-                    _unit->error("illegal identifier `" + name + "': `" + name.substr(0, 3) + "' prefix is reserved");
-                }
-            }
-        }
-    }
-}
-
 bool
 Slice::Container::checkInterfaceAndLocal(const string& name, bool defined,
                                          bool intf, bool intfOther,
@@ -2986,14 +2923,21 @@ Slice::Container::validateConstant(const string& name, const TypePtr& type, Synt
     return true;
 }
 
-void
+EnumeratorPtr
 Slice::Container::validateEnumerator(const string& name)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
+        EnumeratorPtr p = EnumeratorPtr::dynamicCast(matches.front());
+        if(p)
+        {
+            if(_unit->ignRedefs())
+            {
+                p->updateIncludeLevel();
+                return p;
+            }
+        }
         if(matches.front()->name() == name)
         {
             _unit->error(string("redefinition of enumerator `") + name + "'");
@@ -3006,7 +2950,8 @@ Slice::Container::validateEnumerator(const string& name)
         }
     }
 
-    nameIsLegal(name, "enumerator"); // Don't return here -- we create the enumerator anyway.
+    nameIsLegal(name, "enumerator"); // Ignore return value.
+    return 0;
 }
 
 // ----------------------------------------------------------------------
@@ -3386,8 +3331,6 @@ Slice::ClassDef::createOperation(const string& name,
                                  int tag,
                                  Operation::Mode mode)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -3498,8 +3441,6 @@ Slice::ClassDef::createDataMember(const string& name, const TypePtr& type, bool 
                                   const SyntaxTreeBasePtr& defaultValueType, const string& defaultValue,
                                   const string& defaultLiteral)
 {
-    checkIdentifier(name);
-
     assert(!isInterface());
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
@@ -3614,6 +3555,8 @@ Slice::ClassDef::createDataMember(const string& name, const TypePtr& type, bool 
             }
         }
     }
+
+    checkDeprecatedType(_unit, type);
 
     _hasDataMembers = true;
     DataMemberPtr member = new DataMember(this, name, type, optional, tag, dlt, dv, dl);
@@ -3957,7 +3900,7 @@ Slice::ClassDef::ClassDef(const ContainerPtr& container, const string& name, int
     if(!local && !intf)
     {
         for(ClassList::const_iterator p = _bases.begin(); p != _bases.end(); ++p)
-        {  
+        {
             if((*p)->isInterface())
             {
                 _unit->warning(Deprecated, "classes implementing interfaces are deprecated");
@@ -4045,8 +3988,6 @@ Slice::Exception::createDataMember(const string& name, const TypePtr& type, bool
                                    const SyntaxTreeBasePtr& defaultValueType, const string& defaultValue,
                                    const string& defaultLiteral)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -4148,6 +4089,8 @@ Slice::Exception::createDataMember(const string& name, const TypePtr& type, bool
             }
         }
     }
+
+    checkDeprecatedType(_unit, type);
 
     DataMemberPtr p = new DataMember(this, name, type, optional, tag, dlt, dv, dl);
     _contents.push_back(p);
@@ -4470,6 +4413,8 @@ Slice::Struct::createDataMember(const string& name, const TypePtr& type, bool op
             }
         }
     }
+
+    checkDeprecatedType(_unit, type);
 
     DataMemberPtr p = new DataMember(this, name, type, optional, tag, dlt, dv, dl);
     _contents.push_back(p);
@@ -5248,8 +5193,6 @@ Slice::Operation::hasMarshaledResult() const
 ParamDeclPtr
 Slice::Operation::createParamDecl(const string& name, const TypePtr& type, bool isOutParam, bool optional, int tag)
 {
-    checkIdentifier(name);
-
     ContainedList matches = _unit->findContents(thisScope() + name);
     if(!matches.empty())
     {
@@ -5303,6 +5246,11 @@ Slice::Operation::createParamDecl(const string& name, const TypePtr& type, bool 
         msg += name + "' in operation `" + this->name() + "'";
         _unit->error(msg);
     }
+
+    //
+    // Issue a warning for a deprecated parameter type.
+    //
+    checkDeprecatedType(_unit, type);
 
     if(optional)
     {
@@ -5718,6 +5666,10 @@ Slice::Operation::Operation(const ContainerPtr& container,
     _returnTag(returnTag),
     _mode(mode)
 {
+    if(returnType)
+    {
+        checkDeprecatedType(_unit, returnType);
+    }
 }
 
 // ----------------------------------------------------------------------
@@ -6715,7 +6667,6 @@ Slice::cICompare(const std::string& s1, const std::string& s2)
     return c(s1, s2);
 }
 #endif
-
 
 // ----------------------------------------------------------------------
 // DerivedToBaseCompare

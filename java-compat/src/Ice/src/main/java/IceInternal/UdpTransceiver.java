@@ -166,7 +166,7 @@ final class UdpTransceiver implements Transceiver
         }
 
         assert(ret == buf.b.limit());
-        buf.b.position(buf.b.limit());
+        buf.position(buf.b.limit());
         return SocketOperation.None;
     }
 
@@ -182,7 +182,7 @@ final class UdpTransceiver implements Transceiver
 
         final int packetSize = java.lang.Math.min(_maxPacketSize, _rcvSize - _udpOverhead);
         buf.resize(packetSize, true);
-        buf.b.position(0);
+        buf.position(0);
 
         int ret = 0;
         while(true)
@@ -233,7 +233,7 @@ final class UdpTransceiver implements Transceiver
         }
 
         buf.resize(ret, true);
-        buf.b.position(ret);
+        buf.position(ret);
 
         return SocketOperation.None;
     }
@@ -290,7 +290,7 @@ final class UdpTransceiver implements Transceiver
         }
         else
         {
-            intfs = Network.getInterfacesForMulticast(_mcastInterface, _mcastAddr);
+            intfs = Network.getInterfacesForMulticast(_mcastInterface, Network.getProtocolSupport(_mcastAddr));
         }
         if(!intfs.isEmpty())
         {
@@ -340,7 +340,7 @@ final class UdpTransceiver implements Transceiver
     }
 
     @Override
-    public void checkSendSize(Buffer buf)
+    public synchronized void checkSendSize(Buffer buf)
     {
         //
         // The maximum packetSize is either the maximum allowable UDP packet size, or
@@ -349,12 +349,13 @@ final class UdpTransceiver implements Transceiver
         final int packetSize = java.lang.Math.min(_maxPacketSize, _sndSize - _udpOverhead);
         if(packetSize < buf.size())
         {
-            throw new Ice.DatagramLimitException();
+            throw new Ice.DatagramLimitException("message size of " + buf.size() +
+                                                 " exceeds the maximum packet size of " + packetSize);
         }
     }
 
     @Override
-    public void setBufferSize(int rcvSize, int sndSize)
+    public synchronized void setBufferSize(int rcvSize, int sndSize)
     {
         setBufSize(rcvSize, sndSize);
     }
@@ -381,7 +382,7 @@ final class UdpTransceiver implements Transceiver
             Network.setBlock(_fd, false);
             //
             // NOTE: setting the multicast interface before performing the
-            // connect is important for some OS such as OS X.
+            // connect is important for some OS such as macOS.
             //
             if(_addr.getAddress().isMulticastAddress())
             {
@@ -431,7 +432,7 @@ final class UdpTransceiver implements Transceiver
         }
     }
 
-    private synchronized void setBufSize(int rcvSize, int sndSize)
+    private void setBufSize(int rcvSize, int sndSize)
     {
         assert(_fd != null);
 
@@ -526,6 +527,7 @@ final class UdpTransceiver implements Transceiver
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void finalize()
         throws Throwable

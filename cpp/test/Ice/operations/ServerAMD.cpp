@@ -19,7 +19,7 @@ int
 run(int, char**, const Ice::CommunicatorPtr& communicator)
 {
     string endpt = getTestEndpoint(communicator, 0);
-    communicator->getProperties()->setProperty("TestAdapter.Endpoints", endpt + ":udp");
+    communicator->getProperties()->setProperty("TestAdapter.Endpoints", endpt);
     Ice::ObjectAdapterPtr adapter = communicator->createObjectAdapter("TestAdapter");
     adapter->add(ICE_MAKE_SHARED(MyDerivedClassI), Ice::stringToIdentity("test"));
     adapter->activate();
@@ -32,7 +32,9 @@ int
 main(int argc, char* argv[])
 {
 #ifdef ICE_STATIC_LIBS
-    Ice::registerIceSSL();
+    Ice::registerIceSSL(false);
+    Ice::registerIceWS(true);
+    Ice::registerIceUDP(true);
 #endif
 
     try
@@ -45,7 +47,7 @@ main(int argc, char* argv[])
         //
         initData.properties->setProperty("Ice.Warn.Dispatch", "0");
 
-        Ice::CommunicatorHolder ich = Ice::initialize(argc, argv, initData);
+        Ice::CommunicatorHolder ich(argc, argv, initData);
         return run(argc, argv, ich.communicator());
     }
     catch(const Ice::Exception& ex)

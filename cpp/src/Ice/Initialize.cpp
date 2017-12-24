@@ -7,7 +7,7 @@
 //
 // **********************************************************************
 
-#include <IceUtil/ArgVector.h>
+#include <Ice/ArgVector.h>
 #include <IceUtil/DisableWarnings.h>
 #include <Ice/CommunicatorI.h>
 #include <Ice/PropertiesI.h>
@@ -52,7 +52,7 @@ Init init;
 }
 
 StringSeq
-Ice::argsToStringSeq(int argc, char* argv[])
+Ice::argsToStringSeq(int argc, const char* const argv[])
 {
     StringSeq result;
     for(int i = 0; i < argc; i++)
@@ -65,7 +65,7 @@ Ice::argsToStringSeq(int argc, char* argv[])
 #ifdef _WIN32
 
 StringSeq
-Ice::argsToStringSeq(int /*argc*/, wchar_t* argv[])
+Ice::argsToStringSeq(int /*argc*/, const wchar_t* const argv[])
 {
     //
     // Don't need to use a wide string converter argv is expected to
@@ -73,7 +73,7 @@ Ice::argsToStringSeq(int /*argc*/, wchar_t* argv[])
     //
     const StringConverterPtr converter = getProcessStringConverter();
     StringSeq args;
-    for(int i=0; argv[i] != 0; i++)
+    for(int i = 0; argv[i] != 0; i++)
     {
         args.push_back(wstringToString(argv[i], converter));
     }
@@ -83,7 +83,7 @@ Ice::argsToStringSeq(int /*argc*/, wchar_t* argv[])
 #endif
 
 void
-Ice::stringSeqToArgs(const StringSeq& args, int& argc, char* argv[])
+Ice::stringSeqToArgs(const StringSeq& args, int& argc, const char* argv[])
 {
     //
     // Shift all elements in argv which are present in args to the
@@ -121,7 +121,7 @@ Ice::stringSeqToArgs(const StringSeq& args, int& argc, char* argv[])
 
 #ifdef _WIN32
 void
-Ice::stringSeqToArgs(const StringSeq& args, int& argc, wchar_t* argv[])
+Ice::stringSeqToArgs(const StringSeq& args, int& argc, const wchar_t* argv[])
 {
     //
     // Don't need to use a wide string converter argv is expected to
@@ -177,7 +177,7 @@ Ice::createProperties(StringSeq& args, const PropertiesPtr& defaults)
 }
 
 PropertiesPtr
-Ice::createProperties(int& argc, char* argv[], const PropertiesPtr& defaults)
+Ice::createProperties(int& argc, const char* argv[], const PropertiesPtr& defaults)
 {
     StringSeq args = argsToStringSeq(argc, argv);
     PropertiesPtr properties = createProperties(args, defaults);
@@ -187,7 +187,7 @@ Ice::createProperties(int& argc, char* argv[], const PropertiesPtr& defaults)
 
 #ifdef _WIN32
 PropertiesPtr
-Ice::createProperties(int& argc, wchar_t* argv[], const PropertiesPtr& defaults)
+Ice::createProperties(int& argc, const wchar_t* argv[], const PropertiesPtr& defaults)
 {
     StringSeq args = argsToStringSeq(argc, argv);
     PropertiesPtr properties = createProperties(args, defaults);
@@ -234,7 +234,7 @@ Ice::ThreadHookPlugin::destroy()
 namespace
 {
 
-inline void checkIceVersion(Int version)
+inline void checkIceVersion(int version)
 {
 #ifndef ICE_IGNORE_VERSION
 
@@ -280,7 +280,7 @@ inline void checkIceVersion(Int version)
 }
 
 Ice::CommunicatorPtr
-Ice::initialize(int& argc, char* argv[], const InitializationData& initializationData, Int version)
+Ice::initialize(int& argc, const char* argv[], const InitializationData& initializationData, int version)
 {
     checkIceVersion(version);
 
@@ -292,28 +292,55 @@ Ice::initialize(int& argc, char* argv[], const InitializationData& initializatio
     return communicator;
 }
 
+Ice::CommunicatorPtr
+Ice::initialize(int& argc, const char* argv[], ICE_CONFIG_FILE_STRING configFile, int version)
+{
+    InitializationData initData;
+    initData.properties = createProperties();
+    initData.properties->load(configFile);
+    return initialize(argc, argv, initData, version);
+}
+
 #ifdef _WIN32
 Ice::CommunicatorPtr
-Ice::initialize(int& argc, wchar_t* argv[], const InitializationData& initializationData, Int version)
+Ice::initialize(int& argc, const wchar_t* argv[], const InitializationData& initializationData, int version)
 {
     Ice::StringSeq args = argsToStringSeq(argc, argv);
     CommunicatorPtr communicator = initialize(args, initializationData, version);
     stringSeqToArgs(args, argc, argv);
     return communicator;
 }
+
+Ice::CommunicatorPtr
+Ice::initialize(int& argc, const wchar_t* argv[], ICE_CONFIG_FILE_STRING configFile, int version)
+{
+    InitializationData initData;
+    initData.properties = createProperties();
+    initData.properties->load(configFile);
+    return initialize(argc, argv, initData, version);
+}
 #endif
 
 Ice::CommunicatorPtr
-Ice::initialize(StringSeq& args, const InitializationData& initializationData, Int version)
+Ice::initialize(StringSeq& args, const InitializationData& initializationData, int version)
 {
-    IceUtilInternal::ArgVector av(args);
+    IceInternal::ArgVector av(args);
     CommunicatorPtr communicator = initialize(av.argc, av.argv, initializationData, version);
     args = argsToStringSeq(av.argc, av.argv);
     return communicator;
 }
 
 Ice::CommunicatorPtr
-Ice::initialize(const InitializationData& initData, Int version)
+Ice::initialize(StringSeq& args, ICE_CONFIG_FILE_STRING configFile, int version)
+{
+    InitializationData initData;
+    initData.properties = createProperties();
+    initData.properties->load(configFile);
+    return initialize(args, initData, version);
+}
+
+Ice::CommunicatorPtr
+Ice::initialize(const InitializationData& initData, int version)
 {
     //
     // We can't simply call the other initialize() because this one does NOT read
@@ -323,9 +350,18 @@ Ice::initialize(const InitializationData& initData, Int version)
 
     CommunicatorIPtr communicator = CommunicatorI::create(initData);
     int argc = 0;
-    char* argv[] = { 0 };
+    const char* argv[] = { 0 };
     communicator->finishSetup(argc, argv);
     return communicator;
+}
+
+Ice::CommunicatorPtr
+Ice::initialize(ICE_CONFIG_FILE_STRING configFile, int version)
+{
+    InitializationData initData;
+    initData.properties = createProperties();
+    initData.properties->load(configFile);
+    return initialize(initData, version);
 }
 
 LoggerPtr
@@ -357,17 +393,123 @@ Ice::registerPluginFactory(const std::string& name, PluginFactory factory, bool 
     PluginManagerI::registerPluginFactory(name, factory, loadOnInitialize);
 }
 
+//
+// CommunicatorHolder
+//
+
+Ice::CommunicatorHolder::CommunicatorHolder()
+{
+}
+
 #ifdef ICE_CPP11_MAPPING
 Ice::CommunicatorHolder::CommunicatorHolder(shared_ptr<Communicator> communicator) :
     _communicator(std::move(communicator))
 {
 }
 
-#else
+Ice::CommunicatorHolder&
+Ice::CommunicatorHolder::operator=(shared_ptr<Communicator> communicator)
+{
+    if(_communicator)
+    {
+        _communicator->destroy();
+    }
+    _communicator = std::move(communicator);
+    return *this;
+}
+
+Ice::CommunicatorHolder&
+Ice::CommunicatorHolder::operator=(CommunicatorHolder&& other)
+{
+    if(_communicator)
+    {
+        _communicator->destroy();
+    }
+    _communicator = std::move(other._communicator);
+    return *this;
+}
+
+#else // C++98 mapping
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, const char* argv[], const InitializationData& initData,
+                                            int version) :
+    _communicator(initialize(argc, argv, initData, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, char* argv[], const InitializationData& initData, int version) :
+    _communicator(initialize(argc, argv, initData, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, const char* argv[], const char* configFile, int version) :
+    _communicator(initialize(argc, argv, configFile, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, char* argv[], const char* configFile, int version) :
+    _communicator(initialize(argc, argv, configFile, version))
+{
+}
+
+#   ifdef _WIN32
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, const wchar_t* argv[], const InitializationData& initData,
+                                            int version) :
+    _communicator(initialize(argc, argv, initData, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, wchar_t* argv[], const InitializationData& initData,
+                                            int version) :
+    _communicator(initialize(argc, argv, initData, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, const wchar_t* argv[], const char* configFile, int version) :
+    _communicator(initialize(argc, argv, configFile, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(int& argc, wchar_t* argv[], const char* configFile, int version) :
+    _communicator(initialize(argc, argv, configFile, version))
+{
+}
+#   endif
+
+Ice::CommunicatorHolder::CommunicatorHolder(StringSeq& args, const InitializationData& initData, int version) :
+    _communicator(initialize(args, initData, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(StringSeq& args, const char* configFile, int version) :
+    _communicator(initialize(args, configFile, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(const InitializationData& initData, int version) :
+    _communicator(initialize(initData, version))
+{
+}
+
+Ice::CommunicatorHolder::CommunicatorHolder(const char* configFile, int version) :
+    _communicator(initialize(configFile, version))
+{
+}
 
 Ice::CommunicatorHolder::CommunicatorHolder(const CommunicatorPtr& communicator) :
     _communicator(communicator)
 {
+}
+
+Ice::CommunicatorHolder&
+Ice::CommunicatorHolder::operator=(const CommunicatorPtr& communicator)
+{
+    if(_communicator)
+    {
+        _communicator->destroy();
+    }
+    _communicator = communicator;
+    return *this;
 }
 
 #endif
@@ -380,8 +522,19 @@ Ice::CommunicatorHolder::~CommunicatorHolder()
     }
 }
 
+Ice::CommunicatorHolder::operator bool() const
+{
+    return _communicator != ICE_NULLPTR;
+}
+
 const Ice::CommunicatorPtr&
 Ice::CommunicatorHolder::communicator() const
+{
+    return _communicator;
+}
+
+const Ice::CommunicatorPtr&
+Ice::CommunicatorHolder::operator->() const
 {
     return _communicator;
 }
@@ -396,12 +549,6 @@ Ice::CommunicatorHolder::release()
     result.swap(_communicator);
     return result;
 #endif
-}
-
-const Ice::CommunicatorPtr&
-Ice::CommunicatorHolder::operator->() const
-{
-    return _communicator;
 }
 
 InstancePtr
@@ -452,9 +599,7 @@ Ice::stringToIdentity(const string& s)
                 //
                 // Extra unescaped slash found.
                 //
-                IdentityParseException ex(__FILE__, __LINE__);
-                ex.str = "unescaped '/' in identity `" + s + "'";
-                throw ex;
+                throw IdentityParseException(__FILE__, __LINE__, "unescaped '/' in identity `" + s + "'");
             }
         }
         pos++;
@@ -466,11 +611,9 @@ Ice::stringToIdentity(const string& s)
         {
             ident.name = unescapeString(s, 0, s.size(), "/");
         }
-        catch(const IceUtil::IllegalArgumentException& e)
+        catch(const IceUtil::IllegalArgumentException& ex)
         {
-            IdentityParseException ex(__FILE__, __LINE__);
-            ex.str = "invalid identity name `" + s + "': " + e.reason();
-            throw ex;
+            throw IdentityParseException(__FILE__, __LINE__, "invalid identity name `" + s + "': " + ex.reason());
         }
     }
     else
@@ -479,11 +622,10 @@ Ice::stringToIdentity(const string& s)
         {
             ident.category = unescapeString(s, 0, slash, "/");
         }
-        catch(const IceUtil::IllegalArgumentException& e)
+        catch(const IceUtil::IllegalArgumentException& ex)
         {
-            IdentityParseException ex(__FILE__, __LINE__);
-            ex.str = "invalid category in identity `" + s + "': " + e.reason();
-            throw ex;
+            throw IdentityParseException(__FILE__, __LINE__, "invalid category in identity `" + s + "': " +
+                                         ex.reason());
         }
 
         if(slash + 1 < s.size())
@@ -492,11 +634,10 @@ Ice::stringToIdentity(const string& s)
             {
                 ident.name = unescapeString(s, slash + 1, s.size(), "/");
             }
-            catch(const IceUtil::IllegalArgumentException& e)
+            catch(const IceUtil::IllegalArgumentException& ex)
             {
-                IdentityParseException ex(__FILE__, __LINE__);
-                ex.str = "invalid name in identity `" + s + "': " + e.reason();
-                throw ex;
+                throw IdentityParseException(__FILE__, __LINE__, "invalid name in identity `" + s + "': " +
+                                             ex.reason());
             }
         }
     }

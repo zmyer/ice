@@ -68,6 +68,12 @@ Slice::Preprocessor::~Preprocessor()
 }
 
 string
+Slice::Preprocessor::getFileName()
+{
+    return _fileName;
+}
+
+string
 Slice::Preprocessor::getBaseName()
 {
     string base(_fileName);
@@ -173,7 +179,10 @@ FILE*
 Slice::Preprocessor::preprocess(bool keepComments, const string& extraArg)
 {
     vector<string> args;
-    args.push_back(extraArg);
+    if(!extraArg.empty())
+    {
+        args.push_back(extraArg);
+    }
     return preprocess(keepComments, args);
 }
 

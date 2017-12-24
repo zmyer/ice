@@ -11,14 +11,14 @@
 import os, sys, traceback
 
 import Ice
-Ice.loadSlice('-I. --all ServerPrivateAMD.ice')
+Ice.loadSlice('-I. --all ServerPrivate.ice')
 import Test
 
 def test(b):
     if not b:
         raise RuntimeError('test assertion failed')
 
-class TestI(Test._TestIntfDisp):
+class TestI(Test.TestIntf):
     def SBaseAsObject(self, current=None):
         sb = Test.SBase()
         sb.sb = "SBase.sb"

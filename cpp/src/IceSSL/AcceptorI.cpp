@@ -10,12 +10,7 @@
 #include <IceSSL/AcceptorI.h>
 #include <IceSSL/EndpointI.h>
 #include <IceSSL/Instance.h>
-
-
-#include <IceSSL/OpenSSLTransceiverI.h>
-#include <IceSSL/SecureTransportTransceiverI.h>
-#include <IceSSL/SChannelTransceiverI.h>
-#include <IceSSL/UWPTransceiverI.h>
+#include <IceSSL/SSLEngine.h>
 
 #include <IceSSL/Util.h>
 
@@ -32,7 +27,6 @@ IceSSL::AcceptorI::getNativeInfo()
 {
     return _delegate->getNativeInfo();
 }
-
 
 #if defined(ICE_USE_IOCP) || defined(ICE_OS_UWP)
 IceInternal::AsyncInfo*
@@ -78,12 +72,10 @@ IceSSL::AcceptorI::accept()
     //
     if(!_instance->initialized())
     {
-        PluginInitializationException ex(__FILE__, __LINE__);
-        ex.reason = "IceSSL: plug-in is not initialized";
-        throw ex;
+        throw PluginInitializationException(__FILE__, __LINE__, "IceSSL: plug-in is not initialized");
     }
 
-    return new TransceiverI(_instance, _delegate->accept(), _adapterName, true);
+    return _instance->engine()->createTransceiver(_instance, _delegate->accept(), _adapterName, true);
 }
 
 string

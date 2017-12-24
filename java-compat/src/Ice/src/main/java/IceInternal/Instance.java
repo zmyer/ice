@@ -1086,6 +1086,12 @@ public final class Instance implements Ice.ClassResolver
             ProtocolInstance udpProtocolInstance = new ProtocolInstance(this, Ice.UDPEndpointType.value, "udp", false);
             _endpointFactoryManager.add(new UdpEndpointFactory(udpProtocolInstance));
 
+            ProtocolInstance wsProtocolInstance = new ProtocolInstance(this, Ice.WSEndpointType.value, "ws", false);
+            _endpointFactoryManager.add(new WSEndpointFactory(wsProtocolInstance, Ice.TCPEndpointType.value));
+
+            ProtocolInstance wssProtocolInstance = new ProtocolInstance(this, Ice.WSSEndpointType.value, "wss", true);
+            _endpointFactoryManager.add(new WSEndpointFactory(wssProtocolInstance, Ice.SSLEndpointType.value));
+
             _pluginManager = new Ice.PluginManagerI(communicator, this);
 
             if(_initData.valueFactoryManager == null)
@@ -1126,6 +1132,7 @@ public final class Instance implements Ice.ClassResolver
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     protected synchronized void
     finalize()
@@ -1169,20 +1176,10 @@ public final class Instance implements Ice.ClassResolver
         pluginManagerImpl.loadPlugins(args);
 
         //
-        // Add WS and WSS endpoint factories if TCP/SSL factories are installed.
+        // Initialize the endpoint factories once all the plugins are loaded. This gives
+        // the opportunity for the endpoint factories to find underyling factories.
         //
-        final EndpointFactory tcpFactory = _endpointFactoryManager.get(Ice.TCPEndpointType.value);
-        if(tcpFactory != null)
-        {
-            final ProtocolInstance instance = new ProtocolInstance(this, Ice.WSEndpointType.value, "ws", false);
-            _endpointFactoryManager.add(new WSEndpointFactory(instance, tcpFactory.clone(instance, null)));
-        }
-        final EndpointFactory sslFactory = _endpointFactoryManager.get(Ice.SSLEndpointType.value);
-        if(sslFactory != null)
-        {
-            final ProtocolInstance instance = new ProtocolInstance(this, Ice.WSSEndpointType.value, "wss", true);
-            _endpointFactoryManager.add(new WSEndpointFactory(instance, sslFactory.clone(instance, null)));
-        }
+        _endpointFactoryManager.initialize();
 
         //
         // Create Admin facets, if enabled.
@@ -1536,6 +1533,12 @@ public final class Instance implements Ice.ClassResolver
             if(_pluginManager != null)
             {
                 _pluginManager.destroy();
+            }
+
+            if(_initData.logger instanceof Ice.LoggerI)
+            {
+                Ice.LoggerI logger = (Ice.LoggerI)_initData.logger;
+                logger.destroy();
             }
 
             synchronized(this)

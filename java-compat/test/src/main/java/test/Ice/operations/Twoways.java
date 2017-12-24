@@ -955,14 +955,14 @@ class Twoways
             List<Map<Long, Float>> dsi2 = new ArrayList<>();
 
             Map<Long, Float> di1 = new HashMap<>();
-            di1.put(999999110L, new Float(-1.1));
-            di1.put(999999111L, new Float(123123.2));
+            di1.put(999999110L, Float.valueOf((float)-1.1));
+            di1.put(999999111L, Float.valueOf((float)123123.2));
             Map<Long, Float> di2 = new HashMap<>();
-            di2.put(999999110L, new Float(-1.1));
-            di2.put(999999120L, new Float(-100.4));
-            di2.put(999999130L, new Float(0.5));
+            di2.put(999999110L, Float.valueOf((float)-1.1));
+            di2.put(999999120L, Float.valueOf((float)-100.4));
+            di2.put(999999130L, Float.valueOf((float)0.5));
             Map<Long, Float> di3 = new HashMap<>();
-            di3.put(999999140L, new Float(3.14));
+            di3.put(999999140L, Float.valueOf((float)3.14));
 
             dsi1.add(di1);
             dsi1.add(di2);
@@ -1393,7 +1393,6 @@ class Twoways
             StringStringSDHolder _do = new StringStringSDHolder();
             java.util.Map<String, String[]> ro = p.opStringStringSD(sdi1, sdi2, _do);
 
-
             test(_do.value.size() == 1);
             test(_do.value.get("ghi").length== 2);
             test(_do.value.get("ghi")[0].equals("and"));
@@ -1583,7 +1582,6 @@ class Twoways
         test(p.opByteBoolD1(null).size() == 0);
         test(p.opStringS2(null).length == 0);
         test(p.opByteBoolD2(null).size() == 0);
-
 
         MyDerivedClassPrx d = MyDerivedClassPrxHelper.uncheckedCast(p);
         MyStruct1 s = new MyStruct1();

@@ -43,11 +43,10 @@ module Ice
         end
 
         if RUBY_PLATFORM =~ /linux/i
-            iceVer = Ice::stringVersion
             #
-            # Check the default RPM location.
+            # Check the default Linux location.
             #
-            dir = File::join("/", "usr", "share", "Ice-" + iceVer, "slice")
+            dir = File::join("/", "usr", "share", "ice", "slice")
             if File::exists?(dir)
                 return dir
             end
@@ -137,13 +136,16 @@ module Ice
             self::ICE_ID
         end
 
+        def ice_getSlicedData()
+            return _ice_slicedData
+        end
+
         attr_accessor :_ice_slicedData  # Only used for instances of preserved classes.
     end
 
     T_Value.defineClass(Value, -1, false, false, nil, [])
 
     T_ObjectPrx.defineProxy(ObjectPrx, nil, [])
-
 
     class InterfaceByValue < Value
         def initialize(id)
@@ -159,7 +161,9 @@ module Ice
     # UnknownSlicedValue.
     #
     class UnknownSlicedValue < Value
-        attr_accessor :unknownTypeId
+        def ice_id
+            return @unknownTypeId
+        end
     end
     T_UnknownSlicedValue = Ice.__declareClass('::Ice::UnknownSlicedValue')
     T_UnknownSlicedValue.defineClass(UnknownSlicedValue, -1, true, false, T_Value, [])
@@ -294,35 +298,33 @@ module Ice
             @condVar = ConditionVariable.new
             @mutex = Mutex.new
             @queue = Array.new
-            @done = false
             @callback = nil
+
+            @read, @write = IO.pipe
 
             #
             # Setup and install signal handlers
             #
             if Signal.list.has_key?('HUP')
-                Signal.trap('HUP') { signalHandler('HUP') }
+                Signal.trap('HUP') { @write.puts 'HUP' }
             end
-            Signal.trap('INT') { signalHandler('INT') }
-            Signal.trap('TERM') { signalHandler('TERM') }
+            Signal.trap('INT') { @write.puts 'INT' }
+            Signal.trap('TERM') { @write.puts 'TERM' }
 
             @thr = Thread.new { main }
         end
 
-        # Dequeue and dispatch signals.
+        # Read and dispatch signals.
         def main
-            while true
-                sig, callback = @mutex.synchronize {
-                    while @queue.empty? and not @done
-                        @condVar.wait(@mutex)
-                    end
-                    if @done
-                        return
-                    end
-                    @queue.shift
-                }
+            while rs = IO.select([@read])
+                signal = rs.first[0].gets.strip
+                if signal == 'DONE'
+                    @read.close()
+                    break
+                end
+                callback = @callback
                 if callback
-                    callback.call(sig)
+                    callback.call(signal)
                 end
             end
         end
@@ -330,10 +332,8 @@ module Ice
         # Destroy the object. Wait for the thread to terminate and cleanup
         # the internal state.
         def destroy
-            @mutex.synchronize {
-                @done = true
-                @condVar.signal
-            }
+            @write.puts 'DONE'
+            @write.close()
 
             # Wait for the thread to terminate
             @thr.join
@@ -361,16 +361,6 @@ module Ice
             }
         end
 
-        # Private. Only called by the signal handling mechanism.
-        def signalHandler(sig)
-            @mutex.synchronize {
-                #
-                # The signal AND the current callback are queued together.
-                #
-                @queue = @queue.push([sig, @callback])
-                @condVar.signal
-            }
-        end
         @@_self = nil
     end
 

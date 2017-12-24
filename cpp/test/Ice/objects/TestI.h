@@ -85,6 +85,7 @@ class InitialI : public Test::Initial
 public:
 
     InitialI(const Ice::ObjectAdapterPtr&);
+    virtual ~InitialI();
 
     virtual void shutdown(const Ice::Current&);
     virtual Test::BPtr getB1(const Ice::Current&);
@@ -93,6 +94,9 @@ public:
     virtual Test::DPtr getD(const Ice::Current&);
     virtual Test::EPtr getE(const Ice::Current&);
     virtual Test::FPtr getF(const Ice::Current&);
+
+    virtual void setRecursive(ICE_IN(Test::RecursivePtr), const Ice::Current&);
+    virtual bool supportsClassGraphDepthMax(const Ice::Current&);
 
 #ifdef ICE_CPP11_MAPPING
     virtual GetMBMarshaledResult getMB(const Ice::Current&);
@@ -149,7 +153,7 @@ class UnexpectedObjectExceptionTestI : public Ice::Blobject
 {
 public:
 
-    virtual bool ice_invoke(const std::vector<Ice::Byte>&, std::vector<Ice::Byte>&, const Ice::Current&);
+    virtual bool ice_invoke(ICE_IN(std::vector<Ice::Byte>), std::vector<Ice::Byte>&, const Ice::Current&);
 };
 ICE_DEFINE_PTR(UnexpectedObjectExceptionTestIPtr, UnexpectedObjectExceptionTestI);
 

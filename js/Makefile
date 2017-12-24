@@ -12,22 +12,21 @@ NPM = npm
 endif
 
 all: npminstall
-	$(NPM) run gulp:build
+	$(NPM) run build
 
 dist: npminstall
-	$(NPM) run gulp:dist
+	$(NPM) run dist
 
 install:
 
-
 distclean clean: npminstall
-	$(NPM) run gulp:clean
+	$(NPM) run clean
 
 lint: npminstall
-	$(NPM) run gulp:lint
+	$(NPM) run lint
 
 test:
 	@python ./allTests.py
 
 npminstall:
-	$(NPM) install
+	$(NPM) install --no-optional

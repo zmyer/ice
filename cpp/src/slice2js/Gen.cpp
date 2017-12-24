@@ -159,9 +159,13 @@ Slice::JsVisitor::getValue(const string& scope, const TypePtr& type)
             case Builtin::KindByte:
             case Builtin::KindShort:
             case Builtin::KindInt:
-            case Builtin::KindLong:
             {
                 return "0";
+                break;
+            }
+            case Builtin::KindLong:
+            {
+                return "new Ice.Long(0, 0)";
                 break;
             }
             case Builtin::KindFloat:
@@ -301,7 +305,14 @@ Slice::JsVisitor::writeDocComment(const ContainedPtr& p, const string& deprecate
             _out << nl << " * " << extraParam;
             doneExtraParam = true;
         }
-        _out << nl << " * " << *i;
+        if((*i).empty())
+        {
+            _out << nl << " *";
+        }
+        else
+        {
+            _out << nl << " * " << *i;
+        }
     }
 
     if(!doneExtraParam && !extraParam.empty())
@@ -347,7 +358,6 @@ Slice::Gen::Gen(const string& base, const vector<string>& includePaths, const st
         throw FileException(__FILE__, __LINE__, os.str());
     }
     FileTracker::instance()->addFile(file);
-
 
     printHeader();
     printGeneratedHeader(_out, _fileBase + ".ice");
@@ -685,7 +695,6 @@ Slice::Gen::RequireVisitor::writeRequires(const UnitPtr& p)
 
         seenModules.push_back("Ice");
 
-
         for(StringList::const_iterator i = includes.begin(); i != includes.end(); ++i)
         {
             set<string> modules = p->getTopLevelModules(*i);
@@ -797,7 +806,7 @@ Slice::Gen::RequireVisitor::writeRequires(const UnitPtr& p)
             }
             else
             {
-                _out << nl << "const " << i->first << " = _ModuleRegistry.require(module, ";
+                _out << nl << "const " << i->first << " = _ModuleRegistry.require(module,";
                 _out << nl << "[";
                 _out.inc();
                 for(list<string>::const_iterator j = i->second.begin(); j != i->second.end();)
@@ -815,7 +824,7 @@ Slice::Gen::RequireVisitor::writeRequires(const UnitPtr& p)
                 }
                 _out.dec();
                 _out << nl << "])." << i->first << ";";
-                _out << nl;
+                _out << sp;
             }
             seenModules.push_back(i->first);
         }
@@ -1063,7 +1072,7 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
         {
             bool preserved = p->hasMetaData("preserve-slice") && !p->inheritsMetaData("preserve-slice");
 
-            _out << nl << "Slice.defineValue(" << localScope << "." << name << ", " 
+            _out << nl << "Slice.defineValue(" << localScope << "." << name << ", "
                  << "iceC_" << getLocalScope(scoped, "_") << "_ids[" << scopedPos << "], "
                  << (preserved ? "true" : "false") ;
             if(p->compactId() >= 0)
@@ -1081,10 +1090,10 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
     {
         _out << sp;
         writeDocComment(p, getDeprecateReason(p, 0, "type"));
-        _out << nl << localScope << "._" << p->name() << "Disp" << " = class extends ";
+        _out << nl << localScope << "." << (p->isInterface() ? p->name() :  p->name() + "Disp") << " = class extends ";
         if(hasBaseClass)
         {
-            _out << getLocalScope(base->scope())  << "._" << base->name() << "Disp";
+            _out << getLocalScope(base->scope())  << "." << base->name() << "Disp";
         }
         else
         {
@@ -1104,10 +1113,11 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
                 ClassDefPtr base = *q;
                 if(base->isInterface())
                 {
-                    _out << nl << getLocalScope(base->scope()) << "._" << base->name()<< "Disp" ;
+                    _out << nl << getLocalScope(base->scope()) << "." <<
+                        (base->isInterface() ? base->name() : base->name() + "Disp");
                     if(++q != bases.end())
                     {
-                        _out << ", ";
+                        _out << ",";
                     }
                 }
                 else
@@ -1120,7 +1130,7 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
             _out << eb;
         }
         _out << eb << ";";
-        
+
         //
         // Generate a proxy class for interfaces or classes with operations.
         //
@@ -1138,14 +1148,13 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
             _out << nl << proxyType << " = class extends " << baseProxy;
             _out << sb;
 
-
             if(!bases.empty())
             {
                 _out << sp;
                 _out << nl << "static get _implements()";
                 _out << sb;
                 _out << nl << "return [";
-            
+
                 _out.inc();
                 for(ClassList::const_iterator q = bases.begin(); q != bases.end();)
                 {
@@ -1155,7 +1164,7 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
                         _out << nl << getLocalScope(base->scope()) << "." << base->name() << "Prx";
                         if(++q != bases.end())
                         {
-                            _out << ", ";
+                            _out << ",";
                         }
                     }
                     else
@@ -1172,7 +1181,7 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
         }
 
         _out << sp << nl << "Slice.defineOperations("
-             << localScope << "._" << p->name() << "Disp, "
+             << localScope << "." << (p->isInterface() ? p->name() : p->name() + "Disp") << ", "
              << proxyType << ", "
              << "iceC_" << getLocalScope(scoped, "_") << "_ids, "
              << scopedPos;
@@ -1336,7 +1345,7 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
                     }
                     _out << ']';
                 }
-                _out << ", ";
+                _out << ",";
 
                 //
                 // User exceptions.
@@ -1349,7 +1358,11 @@ Slice::Gen::TypesVisitor::visitClassDefStart(const ClassDefPtr& p)
 #else
                 throws.sort(Slice::DerivedToBaseCompare());
 #endif
-                if(!throws.empty())
+                if(throws.empty())
+                {
+                    _out << " ";
+                }
+                else
                 {
                     _out << nl << '[';
                     _out.inc();
@@ -1505,12 +1518,6 @@ Slice::Gen::TypesVisitor::visitExceptionStart(const ExceptionPtr& p)
     _out << nl << "static get _id()";
     _out << sb;
     _out << nl << "return \"" << p->scoped() << "\";";
-    _out << eb;
-
-    _out << sp;
-    _out << nl << "ice_name()";
-    _out << sb;
-    _out << nl << "return \"" << p->scoped().substr(2) << "\";";
     _out << eb;
 
     // TODO: equals?

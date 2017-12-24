@@ -718,7 +718,7 @@ Ice::ObjectAdapterI::setPublishedEndpoints(const EndpointSeq& newEndpoints)
 
     LocatorInfoPtr locatorInfo;
     vector<EndpointIPtr> oldPublishedEndpoints;
-   {
+    {
         IceUtil::Monitor<IceUtil::RecMutex>::Lock sync(*this);
         checkForDeactivation();
 
@@ -787,7 +787,7 @@ Ice::ObjectAdapterI::isLocal(const ObjectPrxPtr& proxy) const
             for(vector<IncomingConnectionFactoryPtr>::const_iterator q = _incomingConnectionFactories.begin();
                 q != _incomingConnectionFactories.end(); ++q)
             {
-                if((*p)->equivalent((*q)->endpoint()))
+                if((*q)->isLocal(*p))
                 {
                     return true;
                 }
@@ -994,9 +994,7 @@ Ice::ObjectAdapterI::initialize(const RouterPrxPtr& router)
         //
         if(router == 0 && noProps)
         {
-            InitializationException ex(__FILE__, __LINE__);
-            ex.reason = "object adapter `" + _name + "' requires configuration";
-            throw ex;
+            throw InitializationException(__FILE__, __LINE__, "object adapter `" + _name + "' requires configuration");
         }
 
         const_cast<string&>(_id) = properties->getProperty(_name + ".AdapterId");
@@ -1013,9 +1011,8 @@ Ice::ObjectAdapterI::initialize(const RouterPrxPtr& router)
         }
         catch(const ProxyParseException&)
         {
-            InitializationException ex(__FILE__, __LINE__);
-            ex.reason = "invalid proxy options `" + proxyOptions + "' for object adapter `" + _name + "'";
-            throw ex;
+            throw InitializationException(__FILE__, __LINE__, "invalid proxy options `" + proxyOptions +
+                                          "' for object adapter `" + _name + "'");
         }
 
         const_cast<ACMConfig&>(_acm) =
@@ -1102,11 +1099,19 @@ Ice::ObjectAdapterI::initialize(const RouterPrxPtr& router)
             vector<EndpointIPtr> endpoints = parseEndpoints(properties->getProperty(_name + ".Endpoints"), true);
             for(vector<EndpointIPtr>::iterator p = endpoints.begin(); p != endpoints.end(); ++p)
             {
-                IncomingConnectionFactoryPtr factory = ICE_MAKE_SHARED(IncomingConnectionFactory, _instance, *p, ICE_SHARED_FROM_THIS);
-                 factory->initialize();
-                _incomingConnectionFactories.push_back(factory);
+                EndpointIPtr publishedEndpoint;
+                vector<EndpointIPtr> expanded = (*p)->expandHost(publishedEndpoint);
+                for(vector<EndpointIPtr>::iterator q = expanded.begin(); q != expanded.end(); ++q)
+                {
+                    IncomingConnectionFactoryPtr factory = ICE_MAKE_SHARED(IncomingConnectionFactory,
+                                                                           _instance,
+                                                                           *q,
+                                                                           publishedEndpoint,
+                                                                           ICE_SHARED_FROM_THIS);
+                    factory->initialize();
+                    _incomingConnectionFactories.push_back(factory);
+                }
             }
-
             if(endpoints.empty())
             {
                 TraceLevelsPtr tl = _instance->traceLevels();
@@ -1215,9 +1220,7 @@ Ice::ObjectAdapterI::checkForDeactivation() const
 {
     if(_state >= StateDeactivating)
     {
-        ObjectAdapterDeactivatedException ex(__FILE__, __LINE__);
-        ex.name = getName();
-        throw ex;
+        throw ObjectAdapterDeactivatedException(__FILE__, __LINE__, getName());
     }
 }
 
@@ -1322,8 +1325,19 @@ ObjectAdapterI::parsePublishedEndpoints()
         //
         for(unsigned int i = 0; i < _incomingConnectionFactories.size(); ++i)
         {
-            vector<EndpointIPtr> endps = _incomingConnectionFactories[i]->endpoint()->expand();
-            endpoints.insert(endpoints.end(), endps.begin(), endps.end());
+            vector<EndpointIPtr> endps = _incomingConnectionFactories[i]->endpoint()->expandIfWildcard();
+            for(vector<EndpointIPtr>::const_iterator p = endps.begin(); p != endps.end(); ++p)
+            {
+                //
+                // Check for duplicate endpoints, this might occur if an endpoint with a DNS name
+                // expands to multiple addresses. In this case, multiple incoming connection
+                // factories can point to the same published endpoint.
+                //
+                if(::find(endpoints.begin(), endpoints.end(), *p) == endpoints.end())
+                {
+                    endpoints.push_back(*p);
+                }
+            }
         }
     }
 
@@ -1378,10 +1392,7 @@ ObjectAdapterI::updateLocatorRegistry(const IceInternal::LocatorInfoPtr& locator
             out << "the object adapter is not known to the locator registry";
         }
 
-        NotRegisteredException ex(__FILE__, __LINE__);
-        ex.kindOfObject = "object adapter";
-        ex.id = _id;
-        throw ex;
+        throw NotRegisteredException(__FILE__, __LINE__, "object adapter", _id);
     }
     catch(const InvalidReplicaGroupIdException&)
     {
@@ -1392,10 +1403,7 @@ ObjectAdapterI::updateLocatorRegistry(const IceInternal::LocatorInfoPtr& locator
             out << "the replica group `" << _replicaGroupId << "' is not known to the locator registry";
         }
 
-        NotRegisteredException ex(__FILE__, __LINE__);
-        ex.kindOfObject = "replica group";
-        ex.id = _replicaGroupId;
-        throw ex;
+        throw NotRegisteredException(__FILE__, __LINE__, "replica group", _replicaGroupId);
     }
     catch(const AdapterAlreadyActiveException&)
     {
@@ -1406,9 +1414,7 @@ ObjectAdapterI::updateLocatorRegistry(const IceInternal::LocatorInfoPtr& locator
             out << "the object adapter endpoints are already set";
         }
 
-        ObjectAdapterIdInUseException ex(__FILE__, __LINE__);
-        ex.id = _id;
-        throw ex;
+        throw ObjectAdapterIdInUseException(__FILE__, __LINE__, _id);
     }
     catch(const ObjectAdapterDeactivatedException&)
     {

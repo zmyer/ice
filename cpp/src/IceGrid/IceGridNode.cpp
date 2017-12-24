@@ -55,7 +55,6 @@ private:
     ProcessPtr _origProcess;
 };
 
-
 class NodeService : public Service
 {
 public:
@@ -71,7 +70,7 @@ protected:
     bool startImpl(int, char*[], int&);
     virtual void waitForShutdown();
     virtual bool stop();
-    virtual CommunicatorPtr initializeCommunicator(int&, char*[], const InitializationData&);
+    virtual CommunicatorPtr initializeCommunicator(int&, char*[], const InitializationData&, int);
 
 private:
 
@@ -97,32 +96,24 @@ private:
     ActivatorPtr _activator;
 };
 
-
 #ifdef _WIN32
 void
-setNoIndexingAttribute(const string& pa)
+setNoIndexingAttribute(const string& path)
 {
-    wstring path = Ice::stringToWstring(pa);
-    DWORD attrs = GetFileAttributesW(path.c_str());
+    wstring wpath = Ice::stringToWstring(path);
+    DWORD attrs = GetFileAttributesW(wpath.c_str());
     if(attrs == INVALID_FILE_ATTRIBUTES)
     {
-        FileException ex(__FILE__, __LINE__);
-        ex.path = pa;
-        ex.error = IceInternal::getSystemErrno();
-        throw ex;
+        throw FileException(__FILE__, __LINE__, IceInternal::getSystemErrno(), path);
     }
-    if(!SetFileAttributesW(path.c_str(), attrs | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED))
+    if(!SetFileAttributesW(wpath.c_str(), attrs | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED))
     {
-        FileException ex(__FILE__, __LINE__);
-        ex.path = pa;
-        ex.error = IceInternal::getSystemErrno();
-        throw ex;
+        throw FileException(__FILE__, __LINE__, IceInternal::getSystemErrno(), path);
     }
 }
 #endif
 
 }
-
 
 CollocatedRegistry::CollocatedRegistry(const CommunicatorPtr& com,
                                        const ActivatorPtr& activator,
@@ -203,7 +194,6 @@ NodeService::startImpl(int argc, char* argv[], int& status)
     string initFromReplica;
     string desc;
     vector<string> targets;
-
 
     for(int i = 1; i < argc; ++i)
     {
@@ -343,10 +333,7 @@ NodeService::startImpl(int argc, char* argv[], int& status)
     {
         if(!IceUtilInternal::directoryExists(dataPath))
         {
-            FileException ex(__FILE__, __LINE__);
-            ex.path = dataPath;
-            ex.error = IceInternal::getSystemErrno();
-
+            FileException ex(__FILE__, __LINE__, IceInternal::getSystemErrno(), dataPath);
             ServiceError err(this);
             err << "property `IceGrid.Node.Data' is set to an invalid path:\n" << ex;
             return false;
@@ -431,9 +418,9 @@ NodeService::startImpl(int argc, char* argv[], int& status)
                 Ice::ObjectPrx object = _adapter->addWithUUID(new FileUserAccountMapperI(userAccountFileProperty));
                 mapper = UserAccountMapperPrx::uncheckedCast(object);
             }
-            catch(const std::string& msg)
+            catch(const exception& ex)
             {
-                error(msg);
+                error(ex.what());
                 return false;
             }
         }
@@ -563,7 +550,7 @@ NodeService::startImpl(int argc, char* argv[], int& status)
             RegistryPrx registry = RegistryPrx::checkedCast(communicator()->getDefaultLocator()->findObjectById(regId));
             if(!registry)
             {
-                throw "invalid registry";
+                throw runtime_error("invalid registry");
             }
 
             registry = registry->ice_preferSecure(true); // Use SSL if available.
@@ -622,12 +609,7 @@ NodeService::startImpl(int argc, char* argv[], int& status)
         catch(const std::exception& ex)
         {
             ServiceWarning warn(this);
-            warn << "failed to deploy application `" << desc << "':\n" << ex;
-        }
-        catch(const string& reason)
-        {
-            ServiceWarning warn(this);
-            warn << "failed to deploy application `" << desc << "':\n" << reason;
+            warn << "failed to deploy application `" << desc << "':\n" << ex.what();
         }
     }
 
@@ -754,7 +736,8 @@ NodeService::stop()
 
 CommunicatorPtr
 NodeService::initializeCommunicator(int& argc, char* argv[],
-                                    const InitializationData& initializationData)
+                                    const InitializationData& initializationData,
+                                    int version)
 {
     InitializationData initData = initializationData;
     initData.properties = createProperties(argc, argv, initData.properties);
@@ -782,7 +765,7 @@ NodeService::initializeCommunicator(int& argc, char* argv[],
     //
     initData.properties->setProperty("Ice.ACM.Close", "3");
 
-    return Service::initializeCommunicator(argc, argv, initData);
+    return Service::initializeCommunicator(argc, argv, initData, version);
 }
 
 void
@@ -794,7 +777,7 @@ NodeService::usage(const string& appName)
         "-v, --version        Display the Ice version.\n"
         "--nowarn             Don't print any security warnings.\n"
         "--readonly           Start the collocated master registry in read-only mode.\n"
-        "--initdb-from-replica=<replica>\n"
+        "--initdb-from-replica <replica>\n"
         "                     Initialize the collocated registry database from the\n"
         "                     given replica.\n"
         "--deploy DESCRIPTOR [TARGET1 [TARGET2 ...]]\n"

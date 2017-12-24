@@ -7,7 +7,6 @@
 #
 # **********************************************************************
 
-
 testcases = [
     ClientServerTestCase("client/server with compact format"),
     ClientServerTestCase("client/server with sliced format", props={ "Ice.Default.SlicedFormat" : True }),
@@ -18,13 +17,6 @@ if Mapping.getByPath(__name__).hasSource("Ice/optional", "serveramd"):
     testcases += [
         ClientAMDServerTestCase("client/amd server with compact format"),
         ClientAMDServerTestCase("client/amd server with sliced format", props={ "Ice.Default.SlicedFormat" : True }),
-    ]
-
-# If the mapping has bidir clients, also run with the bidir clients.
-if Mapping.getByPath(__name__).getClientMapping().hasSource("Ice/optional", "clientBidir"):
-    testcases += [
-        ClientEchoServerTestCase("client/echo server with compact format"),
-        ClientEchoServerTestCase("client/echo server with sliced format", props={ "Ice.Default.SlicedFormat" : True }),
     ]
 
 TestSuite(__name__, testcases)
